@@ -1,0 +1,30 @@
+# dependencies & builds
+node_modules/
+.next/
+out/
+build/
+coverage/
+*.tsbuildinfo
+.vercel
+
+# secrets — never commit real keys (see web/.env.example for the names)
+.env
+.env.*
+!.env.example
+
+# local data — the SQLite DB holds real accounts, password hashes and tokens
+*.db
+*.db-journal
+*.sqlite
+
+# user uploads (photos, videos, PDFs) — live in R2 in production
+web/public/uploads/
+
+# per-machine Claude settings
+.claude/settings.local.json
+**/.claude/settings.local.json
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.log

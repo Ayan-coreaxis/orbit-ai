@@ -1,0 +1,24 @@
+export interface ApiKeyConfig {
+  id: string;
+  name: string;
+  description: string;
+  status: "connected" | "not_connected";
+  maskedValue?: string;
+}
+
+export const apiKeyConfigs: ApiKeyConfig[] = [
+  { id: "anthropic", name: "Anthropic (Claude)", description: "Powers the Orchestrator, Competitor Intel, Content, Chatbot, and every other reasoning agent.", status: "not_connected" },
+  { id: "stripe", name: "Stripe Secret Key", description: "The PLATFORM's own Stripe account — charges sellers for their Starter/Growth/Scale subscription. Never used for a seller's own storefront checkout, which uses their own separate Stripe keys instead.", status: "not_connected" },
+  { id: "stripe_price_starter", name: "Stripe Price — Starter", description: "Real Stripe Price id for the $50/mo Starter plan, created in your own Stripe Dashboard > Product catalog. Required for sellers to self-serve upgrade to Starter.", status: "not_connected" },
+  { id: "stripe_price_growth", name: "Stripe Price — Growth", description: "Real Stripe Price id for the $75/mo Growth plan.", status: "not_connected" },
+  { id: "stripe_price_scale", name: "Stripe Price — Scale", description: "Real Stripe Price id for the $150/mo Scale plan.", status: "not_connected" },
+  { id: "stripe_webhook_secret", name: "Stripe Webhook Signing Secret", description: "From Stripe Dashboard > Webhooks — add an endpoint pointing at /api/webhooks/stripe, subscribed to checkout.session.completed, customer.subscription.updated, and customer.subscription.deleted. Without this, a seller's real payment never auto-upgrades their plan.", status: "not_connected" },
+  { id: "meta_app_id", name: "Meta App ID", description: "From your Meta App (developers.facebook.com) — needed for sellers to connect their own Instagram/Facebook via real OAuth, and also powers the real, free Meta Ad Library API used by Competitor Intelligence (no App Review needed for that part). Requires Meta's App Review for ads_management/instagram permissions before real seller OAuth works.", status: "not_connected" },
+  { id: "meta_app_secret", name: "Meta App Secret", description: "Pairs with the App ID above to exchange a real OAuth code for a seller's real access token, and to authenticate real Ad Library API calls — never exposed to the browser.", status: "not_connected" },
+  { id: "meta_login_config_id", name: "Meta Login Configuration ID", description: "From your Meta App > Facebook Login for Business > Configurations. Needed when the app uses the Facebook Login for Business use cases — the seller connect button then asks for the permissions in that configuration instead of a raw scope list. Leave empty for a classic Facebook Login app.", status: "not_connected" },
+  { id: "twilio_sid", name: "Twilio Account SID", description: "Your Twilio account identifier — pairs with the Auth Token below to send real WhatsApp messages.", status: "not_connected" },
+  { id: "twilio", name: "Twilio Auth Token", description: "Authenticates WhatsApp sends (weekly plan notifications) and, later, the Voice/Calling agent.", status: "not_connected" },
+  { id: "twilio_whatsapp", name: "Twilio WhatsApp Sender", description: "The WhatsApp-enabled number messages are sent from, e.g. +14155238886 (Twilio's sandbox number for testing).", status: "not_connected" },
+  { id: "apify_token", name: "Apify API Token", description: "Paid, usage-based scraping service (apify.com) — lets Competitor Intelligence actually read Instagram and TikTok profiles, which block plain automated browsers. Without this, those two sources stay honestly marked as blocked.", status: "not_connected" },
+  { id: "google_tts", name: "Google Cloud TTS API Key", description: "Real neural voice for the Orchestrator's spoken replies (console.cloud.google.com) — sounds natural in every browser, not just Edge. Free tier: 1M characters/month, recurring. Without this, voice replies fall back to the browser's own built-in voices.", status: "not_connected" },
+];

@@ -1,0 +1,63 @@
+-- RedefineTables
+PRAGMA defer_foreign_keys=ON;
+PRAGMA foreign_keys=OFF;
+CREATE TABLE "new_Business" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "ownerId" TEXT,
+    "name" TEXT NOT NULL,
+    "niche" TEXT NOT NULL,
+    "businessModel" TEXT,
+    "website" TEXT,
+    "instagram" TEXT,
+    "whatsapp" TEXT,
+    "lastSeenReportId" TEXT,
+    "agentSettings" TEXT,
+    "plan" TEXT NOT NULL DEFAULT 'starter',
+    "monthlyUsageCapUsd" REAL DEFAULT 15,
+    "taxRatePercent" REAL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "metaAccessToken" TEXT,
+    "metaPageId" TEXT,
+    "metaPageName" TEXT,
+    "metaInstagramUserId" TEXT,
+    "metaAdAccountId" TEXT,
+    "metaConnectedAt" DATETIME,
+    "whatsappInboundNumber" TEXT,
+    "paymentProvider" TEXT NOT NULL DEFAULT 'cod',
+    "stripeSecretKey" TEXT,
+    "stripePublishableKey" TEXT,
+    "stripeWebhookSecret" TEXT,
+    "storeCurrency" TEXT NOT NULL DEFAULT 'usd',
+    "shippingFee" REAL NOT NULL DEFAULT 0,
+    "freeShippingOver" REAL,
+    "taxInclusive" BOOLEAN NOT NULL DEFAULT false,
+    "taxLabel" TEXT DEFAULT 'Tax',
+    "codVerification" BOOLEAN NOT NULL DEFAULT false,
+    "notifyNewOrders" BOOLEAN NOT NULL DEFAULT true,
+    "fraudBlocklist" TEXT,
+    "courierProvider" TEXT,
+    "courierApiKey" TEXT,
+    "ga4MeasurementId" TEXT,
+    "metaPixelId" TEXT,
+    "relatedProductsEnabled" BOOLEAN NOT NULL DEFAULT true,
+    "recentlyViewedEnabled" BOOLEAN NOT NULL DEFAULT true,
+    "widgetCopy" TEXT,
+    "widgetMotion" TEXT NOT NULL DEFAULT 'standard',
+    "loyaltyEnabled" BOOLEAN NOT NULL DEFAULT false,
+    "loyaltyEarnRate" REAL NOT NULL DEFAULT 1,
+    "loyaltyRedeemRate" REAL NOT NULL DEFAULT 0.01,
+    "loyaltyMinRedeem" INTEGER NOT NULL DEFAULT 100,
+    "referralEnabled" BOOLEAN NOT NULL DEFAULT false,
+    "referralReferrerPoints" INTEGER NOT NULL DEFAULT 200,
+    "referralRefereePoints" INTEGER NOT NULL DEFAULT 100,
+    "giftCardsEnabled" BOOLEAN NOT NULL DEFAULT false,
+    "stripeCustomerId" TEXT,
+    "stripeSubscriptionId" TEXT,
+    "subscriptionStatus" TEXT,
+    CONSTRAINT "Business_ownerId_fkey" FOREIGN KEY ("ownerId") REFERENCES "User" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+);
+INSERT INTO "new_Business" ("agentSettings", "businessModel", "codVerification", "courierApiKey", "courierProvider", "createdAt", "fraudBlocklist", "freeShippingOver", "ga4MeasurementId", "giftCardsEnabled", "id", "instagram", "lastSeenReportId", "loyaltyEarnRate", "loyaltyEnabled", "loyaltyMinRedeem", "loyaltyRedeemRate", "metaAccessToken", "metaAdAccountId", "metaConnectedAt", "metaInstagramUserId", "metaPageId", "metaPageName", "metaPixelId", "monthlyUsageCapUsd", "name", "niche", "notifyNewOrders", "ownerId", "paymentProvider", "plan", "recentlyViewedEnabled", "referralEnabled", "referralRefereePoints", "referralReferrerPoints", "relatedProductsEnabled", "shippingFee", "storeCurrency", "stripeCustomerId", "stripePublishableKey", "stripeSecretKey", "stripeSubscriptionId", "stripeWebhookSecret", "subscriptionStatus", "taxInclusive", "taxLabel", "taxRatePercent", "website", "whatsapp", "whatsappInboundNumber") SELECT "agentSettings", "businessModel", "codVerification", "courierApiKey", "courierProvider", "createdAt", "fraudBlocklist", "freeShippingOver", "ga4MeasurementId", "giftCardsEnabled", "id", "instagram", "lastSeenReportId", "loyaltyEarnRate", "loyaltyEnabled", "loyaltyMinRedeem", "loyaltyRedeemRate", "metaAccessToken", "metaAdAccountId", "metaConnectedAt", "metaInstagramUserId", "metaPageId", "metaPageName", "metaPixelId", "monthlyUsageCapUsd", "name", "niche", "notifyNewOrders", "ownerId", "paymentProvider", "plan", "recentlyViewedEnabled", "referralEnabled", "referralRefereePoints", "referralReferrerPoints", "relatedProductsEnabled", "shippingFee", "storeCurrency", "stripeCustomerId", "stripePublishableKey", "stripeSecretKey", "stripeSubscriptionId", "stripeWebhookSecret", "subscriptionStatus", "taxInclusive", "taxLabel", "taxRatePercent", "website", "whatsapp", "whatsappInboundNumber" FROM "Business";
+DROP TABLE "Business";
+ALTER TABLE "new_Business" RENAME TO "Business";
+PRAGMA foreign_keys=ON;
+PRAGMA defer_foreign_keys=OFF;

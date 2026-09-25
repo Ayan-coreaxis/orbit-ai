@@ -1,0 +1,1060 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+
+  businesses  Business[]
+  memberships BusinessMember[]
+}
+
+model Business {
+  id                 String   @id @default(cuid())
+  ownerId            String?
+  owner              User?    @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  name               String
+  niche              String
+  businessModel      String? // own_products | trending_products | dropshipping | mixed — seller-picked at onboarding; shapes HOW the Strategy Orchestrator plans, the growth/orders goal itself never changes
+  website            String?
+  instagram          String?
+  whatsapp           String?
+  lastSeenReportId   String?
+  agentSettings      String? // JSON blob: AgentSettings (per-agent config — enabled specialists, brand voice, budget cap, etc.)
+  plan               String   @default("starter") // starter | growth | scale — no billing system yet, set manually in /admin
+  monthlyUsageCapUsd Float?   @default(15) // real AI-cost ceiling per calendar month; null = unlimited (used for internal/test businesses)
+  taxRatePercent     Float? // real seller-entered tax rate (e.g. GST/VAT %), null = tax not tracked for this business
+  createdAt          DateTime @default(now())
+
+  // Real Meta (Instagram/Facebook) connection — set by a real OAuth flow, not manual entry.
+  metaAccessToken     String? // real long-lived Page access token
+  metaPageId          String?
+  metaPageName        String?
+  metaInstagramUserId String? // real IG Business Account id linked to the connected Page, if any
+  metaAdAccountId     String? // real Ad Account id, only present if the seller granted ads_management
+  metaConnectedAt     DateTime?
+
+  // Real WhatsApp two-way number — admin-assigned (WhatsApp Business numbers aren't self-serve
+  // the way Facebook Login is), so a seller gets a dedicated real Twilio WhatsApp number here.
+  whatsappInboundNumber String?
+
+  // Real storefront payment gateway — the SELLER's own Stripe account, so real customer
+  // payments on their store go straight to them, never through the platform. "cod" (default)
+  // needs nothing; "stripe" requires the seller's own secret/publishable keys.
+  paymentProvider      String  @default("cod") // cod | stripe | both
+  stripeSecretKey      String? // seller's own — never the platform's key
+  stripePublishableKey String?
+  stripeWebhookSecret  String? // seller's own storefront webhook signing secret (optional — the return-url check is the primary confirmation path)
+  storeCurrency        String  @default("usd") // real 3-letter currency Stripe should charge in — must match what the seller's own Stripe account actually settles in
+  shippingFee          Float   @default(0) // flat delivery fee added at checkout, in storeCurrency — the fallback rate when no zone matches (or no zones exist)
+  freeShippingOver     Float? // order subtotal at/above which shipping is free — null = never free (applies to the fallback rate; a zone can also set its own)
+  taxInclusive         Boolean @default(false) // true = displayed prices already include tax; false = tax added on top at checkout
+  taxLabel             String? @default("Tax") // "GST", "VAT", "Sales tax"…
+  codVerification      Boolean @default(false) // require the shopper to confirm a COD order (reply YES / verify link) before it counts
+  notifyNewOrders      Boolean @default(true) // ping the seller (WhatsApp/email) the moment an order comes in
+  fraudBlocklist       String? // JSON: string[] of phone numbers to auto-flag at checkout
+  courierProvider      String? // postex | leopards | tcs | manual — storefront dispatch integration
+  courierApiKey        String? // seller's own courier API token
+  ga4MeasurementId     String? // seller's Google Analytics 4 id (G-XXXX), injected into their storefront
+  metaPixelId          String? // seller's Meta Pixel id
+
+  // Real platform-injected product-page sections — NOT part of the Orbit Design doc (they render
+  // live personalised data per shopper), so a seller can't hide/reorder them by editing the design
+  // the way they can everything else. These are the one on/off switch they get for each.
+  relatedProductsEnabled Boolean @default(true) // "You may also like" — real co-view recommendations
+  recentlyViewedEnabled  Boolean @default(true) // "Recently viewed" — per-browser history
+
+  // Real end-user customization for the generic "widget" components (checkout, cart, auth, account,
+  // track) that live OUTSIDE the Orbit Design doc — a seller couldn't touch their copy or motion at
+  // all before this. widgetCopy overrides individual hardcoded strings (see lib/widget-copy.ts for
+  // every overridable key + its default English text); unset keys fall back to the default. Both are
+  // editable from Orbit Design chat/Studio, same as anything else in the store.
+  widgetCopy  String? // JSON: Record<string,string> — key -> seller's own text
+  widgetMotion String @default("standard") // none | standard | playful | premium — see lib/widget-motion.ts
+
+  // Which tabs the customer Account page shows, and in what order — a seller-editable subset/reorder
+  // of ["orders","track","rewards","addresses","profile"]. null = every tab, default order.
+  accountTabs String?
+
+  // Extra checkout fields a seller adds on top of the fixed name/phone/email/address set (those stay
+  // fixed — real delivery needs them). JSON: {key,label,type:"text"|"textarea"|"checkbox",required}[].
+  // Answers land on Order.customFieldsData.
+  checkoutCustomFields String?
+
+  // Real loyalty/rewards program — off by default. Points earn on a confirmed order's total and
+  // redeem as a real discount at checkout (same discountAmount field an Order already has).
+  loyaltyEnabled     Boolean @default(false)
+  loyaltyEarnRate    Float   @default(1) // points earned per 1 storeCurrency unit spent (floor'd)
+  loyaltyRedeemRate  Float   @default(0.01) // storeCurrency discount per point redeemed (e.g. 0.01 = 100 points -> 1 unit off)
+  loyaltyMinRedeem   Int     @default(100) // minimum points a shopper must hold to redeem any
+
+  // Real referral program — off by default. Rewards pay out as loyalty points (reuses the ledger
+  // above), so this only does anything useful once loyalty is also on.
+  referralEnabled        Boolean @default(false)
+  referralReferrerPoints Int     @default(200) // points credited to the referrer once the friend's first order confirms
+  referralRefereePoints  Int     @default(100) // points credited to the new shopper on signup, for using a code
+
+  // Real gift cards — off by default. Seller issues a card with a real balance (goodwill, a refund
+  // as store credit, or a manual sale over WhatsApp); a shopper redeems its code at checkout as a
+  // real discount, decrementing the card's real remaining balance.
+  giftCardsEnabled Boolean @default(false)
+
+  // Real SaaS platform billing — the seller paying US for their Starter/Growth/Scale plan,
+  // via the platform's own Stripe account (lib/platform-stripe.ts), not the seller's.
+  stripeCustomerId     String?
+  stripeSubscriptionId String?
+  subscriptionStatus   String? // active | past_due | canceled | none — real Stripe subscription status, set only by the real webhook
+
+  competitors           Competitor[]
+  reports               GrowthReport[]
+  growthPlans           GrowthPlan[]
+  agentUsage            AgentUsage[]
+  products              Product[]
+  orders                Order[]
+  storeCustomers        StoreCustomer[]
+  customerOtps          CustomerOtp[]
+  storeRecords          StoreRecord[]
+  storeDesign           StoreDesign?
+  orbitDesignTurns      OrbitDesignTurn[]
+  pages                 Page[]
+  orchestratorMessages  OrchestratorMessage[]
+  storeEvents           StoreEvent[]
+  abandonedCarts        AbandonedCart[]
+  reviews               Review[]
+  returnRequests        ReturnRequest[]
+  experiments           Experiment[]
+  adCampaigns           AdCampaign[]
+  chatMessages          ChatMessage[]
+  mcpConnections        McpConnection[]
+  skills                Skill[]
+  pluginInstalls        PluginInstall[]
+  categories            Category[]
+  coupons               Coupon[]
+  carts                 Cart[]
+  newsletterSubscribers NewsletterSubscriber[]
+  contactMessages       ContactMessage[]
+  stockNotifications    StockNotification[]
+  loyaltyAccounts       LoyaltyAccount[]
+  loyaltyTransactions   LoyaltyTransaction[]
+  referralCodes         ReferralCode[]
+  referrals             Referral[]
+  giftCards             GiftCard[]
+  giftCardTransactions  GiftCardTransaction[]
+  bundles               Bundle[]
+  shippingZones         ShippingZone[]
+  members               BusinessMember[]
+  mediaAssets MediaAsset[]
+}
+
+/** A staff account with dashboard access to a business it doesn't own — invited by email. If the
+ *  email doesn't have a real account yet, `userId`/`acceptedAt` stay null until they sign up with
+ *  that exact email, which auto-links it (see lib/team.ts). No granular per-route permissions yet
+ *  — any accepted member gets the same dashboard access as the owner; `role` is stored for future
+ *  use. */
+model BusinessMember {
+  id         String    @id @default(cuid())
+  businessId String
+  business   Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  userId     String?
+  user       User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  email      String
+  role       String    @default("staff") // staff | admin — owner is separate, via Business.ownerId
+  invitedAt  DateTime  @default(now())
+  acceptedAt DateTime?
+
+  @@unique([businessId, email])
+  @@index([userId])
+}
+
+/**
+ * A real MCP (Model Context Protocol) server connected at the BUSINESS level — a shared pool,
+ * not owned by any one agent. When a specialist agent runs, a lightweight router call picks which
+ * of these connections are actually relevant to that cycle's task; only those are connected for
+ * real (real `initialize` + `tools/list`), their `skill` text is loaded into that agent's prompt
+ * alongside the tools, and the whole session is dropped the moment the run ends. Nothing is kept
+ * warm between runs and nothing is pinned to a specific agent.
+ */
+model McpConnection {
+  id            String    @id @default(cuid())
+  businessId    String
+  business      Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  name          String // seller-given label, e.g. "Higgsfield Video Gen"
+  connectorId   String? // id from lib/known-mcp-connectors.ts when picked from the gallery, else null
+  mcpServerUrl  String // real remote MCP server endpoint (Streamable HTTP transport)
+  authType      String    @default("none") // none | api_key | oauth
+  authToken     String? // api_key mode: the seller's bearer token / API key — never the platform's own
+  skill         String? // seller-written instructions for HOW/WHEN an agent should use this
+  enabled       Boolean   @default(true)
+  lastStatus    String? // "ok" | "error" | "pending_oauth" — outcome of the last real connection attempt
+  lastCheckedAt DateTime?
+  lastToolNames String? // JSON string[] of real tool names seen on the last good check (display only)
+  createdAt     DateTime  @default(now())
+
+  // oauth mode — real MCP OAuth (RFC 9728 discovery + RFC 7591 dynamic client registration + PKCE).
+  // Tokens are the seller's own grant to that server; the platform never sees the seller's password.
+  oauthState        String?   @unique // random value while an auth flow is in flight (also the "pending" marker)
+  oauthCodeVerifier String?
+  oauthClientId     String?
+  oauthClientSecret String?
+  oauthTokenUrl     String?
+  oauthResource     String? // RFC 8707 resource indicator for this MCP server
+  oauthScope        String?
+  oauthAccessToken  String?
+  oauthRefreshToken String?
+  oauthExpiresAt    DateTime?
+
+  sourcePluginId String? // id from lib/plugins.ts when this row was created by a plugin install
+
+  @@index([businessId])
+}
+
+/**
+ * A business-level SKILL — a named block of seller-written instructions (brand voice, a returns
+ * playbook, a content formula, tone rules…). Not tied to any MCP tool or agent. When a specialist
+ * runs, a lightweight router picks which skills are actually relevant to that cycle's task (plus
+ * any marked `alwaysOn`); their `instructions` are appended to that agent's prompt for the run and
+ * gone the moment it ends.
+ */
+model Skill {
+  id             String   @id @default(cuid())
+  businessId     String
+  business       Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  name           String // e.g. "Brand voice", "Return-request replies"
+  description    String // one line — what this skill is for; the router matches tasks against this
+  instructions   String // the actual guidance (plain text / markdown), injected into the agent prompt
+  alwaysOn       Boolean  @default(false) // load every run without asking the router
+  enabled        Boolean  @default(true)
+  sourcePluginId String? // id from lib/plugins.ts when this row was created by a plugin install
+  createdAt      DateTime @default(now())
+
+  @@index([businessId])
+}
+
+/**
+ * Record that a business installed a curated plugin (lib/plugins.ts) — a one-click bundle of MCP
+ * connections + skills. The actual rows it created carry `sourcePluginId`; uninstalling deletes
+ * those and this record.
+ */
+model PluginInstall {
+  id          String   @id @default(cuid())
+  businessId  String
+  business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  pluginId    String
+  installedAt DateTime @default(now())
+
+  @@unique([businessId, pluginId])
+}
+
+/**
+ * Real, persisted chatbot conversation log — website widget and WhatsApp both write here, so the seller can actually see what real customers asked.
+ */
+model ChatMessage {
+  id          String   @id @default(cuid())
+  businessId  String
+  business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  channel     String // website | whatsapp
+  customerRef String // real visitor cookie id (website) or real phone number (whatsapp) — groups messages into one conversation
+  role        String // user | assistant
+  content     String
+  createdAt   DateTime @default(now())
+
+  @@index([businessId, channel, customerRef])
+}
+
+model AdCampaign {
+  id             String    @id @default(cuid())
+  businessId     String
+  business       Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  metaCampaignId String // real Meta campaign id
+  metaAdSetId    String? // real Meta ad set id
+  name           String
+  dailyBudgetUsd Float
+  reasoning      String // real reasoning the Ads Agent gave for creating this campaign
+  status         String    @default("paused") // paused | active | error — real Meta status, mirrored here
+  activatedAt    DateTime?
+  createdAt      DateTime  @default(now())
+
+  @@index([businessId, status])
+}
+
+model Review {
+  id            String    @id @default(cuid())
+  businessId    String
+  business      Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  orderId       String
+  productId     String? // set when the order was for a single product — powers the product page rating
+  customerName  String? // display name for the storefront
+  published     Boolean   @default(true) // seller can hide a review from the storefront
+  customerPhone String
+  productNames  String // real, denormalized from the real order's items at request time
+  status        String    @default("requested") // requested | submitted | flagged
+  rating        Int? // 1-5, only set once the real customer actually responds
+  comment       String?
+  requestedAt   DateTime  @default(now())
+  respondedAt   DateTime?
+  notifyError   String? // honest — set if the real WhatsApp send failed, never pretend it sent
+
+  @@index([businessId, status])
+  @@index([businessId, productId, status])
+}
+
+model ReturnRequest {
+  id             String    @id @default(cuid())
+  businessId     String
+  business       Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  orderId        String
+  reason         String
+  status         String    @default("requested") // requested | approved | rejected | received | refunded
+  sellerNote     String?
+  refundAmount   Float? // real amount refunded to the customer
+  refundMethod   String? // stripe | cod_manual | store_credit
+  stripeRefundId String? // real Stripe refund id, for card orders refunded through Stripe
+  receivedAt     DateTime? // when the seller marked the returned goods as received (triggers restock)
+  refundedAt     DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([businessId, status])
+}
+
+model Experiment {
+  id           String   @id @default(cuid())
+  businessId   String
+  business     Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  name         String
+  variantAText String
+  variantBText String
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  events ExperimentEvent[]
+}
+
+model ExperimentEvent {
+  id           String     @id @default(cuid())
+  experimentId String
+  experiment   Experiment @relation(fields: [experimentId], references: [id], onDelete: Cascade)
+  sessionId    String // same anonymous visitor id used in StoreEvent — real, deterministic A/B split
+  variant      String // "A" | "B"
+  type         String // "view" | "convert" (real order placed while assigned to this variant)
+  createdAt    DateTime   @default(now())
+
+  @@index([experimentId, variant, type])
+}
+
+model AbandonedCart {
+  id            String    @id @default(cuid())
+  businessId    String
+  business      Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  sessionId     String
+  customerPhone String
+  items         String // JSON snapshot: [{productId, variantId, name, price, qty}]
+  total         Float
+  recovered     Boolean   @default(false) // true once a matching real order comes in
+  notifiedAt    DateTime?
+  notifyError   String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([businessId, sessionId])
+  @@index([businessId, recovered, notifiedAt])
+}
+
+model StoreEvent {
+  id         String   @id @default(cuid())
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  sessionId  String // anonymous visitor id (cookie), not tied to any account
+  type       String // "view_store" | "view_product" | "add_to_cart" | "checkout_start" | "order_complete"
+  productId  String?
+  referrer   String? // real document.referrer host at first touch of the session, for traffic-source breakdown — null for direct
+  createdAt  DateTime @default(now())
+
+  @@index([businessId, type])
+  @@index([businessId, createdAt])
+}
+
+model OrchestratorMessage {
+  id         String   @id @default(cuid())
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  role       String // "user" | "assistant"
+  content    String
+  speaker    String? // null/"orchestrator" = the Orchestrator persona; a specialist agentId (e.g. "content", "seo") = that specialist visibly speaking in the meeting
+  needsUser  Boolean  @default(false) // true when this specialist message is a real, unmet requirement only the business owner can supply — the meeting is paused on this until answered
+  // Growth-plan discussion (Strategy Lab lives inside this chat): which plan the turn was about,
+  // and any plan edits. On an ACTIVE plan edits wait in pendingOps until the owner presses Apply.
+  planId         String?
+  pendingOps     String? // JSON PlanOp[] awaiting Apply
+  opsState       String? // pending | applied | dismissed
+  opsSummary     String? // JSON string[] — what changed / what would change
+  askApproval    Boolean  @default(false) // owner seems ready — UI offers the final-plan review
+  attachments    String? // JSON string[] of MediaAsset ids the owner attached to this message
+  createdAt  DateTime @default(now())
+}
+
+/// A file the owner gave Orbit (chat attachment or store upload) — the business's media library.
+/// Any agent can use it with the Orchestrator's permission (data scope "media").
+model MediaAsset {
+  id         String   @id @default(cuid())
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  kind       String // image | video | audio | pdf
+  name       String // original file name
+  mime       String
+  size       Int // bytes stored
+  url        String // public path, e.g. /uploads/<businessId>/media/<id>.webp
+  frames     String? // video only: JSON string[] of still-frame image urls (captured in the browser) so AI can "see" it
+  text       String? // audio: transcript; pdf: nothing (Claude reads the file itself)
+  note       String? // e.g. why a transcript is missing
+  source     String   @default("chat") // chat | store | library
+  createdAt  DateTime @default(now())
+
+  @@index([businessId, createdAt])
+}
+
+model Competitor {
+  id         String   @id @default(cuid())
+  url        String
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+}
+
+model GrowthReport {
+  id         String   @id @default(cuid())
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  content    String // JSON blob: { summary, gaps[], focusProduct, targets[], tasks[] }
+  createdAt  DateTime @default(now())
+}
+
+/**
+ * Strategy Lab — a growth plan as data (not a blob of text). The Orchestrator drafts it from the
+ * seller's OWN business numbers (competitors are reference only), the seller discusses/approves it,
+ * and each strategy is then measured by real code against real orders. One `active` plan at a time;
+ * a fresh `draft` can sit alongside it until the seller approves it.
+ */
+model GrowthPlan {
+  id         String     @id @default(cuid())
+  businessId String
+  business   Business   @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  title      String
+  diagnosis  String // the single biggest thing holding the business back right now, and why — grounded in the real snapshot
+  snapshot   String? // JSON: the real business numbers the plan was drafted from (for "what did it see?" transparency)
+  status     String     @default("draft") // draft | active | archived
+  approvedAt DateTime?
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+  strategies Strategy[]
+  agents     PlanAgent[]
+
+  @@index([businessId, status])
+}
+
+model Strategy {
+  id           String     @id @default(cuid())
+  planId       String
+  plan         GrowthPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  businessId   String
+  position     Int        @default(0)
+  title        String
+  kind         String // word_of_mouth | loyalty | offer | content | partnership | ads | operations | retention | other
+  audience     String // who it's for
+  why          String // the reasoning, in plain words
+  steps        String // JSON: {text, owner:"orbit"|"seller"|"not_possible", note?}[]
+  durationDays Int? // null = ongoing (no fixed end)
+  metric       String // JSON: {type, label, couponCode?, target?} — see lib/strategy-lab.ts METRIC_TYPES
+  costNote     String?
+  discountPct  Float? // if the strategy gives a discount, how much — lets real code run the profit guard
+  profitNote   String? // real-code profit-guard result (e.g. "discount eats most of the margin on X")
+  status       String     @default("proposed") // proposed | running | paused | stopped | done
+  startedAt    DateTime?
+  endedAt      DateTime?
+  executedAt   DateTime? // when Orbit last ran this strategy's Orbit steps (harness)
+  lastReviewedAt DateTime? // last time the Orchestrator reviewed this strategy's results with the owner
+  agentId      String? // the hired agent running it (Max plan), null = Orbit's default executor
+  agent        PlanAgent? @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  actions      StrategyAction[]
+
+  @@index([businessId, status])
+}
+
+/**
+ * A specialist the Orchestrator hires for a plan (Max plan only). It runs its strategies' Orbit
+ * steps with ONLY the tools and data it was granted, inside a budget carved out of the business's
+ * own monthly AI cap. When its strategies end it's retired and its grants go with it.
+ */
+model PlanAgent {
+  id           String     @id @default(cuid())
+  businessId   String
+  planId       String
+  plan         GrowthPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  name         String
+  role         String
+  instructions String // how it works, its voice, what it must never do
+  tools        String // JSON string[] — harness tool names it may use
+  dataScopes   String // JSON string[] — what data it may read (products, customers, orders, ...)
+  budgetUsd    Float // monthly AI budget share
+  spentUsd     Float      @default(0)
+  status       String     @default("active") // active | retired
+  retiredAt    DateTime?
+  createdAt    DateTime   @default(now())
+  strategies   Strategy[]
+
+  @@index([businessId, status])
+}
+
+/**
+ * Harness log — every real thing Orbit did (or couldn't do) for a strategy's Orbit steps: a coupon
+ * created, loyalty turned on, a checkout field added, a caption written, a post published. Written
+ * deliverables (captions, messages, briefs) are kept in `output` for the seller to copy.
+ */
+model StrategyAction {
+  id         String   @id @default(cuid())
+  strategyId String
+  strategy   Strategy @relation(fields: [strategyId], references: [id], onDelete: Cascade)
+  businessId String
+  tool       String
+  input      String // JSON
+  status     String // done | skipped | failed | needs_connection | deliverable
+  summary    String // plain words: what happened
+  output     String? // deliverable text, or a short result
+  createdAt  DateTime @default(now())
+
+  @@index([strategyId])
+}
+
+model Product {
+  id             String    @id @default(cuid())
+  businessId     String
+  business       Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  name           String
+  description    String? // rich text (HTML)
+  imageUrl       String?
+  price          Float
+  costPrice      Float? // real per-unit cost, seller-entered — enables real margin calculation, null = margin not tracked for this product
+  stock          Int       @default(0)
+  seoTitle       String?
+  seoDescription String?
+  galleryUrls    String? // JSON: string[] of additional real photo URLs, shown alongside imageUrl on the product page
+  optionTypes    String? // JSON: [{name:"Size",values:["S","M","L"]}, {name:"Color",values:["Black","Sand"]}] — null/[] means no variants; when set, every purchasable combination has a ProductVariant row and product-level `stock` is ignored
+  categoryId     String?
+  category       Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  createdAt      DateTime  @default(now())
+
+  variants     ProductVariant[]
+  bundleItems  BundleItem[]
+}
+
+model Category {
+  id         String    @id @default(cuid())
+  businessId String
+  business   Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  name       String
+  createdAt  DateTime  @default(now())
+  products   Product[]
+
+  @@unique([businessId, name])
+}
+
+model Coupon {
+  id               String    @id @default(cuid())
+  businessId       String
+  business         Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  code             String // seller-chosen, stored uppercase
+  type             String // percent | fixed
+  value            Float // percent (0-100) or a real fixed Rs amount off, per `type`
+  active           Boolean   @default(true)
+  usageLimit       Int? // null = unlimited total uses
+  usedCount        Int       @default(0)
+  perCustomerLimit Int? // max uses per customer phone (null = unlimited)
+  firstOrderOnly   Boolean   @default(false) // only valid on a phone's first order
+  freeShipping     Boolean   @default(false) // also waives the delivery fee
+  autoApply        Boolean   @default(false) // applied automatically when the cart qualifies
+  minSubtotal      Float? // minimum cart subtotal to qualify
+  productIds       String? // JSON: string[] — discount only applies to these products' line totals
+  expiresAt        DateTime?
+  createdAt        DateTime  @default(now())
+
+  @@unique([businessId, code])
+}
+
+// Real server-side cart, keyed to the anonymous `orbit_visitor` cookie (there's no real customer
+// account system — guest checkout only) so a cart survives a localStorage clear or a new tab on
+// the same browser. Honest limit: it can't follow a shopper across different devices/browsers,
+// since nothing here identifies a real person, only a browser.
+model Cart {
+  id         String   @id @default(cuid())
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  visitorId  String // the anonymous sc_sess cookie, OR "customer:<id>" for a signed-in shopper (follows them across devices)
+  items      String // JSON: [{productId, variantId?, qty}]
+  updatedAt  DateTime @updatedAt
+
+  @@unique([businessId, visitorId])
+}
+
+/** A saved delivery address on a signed-in shopper's account. */
+model CustomerAddress {
+  id         String        @id @default(cuid())
+  businessId String
+  customerId String
+  customer   StoreCustomer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  label      String? // "Home", "Office"
+  name       String
+  phone      String
+  line1      String
+  city       String
+  area       String?
+  postalCode String?
+  province   String?
+  isDefault  Boolean       @default(false)
+  createdAt  DateTime      @default(now())
+
+  @@index([customerId])
+}
+
+/** "Notify me when back in stock" capture for an out-of-stock product / variant. */
+model StockNotification {
+  id         String    @id @default(cuid())
+  businessId String
+  business   Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  productId  String
+  variantId  String?
+  email      String
+  createdAt  DateTime  @default(now())
+  notifiedAt DateTime?
+
+  @@index([businessId, productId, notifiedAt])
+}
+
+/** Durable rate-limit counters — survives deploys and works across serverless instances (unlike an in-memory Map). */
+model RateLimit {
+  key         String   @id
+  count       Int      @default(0)
+  windowStart DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model ProductVariant {
+  id        String   @id @default(cuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  label     String // human label built from option values, e.g. "M / Black"
+  options   String // JSON: { "Size": "M", "Color": "Black" } — one value per option type on the parent product
+  sku       String?
+  price     Float? // null = use the parent product's price
+  stock     Int      @default(0)
+  imageUrl  String? // optional variant-specific photo
+  createdAt DateTime @default(now())
+
+  bundleItems BundleItem[]
+
+  @@index([productId])
+}
+
+model Page {
+  id             String   @id @default(cuid())
+  businessId     String
+  business       Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  slug           String
+  title          String
+  content        String
+  seoTitle       String?
+  seoDescription String?
+  createdAt      DateTime @default(now())
+
+  @@unique([businessId, slug])
+}
+
+model Order {
+  id                      String         @id @default(cuid())
+  businessId              String
+  business                Business       @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  customerId              String? // set when a signed-in storefront customer placed it; null for guest checkout
+  customer                StoreCustomer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  customerName            String
+  customerPhone           String
+  customerEmail           String? // optional — captured at checkout so order updates can also go out by email
+  address                 String // formatted single-line address (always populated for display)
+  shippingAddress         String? // JSON: { name, phone, line1, city, area?, postalCode?, province? } — structured, when the checkout collected it
+  customFieldsData        String? // JSON: Record<string,string> — answers to the seller's own extra checkout fields (Business.checkoutCustomFields), if any were configured
+  sellerNote              String? // private seller-only note on the order
+  items                   String // JSON: [{productId, variantId?, variantLabel?, name, price, qty}]
+  subtotal                Float          @default(0) // items only, before discount / shipping / tax
+  shippingFee             Float          @default(0) // real delivery fee on this order
+  taxAmount               Float          @default(0) // real tax added at checkout
+  total                   Float
+  couponCode              String? // real coupon code the customer actually applied, if any
+  discountAmount          Float          @default(0) // real Rs amount that coupon actually took off `total`
+  loyaltyPointsRedeemed   Int            @default(0) // points the shopper spent on this order's discount, if any
+  loyaltyDiscount         Float          @default(0) // real Rs amount those points actually took off `total`
+  loyaltyPointsEarned     Int            @default(0) // points credited for this order once confirmed — 0 until the LoyaltyTransaction actually posts
+  giftCardCode            String? // real gift card code the customer actually applied, if any
+  giftCardDiscount        Float          @default(0) // real Rs amount that gift card actually took off `total`
+  clientToken             String?        @unique // idempotency key from the checkout client — a retried submit returns the same order instead of a duplicate
+  verified                Boolean        @default(true) // COD orders start false until the shopper confirms (reply YES / verify link); non-COD are always true
+  verifiedAt              DateTime?
+  verifyToken             String? // one-time token for the "confirm your order" link
+  status                  String         @default("pending") // pending | confirmed | shipped | fulfilled | cancelled — real fulfillment status
+  paymentProvider         String         @default("cod") // cod | stripe
+  paymentStatus           String         @default("paid") // paid | pending | failed — cod is treated as "paid" (paid on delivery); real Stripe orders start "pending" and flip to "paid" only once a real Checkout Session is confirmed
+  stripeSessionId         String? // real Stripe Checkout Session id, for real Stripe orders only
+  flagged                 Boolean        @default(false) // real heuristic screen at checkout — never fabricated, only set when a real rule actually matched
+  flagReason              String?
+  confirmedAt             DateTime? // set the moment a real order auto-confirms (passed the real fraud screen) or a seller manually confirms one that was flagged
+  confirmationNotifiedAt  DateTime? // when the real WhatsApp order-confirmation message actually sent
+  confirmationNotifyError String? // honest — set only if the real WhatsApp send actually failed, never pretend it sent
+  // Real seller-entered dispatch info — never a guessed/generated tracking number, always what the seller actually typed after handing the package to a real courier.
+  courierName             String?
+  trackingNumber          String?
+  trackingUrl             String?
+  shippedAt               DateTime?
+  fulfilledAt             DateTime? // real delivery/completion time — set when the seller marks the order fulfilled
+  cancelledAt             DateTime?
+  trackingNotifiedAt      DateTime? // when the real WhatsApp tracking message actually sent
+  trackingNotifyError     String? // honest — set only if the real WhatsApp send actually failed, never pretend it sent
+  reviewRequestedAt       DateTime? // when the post-delivery review request went out (Phase 4)
+  createdAt               DateTime       @default(now())
+
+  @@index([businessId, status])
+  @@index([businessId, createdAt])
+}
+
+/**
+ * Real, persisted Orbit Design chat history — so leaving the page (a refresh, a nav click,
+ * closing the tab) and coming back restores the actual conversation and canvas instead of
+ * silently resetting to empty, which used to read as "all my work just vanished" even though the
+ * real generated pages were always safe in the Page table the whole time. `meta` carries whatever
+ * this turn needs to re-render exactly as it did live (offerWholeSite prompt, createdPages list,
+ * clarify question set) — kept as one JSON blob rather than a column per turn-kind since which
+ * fields exist depends entirely on the turn's role.
+ */
+model OrbitDesignTurn {
+  id         String   @id @default(cuid())
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  role       String // "user" | "assistant"
+  content    String
+  meta       String? // JSON: { offerWholeSite?, createdPages?, clarify? } — only the fields this turn actually used
+  createdAt  DateTime @default(now())
+
+  @@index([businessId, createdAt])
+}
+
+/**
+ * The seller's storefront, as designed in Orbit Design. `doc` is the single source of truth —
+ * a JSON OrbitDesignDoc (see lib/orbit-design.ts): design tokens + an ordered list of sections,
+ * each a self-contained block of inline-styled HTML. The live /store URL renders nothing until
+ * `published` is explicitly flipped on, so no half-designed store leaks to the public.
+ */
+model StoreDesign {
+  id             String    @id @default(cuid())
+  businessId     String    @unique
+  business       Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  published      Boolean   @default(false)
+  doc            String? // JSON: OrbitDesignDoc — the editable draft (tokens + components + pages)
+  wired          String? // JSON: OrbitDesignDoc after the Phase-2 wiring pass — this is what the live /store serves. Regenerated every publish.
+  wiredAt        DateTime?
+  // JSON: StoreBackendSpec (see lib/orbit-backend-spec.ts) — what "Orbit Code" produced from the
+  // designed pages on Handoff. The generic storefront runtime + generic /api/store routes execute
+  // this spec; the DB shape stays fixed (customer data lives in the generic StoreRecord bucket).
+  backend        String?
+  backendWiredAt DateTime?
+  updatedAt      DateTime  @updatedAt
+}
+
+/**
+ * A real registered shopper on ONE seller's storefront (scoped per business — the same person
+ * on two different Orbit stores is two rows). Auth is a signed `sc_<businessId>` cookie
+ * (lib/store-auth.ts), mirroring the seller-side session in lib/auth.ts. `passwordHash` is only
+ * set for password-mode stores; OTP-mode stores leave it null and verify via CustomerOtp.
+ */
+model StoreCustomer {
+  id           String        @id @default(cuid())
+  businessId   String
+  business     Business      @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  name         String
+  email        String?
+  phone        String?
+  passwordHash String?
+  createdAt    DateTime          @default(now())
+  orders       Order[]
+  records      StoreRecord[]
+  addresses    CustomerAddress[]
+  loyaltyAccount      LoyaltyAccount?
+  loyaltyTransactions LoyaltyTransaction[]
+  referralCode        ReferralCode?
+  referralsMade       Referral[] @relation("Referrer")
+  referredAs          Referral?  @relation("Referee")
+  giftCardsPurchased  GiftCard[] @relation("GiftCardPurchaser")
+
+  @@unique([businessId, email])
+  @@unique([businessId, phone])
+  @@index([businessId])
+}
+
+/** One real referral link/code per signed-in shopper who's ever generated one. */
+model ReferralCode {
+  id         String        @id @default(cuid())
+  businessId String
+  business   Business      @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  customerId String        @unique
+  customer   StoreCustomer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  code       String        @unique
+  createdAt  DateTime      @default(now())
+  referrals  Referral[]
+
+  @@index([businessId])
+}
+
+/** One row per real new shopper who signed up via a referral code. `refereeCustomerId` is unique —
+ *  a shopper can only ever be someone's referee once. `status` moves pending -> qualified (their
+ *  first order confirmed) -> rewarded (points actually posted, idempotency guard). */
+model Referral {
+  id                 String        @id @default(cuid())
+  businessId         String
+  business           Business      @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  referralCodeId     String
+  referralCode       ReferralCode  @relation(fields: [referralCodeId], references: [id], onDelete: Cascade)
+  referrerCustomerId String
+  referrer           StoreCustomer @relation("Referrer", fields: [referrerCustomerId], references: [id], onDelete: Cascade)
+  refereeCustomerId  String        @unique
+  referee            StoreCustomer @relation("Referee", fields: [refereeCustomerId], references: [id], onDelete: Cascade)
+  qualifyingOrderId  String?
+  status             String        @default("pending") // pending | qualified | rewarded
+  rewardedAt         DateTime?
+  createdAt          DateTime      @default(now())
+
+  @@index([businessId, referrerCustomerId])
+  @@index([businessId, status])
+}
+
+/** One real gift card per code — issued by the seller (goodwill, a refund as store credit, or a
+ *  manual sale) with a starting balance; `balance` decrements as it's redeemed at checkout, real
+ *  Rs at a time, down to 0. `purchaserCustomerId` is set when a signed-in shopper is the one who
+ *  paid for it, so it can show up in their account; a card can also be recipient-only (a gift with
+ *  no purchaser account, e.g. issued straight to `recipientEmail`). */
+model GiftCard {
+  id                  String         @id @default(cuid())
+  businessId          String
+  business            Business       @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  code                String         @unique
+  initialValue        Float
+  balance             Float
+  purchaserCustomerId String?
+  purchaser           StoreCustomer? @relation("GiftCardPurchaser", fields: [purchaserCustomerId], references: [id], onDelete: SetNull)
+  recipientEmail      String?
+  recipientName       String?
+  message             String?
+  status              String         @default("active") // active | disabled — seller can disable a card (lost/fraud) without deleting its history
+  expiresAt           DateTime?
+  createdAt           DateTime       @default(now())
+  transactions        GiftCardTransaction[]
+
+  @@index([businessId])
+}
+
+/** Real ledger for a gift card — a positive `amount` is issuance (or a top-up/refund back onto the
+ *  card), negative is a redemption against a real order. Kept as an append-only trail so `balance`
+ *  on the card is always independently reconstructable. */
+model GiftCardTransaction {
+  id         String   @id @default(cuid())
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  giftCardId String
+  giftCard   GiftCard @relation(fields: [giftCardId], references: [id], onDelete: Cascade)
+  orderId    String?
+  amount     Float // + issue/refund, - redeem
+  reason     String // issue | redeem | adjust
+  note       String?
+  createdAt  DateTime @default(now())
+
+  @@index([businessId, giftCardId])
+  @@index([businessId, orderId])
+}
+
+/** A real seller-curated combo — a fixed set of real products (optionally specific variants) sold
+ *  together as one unit at `price` (normally less than the sum of the parts). Added to a shopper's
+ *  cart as one line; at checkout each constituent product's real stock is decremented individually
+ *  (so stock stays accurate per product), while the order is charged the bundle's flat price. */
+model Bundle {
+  id          String       @id @default(cuid())
+  businessId  String
+  business    Business     @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  imageUrl    String?
+  price       Float // flat price for one bundle set — real, seller-entered
+  status      String       @default("active") // active | disabled
+  createdAt   DateTime     @default(now())
+  items       BundleItem[]
+
+  @@index([businessId])
+}
+
+/** One real product (or specific variant) required in a bundle, and how many units of it. */
+model BundleItem {
+  id         String          @id @default(cuid())
+  bundleId   String
+  bundle     Bundle          @relation(fields: [bundleId], references: [id], onDelete: Cascade)
+  productId  String
+  product    Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variantId  String?
+  variant    ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  qty        Int             @default(1)
+
+  @@index([bundleId])
+}
+
+/** A real city/region-specific delivery rate — e.g. "Lahore" at Rs 150 vs "Rest of Pakistan" at
+ *  Rs 300. Checked in order (`priority`, lowest first) against the shopper's shipping city; the
+ *  first zone whose `cities` list contains it wins. No match falls back to the business's own
+ *  flat `shippingFee`/`freeShippingOver`. */
+model ShippingZone {
+  id             String   @id @default(cuid())
+  businessId     String
+  business       Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  name           String
+  cities         String // JSON: string[] of city names this zone matches (case-insensitive)
+  fee            Float
+  freeOver       Float? // order subtotal at/above which THIS zone's delivery is free — null = never free
+  priority       Int      @default(0)
+  createdAt      DateTime @default(now())
+
+  @@index([businessId])
+}
+
+/** One row per signed-in shopper per business — the cached running points balance. The real
+ *  history (and the source of truth `points` is recomputed from, if ever in doubt) lives in
+ *  LoyaltyTransaction; this is just the fast-read total. */
+model LoyaltyAccount {
+  id         String        @id @default(cuid())
+  businessId String
+  business   Business      @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  customerId String        @unique
+  customer   StoreCustomer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  points     Int           @default(0)
+  updatedAt  DateTime      @updatedAt
+
+  @@index([businessId])
+}
+
+/** A single real loyalty ledger entry — earn (positive), redeem (negative), or a manual seller
+ *  adjustment (either sign). Never edited after creation; a correction is a new offsetting row. */
+model LoyaltyTransaction {
+  id         String         @id @default(cuid())
+  businessId String
+  business   Business       @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  customerId String
+  customer   StoreCustomer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  orderId    String? // set for earn (that order) / redeem (the order the discount applied to) — null for a manual seller adjustment
+  points     Int // signed
+  reason     String // earn | redeem | adjust | expire
+  note       String? // seller-entered note, only for "adjust"
+  createdAt  DateTime       @default(now())
+
+  @@index([businessId, customerId])
+  @@index([businessId, orderId])
+}
+
+/**
+ * A real one-time login code (phone or email), short-lived. One row per request; consumed on use.
+ */
+model CustomerOtp {
+  id         String    @id @default(cuid())
+  businessId String
+  business   Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  channel    String // "phone" | "email"
+  target     String // the phone number / email the code was sent to
+  code       String // 6-digit
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([businessId, target])
+}
+
+/**
+ * The generic customer-content bucket. Every collection a StoreBackendSpec declares (product
+ * reviews, wishlist items, support tickets, RSVPs, anything the seller designed a form for) is
+ * rows here, keyed by `collection`. `data` is the JSON field map validated against the spec's
+ * field allowlist. This is deliberately one fixed table so Orbit Code never touches the DB schema
+ * or runs a migration — the "backend is data", the storage shape is static and reviewed.
+ */
+model StoreRecord {
+  id         String         @id @default(cuid())
+  businessId String
+  business   Business       @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  collection String // slug, e.g. "reviews" | "support" | "wishlist" — never a reserved name
+  customerId String?
+  customer   StoreCustomer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  productId  String? // set for product-scoped collections (reviews)
+  data       String // JSON: { [fieldKey]: value } per the spec's collection.fields
+  status     String         @default("published") // published | pending | hidden — "pending" for moderated collections
+  createdAt  DateTime       @default(now())
+
+  @@index([businessId, collection, status])
+  @@index([businessId, collection, productId])
+}
+
+/**
+ * Real messages from the storefront's contact form — one row per submission.
+ */
+model ContactMessage {
+  id         String   @id @default(cuid())
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  name       String
+  email      String
+  message    String
+  handled    Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@index([businessId, createdAt])
+}
+
+model NewsletterSubscriber {
+  id         String   @id @default(cuid())
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  email      String
+  createdAt  DateTime @default(now())
+
+  @@unique([businessId, email])
+}
+
+model AgentUsage {
+  id           String   @id @default(cuid())
+  businessId   String
+  business     Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  agentId      String // matches lib/mock-data.ts agent ids, e.g. "seo", "competitor"
+  model        String
+  inputTokens  Int
+  outputTokens Int
+  costUsd      Float
+  createdAt    DateTime @default(now())
+}
+
+/**
+ * Real platform-wide key/value settings, owner-controlled from /admin — currently just which
+ * real Claude model each role (primary / fast) calls, so the Super Admin can pick a model without
+ * a code deploy. Small and generic on purpose: any future platform-wide toggle can reuse this
+ * instead of a new single-purpose table.
+ */
+model PlatformSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
