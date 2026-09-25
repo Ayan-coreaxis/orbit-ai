@@ -416,9 +416,11 @@ model MediaAsset {
   text       String? // audio: transcript; pdf: nothing (Claude reads the file itself)
   note       String? // e.g. why a transcript is missing
   source     String   @default("chat") // chat | store | library
+  hash       String? // sha256 of the uploaded bytes — the same file uploaded again reuses this row
   createdAt  DateTime @default(now())
 
   @@index([businessId, createdAt])
+  @@index([businessId, hash])
 }
 
 model Competitor {

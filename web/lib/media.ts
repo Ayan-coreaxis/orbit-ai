@@ -1,4 +1,4 @@
-import { randomUUID } from "crypto";
+import { createHash, randomUUID } from "crypto";
 import sharp from "sharp";
 import type Anthropic from "@anthropic-ai/sdk";
 import { prisma } from "@/lib/prisma";
@@ -60,6 +60,15 @@ async function transcribe(buf: Buffer, mime: string, name: string): Promise<{ te
   }
 }
 
+export function sha256(buf: Buffer) {
+  return createHash("sha256").update(buf).digest("hex");
+}
+
+/** The library row already holding exactly these bytes (a re-upload), if any. */
+export async function findDuplicate(businessId: string, hash: string) {
+  return prisma.mediaAsset.findFirst({ where: { businessId, hash }, orderBy: { createdAt: "desc" } });
+}
+
 export class MediaError extends Error {
   constructor(message: string, public status = 400) {
     super(message);
@@ -69,6 +78,8 @@ export class MediaError extends Error {
 /**
  * Save one uploaded file. `frames` are still images of a video the browser captured; `transcript`
  * is what the browser's own speech recognition heard while a voice note was recorded.
+ * The same bytes uploaded again return the existing row (`duplicate: true`) instead of a copy —
+ * so a catalog PDF sent twice doesn't pull all its photos out twice.
  */
 export async function saveMedia(
   businessId: string,
@@ -82,6 +93,9 @@ export async function saveMedia(
   const dir = `uploads/${businessId}/media`;
   const id = randomUUID();
   const input = Buffer.from(await file.arrayBuffer());
+  const hash = sha256(input);
+  const existing = await findDuplicate(businessId, hash);
+  if (existing) return { ...existing, duplicate: true };
   let stored: { url: string; bytes: number };
   let frames: string[] = [];
   let text: string | null = null;
@@ -125,9 +139,16 @@ export async function saveMedia(
     try {
       const imgs = await extractCatalogImages(input);
       for (const [i, img] of imgs.entries()) {
+        // A photo already in the library (same image in another catalog, or twice in this one) is reused.
+        const imgHash = sha256(img.webp);
+        const same = await findDuplicate(businessId, imgHash);
+        if (same) {
+          if (!frames.includes(same.url)) frames.push(same.url);
+          continue;
+        }
         const url = await putFile(`${dir}/${id}-p${img.page}-${i}.webp`, img.webp, "image/webp");
         await prisma.mediaAsset.create({
-          data: { businessId, kind: "image", name: `${name.replace(/\.pdf$/i, "")} · page ${img.page}`.slice(0, 160), mime: "image/webp", size: img.webp.length, url, source: "catalog", note: img.from === "link" ? `Downloaded from the link on page ${img.page}` : `Taken from page ${img.page}` },
+          data: { businessId, kind: "image", name: `${name.replace(/\.pdf$/i, "")} · page ${img.page}`.slice(0, 160), mime: "image/webp", size: img.webp.length, url, source: "catalog", hash: imgHash, note: img.from === "link" ? `Downloaded from the link on page ${img.page}` : `Taken from page ${img.page}` },
         });
         frames.push(url);
       }
@@ -138,7 +159,7 @@ export async function saveMedia(
     }
   }
 
-  return prisma.mediaAsset.create({
+  const created = await prisma.mediaAsset.create({
     data: {
       businessId,
       kind,
@@ -150,14 +171,18 @@ export async function saveMedia(
       text,
       note,
       source: opts.source === "store" || opts.source === "library" ? opts.source : "chat",
+      hash,
     },
   });
+  return { ...created, duplicate: false };
 }
 
 export async function deleteMedia(businessId: string, id: string) {
   const m = await prisma.mediaAsset.findFirst({ where: { id, businessId } });
   if (!m) throw new MediaError("Not found.", 404);
-  const files = [m.url, ...parseList(m.frames)];
+  // A PDF's "frames" are its extracted photos — separate library items (maybe on products, maybe
+  // shared with another catalog), so they stay. A video's frames belong to it alone.
+  const files = [m.url, ...(m.kind === "video" ? parseList(m.frames) : [])];
   await Promise.all(files.map((u) => deleteFile(u)));
   await prisma.mediaAsset.delete({ where: { id: m.id } });
 }

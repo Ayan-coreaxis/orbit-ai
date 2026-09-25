@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import sharp from "sharp";
 import { prisma } from "@/lib/prisma";
+import { findDuplicate, sha256 } from "@/lib/media";
 import { putFile } from "@/lib/storage";
 import { getActiveBusinessId } from "@/lib/get-active-business-id";
 
@@ -33,6 +34,10 @@ export async function POST(req: NextRequest) {
   if (file.size > MAX_BYTES) return NextResponse.json({ error: "That image is over 10 MB — please compress it first." }, { status: 413 });
 
   const input = Buffer.from(await file.arrayBuffer());
+  const hash = sha256(input);
+  // Same image uploaded before → reuse it instead of storing another copy.
+  const existing = await findDuplicate(businessId, hash);
+  if (existing?.kind === "image") return NextResponse.json({ url: existing.url });
   const id = randomUUID();
 
   try {
@@ -59,7 +64,7 @@ export async function POST(req: NextRequest) {
     // Stored by lib/storage (Cloudflare R2 when configured) and listed in the business's media library.
     const url = await putFile(`uploads/${businessId}/${name}`, out, ext === "gif" ? "image/gif" : "image/webp");
     await prisma.mediaAsset.create({
-      data: { businessId, kind: "image", name: file.name?.slice(0, 160) || name, mime: ext === "gif" ? "image/gif" : "image/webp", size: out.length, url, source: "store" },
+      data: { businessId, kind: "image", name: file.name?.slice(0, 160) || name, mime: ext === "gif" ? "image/gif" : "image/webp", size: out.length, url, source: "store", hash },
     });
     return NextResponse.json({ url });
   } catch (e) {

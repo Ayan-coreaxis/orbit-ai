@@ -28,7 +28,7 @@ export function MediaLibrary({ initial }: { initial: UploadedMedia[] }) {
       setBusy((b) => b + 1);
       try {
         const m = await uploadMedia(f, { source: "library" });
-        setItems((xs) => [m, ...xs]);
+        setItems((xs) => (xs.some((x) => x.id === m.id) ? xs : [m, ...xs]));
       } catch (e) {
         setErr(`${f.name}: ${e instanceof Error ? e.message : "upload failed"}`);
       } finally {

@@ -49,9 +49,11 @@ export function usePendingFiles() {
   /** Take the uploaded files for sending and clear the composer. */
   const take = useCallback((): UploadedMedia[] => {
     const done = filesRef.current.filter((f) => f.status === "done" && f.media).map((f) => f.media!);
+    // the same file picked twice uploads to the same library item — send it once
+    const unique = done.filter((m, i) => done.findIndex((x) => x.id === m.id) === i);
     filesRef.current.forEach((f) => f.preview && URL.revokeObjectURL(f.preview));
     setFiles([]);
-    return done;
+    return unique;
   }, []);
 
   return {

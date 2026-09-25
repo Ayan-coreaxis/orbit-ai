@@ -16,6 +16,7 @@ export async function GET(req: NextRequest) {
 /**
  * Upload one file (multipart "file"). Optional: "frames" (video stills captured in the browser),
  * "transcript" (what the browser heard while a voice note was recorded), "source" (chat|store).
+ * A file already in the library comes back as the existing item with `duplicate: true`.
  */
 export async function POST(req: NextRequest) {
   const businessId = await getActiveBusinessId();
@@ -37,7 +38,7 @@ export async function POST(req: NextRequest) {
       transcript: typeof transcript === "string" ? transcript : undefined,
       source: typeof source === "string" ? source : undefined,
     });
-    return NextResponse.json({ media: toView(m) });
+    return NextResponse.json({ media: toView(m), duplicate: m.duplicate });
   } catch (e) {
     if (e instanceof MediaError) return NextResponse.json({ error: e.message }, { status: e.status });
     console.warn("[media] upload failed:", String(e).slice(0, 200));

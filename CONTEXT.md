@@ -3,7 +3,7 @@
 > **Every Claude session (local or cloud) reads this first and updates it before finishing.**
 > It is the single source of truth shared between sessions. See "How to update this file" at the bottom.
 
-_Last updated: 2026-09-26 by the local desktop session._
+_Last updated: 2026-09-26 by the cloud session._
 
 ---
 
@@ -83,13 +83,13 @@ npm run dev                       # http://localhost:3000
 
 **Open / next:**
 - Owner still to do: Cloudflare R2 account + keys, Brave API key, Meta App Review, WhatsApp connect.
-- Dedupe identical media uploads (same PDF twice creates duplicate photos).
 - Jev layer (on hold).
 - Decide whether to retire the old competitor-based weekly plan (`runCompetitorAnalysis` + "Your Weekly Plan").
 - Detailed task history: `TASKS.md`.
 
 ## 7. Changelog (newest first — add one entry per session/batch of work)
 
+- **2026-09-26 · cloud** — Media dedupe: `MediaAsset.hash` (sha256 of uploaded bytes, migration `20260926090000_media_dedupe`). Same file uploaded again (chat / library / store / `/api/upload`) returns the existing item (`duplicate: true`); catalog-PDF photos already in the library are reused, not re-extracted. Deleting a PDF no longer deletes its extracted photos (they may be on products or shared). Old rows have no hash, so duplicates made before this stay. Tested locally via dev server + curl. Files: `lib/media.ts`, `app/api/media/route.ts`, `app/api/upload/route.ts`, `MediaLibrary.tsx`, `ChatAttachments.tsx`.
 - **2026-09-26 · local** — Pushed the project to a private GitHub repo; added this CONTEXT.md, root CLAUDE.md, `.gitignore`, `web/.env.example`.
 - **2026-09-26 · local** — Orchestrator ↔ Orbit Design (`design-ops.ts`, `platform-map.ts`); proposal-state notes in history; catalog PDF photo extraction (`pdf-extract.ts`), `open_media`; product add/delete/variants.
 - **2026-09-25 · local** — Strategy Lab Hissa 1–3, 5, 6; media library; R2; Brave web search; chat redesign; onboarding socials/currency.
