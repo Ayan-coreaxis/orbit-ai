@@ -116,6 +116,8 @@ npm run db:copy-sqlite prisma/dev.db
 
 ## 7. Changelog (newest first — add one entry per session/batch of work)
 
+- **2026-09-26 · cloud** — **Hero slider / carousel upgrade.** The store carousel hook (`[data-od-carousel]` in `lib/orbit-design.ts`) now supports swipe on phones, arrow keys, auto-built dots (`[data-od-dots]`), and autoplay that pauses on hover, focus or a hidden tab and then resumes. It also has aria labels. Orbit Design's prompt now explains how to build a HERO SLIDER with the same hook, so a seller can ask for one in Design chat. Tested: autoplay, swipe, dots.
+
 - **2026-09-26 · cloud** — **Inventory ↔ ads.** `lib/inventory-ads.ts`: when a product sells out (a checkout, a Stripe finalize, the seller editing stock, or an applied Orchestrator product change), every running ad that links to `/product/<id>` is paused on Meta. It is marked `AdCampaign.pausedReason = "sold_out"` (migration `20260926260000_ad_paused_reason`), and the Inventory Agent posts in the Orchestrator chat. On restock the owner is told, but the ad is not turned back on automatically, because starting spend is the owner's call. Activating an ad whose product is sold out returns 409. Tested with a mock Graph API.
 
 - **2026-09-26 · cloud** — **Orchestrator can propose delivery zones.** New `store_changes` settings: `shipping_zone` `{name, cities, fee, freeOver}` (a matching name, case-insensitive, updates that zone; otherwise a new zone is added at the next priority) and `remove_shipping_zone` (name). These go through the same Apply card as other changes. Removing a zone that doesn't exist says so honestly. Tested: apply once, a second apply is refused, update, add and remove. Tests are in `lib/store-settings-ops.test.ts`.

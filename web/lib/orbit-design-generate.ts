@@ -160,7 +160,7 @@ SECTION & COMPONENT HTML — hard rules:
   - checkout: <form data-od-form="checkout"> wrapping the delivery-detail inputs (each with its data-od-field, see the CHECKOUT rule above) and the place-order button — same submit mechanism as newsletter/contact, the platform posts the real fields to the real checkout endpoint.
   - FAQ / accordion: <div data-od-accordion> <div data-od-acc-item> <button data-od-acc-trigger>Question</button> <div data-od-acc-panel><p>Answer…</p></div> </div> … </div>  (add data-od-multi to allow several open)
   - tabs: <div data-od-tabs> <button data-od-tab="care">Care</button><button data-od-tab="ship">Shipping</button> <div data-od-panel="care">…</div><div data-od-panel="ship">…</div> </div>
-  - carousel / testimonial slider: <div data-od-carousel data-od-autoplay="5000"> <div data-od-track> <div data-od-slide>…</div> <div data-od-slide>…</div> </div> <button type="button" data-od-prev aria-label="Previous">‹</button> <button type="button" data-od-next aria-label="Next">›</button> </div>
+  - carousel / testimonial slider: <div data-od-carousel data-od-autoplay="5000"> <div data-od-track> <div data-od-slide>…</div> <div data-od-slide>…</div> </div> <button type="button" data-od-prev aria-label="Previous">‹</button> <button type="button" data-od-next aria-label="Next">›</button> </div> — add <div data-od-dots></div> inside for slide dots (filled in automatically). Swipe, arrow keys and pause-on-hover are built in. A HERO SLIDER is the same hook on the hero section: each data-od-slide is a full hero (image slot + headline + CTA), autoplay 5000–7000.
   - scroll-in reveal: add data-od-reveal (or data-od-reveal="up|fade|scale|left|right") to any section/card you want to animate in as it enters the viewport. Use sparingly — hero + one or two key sections, never everything.
   - animated stat: <span data-od-count="1200">1200</span> counts up when scrolled into view (write the final number as both the attribute and the text).
   - marquee row: <div data-od-marquee="28"><div style="display:inline-flex;gap:48px">…logos or phrases…</div></div>
@@ -1039,7 +1039,7 @@ HARD RULES for your fixes:
 - Inline styles for the rest + var(--od-*) only. NO <style>, NO <script>, NO @keyframes, NO inline animation:/animation-name: — they are stripped and leave the element broken.
 - For ANY moving/interactive part use ONLY these platform hooks (the runtime animates them):
   marquee: <div data-od-marquee="30"><div style="display:inline-flex;gap:48px">…items…</div></div>
-  carousel: <div data-od-carousel data-od-autoplay="5000"><div data-od-track><div data-od-slide>…</div>…</div><button type="button" data-od-prev>‹</button><button type="button" data-od-next>›</button></div>
+  carousel: <div data-od-carousel data-od-autoplay="5000"><div data-od-track><div data-od-slide>…</div>…</div><button type="button" data-od-prev>‹</button><button type="button" data-od-next>›</button><div data-od-dots></div></div>
   accordion: <div data-od-accordion><div data-od-acc-item><button data-od-acc-trigger>Q</button><div data-od-acc-panel><p>A</p></div></div>…</div>
   tabs: <div data-od-tabs><button data-od-tab="k">…</button>…<div data-od-panel="k">…</div>…</div>
   scroll reveal: add data-od-reveal (or ="up|fade|scale") to the element.

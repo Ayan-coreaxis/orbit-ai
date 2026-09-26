@@ -2129,15 +2129,26 @@ wrap.querySelectorAll('[data-od-tab]').forEach(function(b){b.setAttribute('aria-
 wrap.querySelectorAll('[data-od-panel]').forEach(function(p){p.style.display=p.getAttribute('data-od-panel')===k?'':'none'});
 });
 document.querySelectorAll('[data-od-tabs]').forEach(function(w){var first=w.querySelector('[data-od-tab]');if(first){var k=first.getAttribute('data-od-tab');w.querySelectorAll('[data-od-panel]').forEach(function(p){p.style.display=p.getAttribute('data-od-panel')===k?'':'none'});first.setAttribute('aria-selected','true')}});
-// carousel
+// carousel — arrows, swipe, keyboard, dots ([data-od-dots] gets one button per slide), autoplay that pauses on hover / hidden tab
 document.querySelectorAll('[data-od-carousel]').forEach(function(c){
 var track=c.querySelector('[data-od-track]');if(!track)return;var slides=track.querySelectorAll('[data-od-slide]');if(!slides.length)return;
-var i=0;track.style.display='flex';track.style.flexWrap='nowrap';track.style.transition='transform .45s cubic-bezier(.4,0,.2,1)';slides.forEach(function(s){s.style.flex='0 0 100%';s.style.minWidth='0'});
-function go(n){i=(n+slides.length)%slides.length;track.style.transform='translateX(-'+(i*100)+'%)'}
+var i=0,n=slides.length;track.style.display='flex';track.style.flexWrap='nowrap';track.style.transition=RM?'none':'transform .45s cubic-bezier(.4,0,.2,1)';slides.forEach(function(s,k){s.style.flex='0 0 100%';s.style.minWidth='0';s.setAttribute('aria-roledescription','slide');s.setAttribute('aria-label',(k+1)+' of '+n)});
+c.setAttribute('aria-roledescription','carousel');if(!c.hasAttribute('tabindex'))c.setAttribute('tabindex','0');
+var dotsWrap=c.querySelector('[data-od-dots]'),dots=[];
+if(dotsWrap&&n>1){dotsWrap.innerHTML='';for(var d=0;d<n;d++){(function(k){var b=document.createElement('button');b.type='button';b.setAttribute('aria-label','Go to slide '+(k+1));b.addEventListener('click',function(){go(k);restart()});dotsWrap.appendChild(b);dots.push(b)})(d)}}
+function go(m){i=(m+n)%n;track.style.transform='translateX(-'+(i*100)+'%)';dots.forEach(function(b,k){if(k===i)b.setAttribute('aria-current','true');else b.removeAttribute('aria-current')});slides.forEach(function(s,k){s.setAttribute('aria-hidden',String(k!==i))})}
 var p=c.querySelector('[data-od-prev]'),nx=c.querySelector('[data-od-next]');
-if(p)p.addEventListener('click',function(){go(i-1)});if(nx)nx.addEventListener('click',function(){go(i+1)});
-var ap=parseInt(c.getAttribute('data-od-autoplay'),10);if(ap>0&&!RM){var iv=setInterval(function(){go(i+1)},ap);c.addEventListener('mouseenter',function(){clearInterval(iv)})}
-go(0);
+if(p)p.addEventListener('click',function(){go(i-1);restart()});if(nx)nx.addEventListener('click',function(){go(i+1);restart()});
+c.addEventListener('keydown',function(e){if(e.key==='ArrowLeft'){go(i-1);restart()}else if(e.key==='ArrowRight'){go(i+1);restart()}});
+var sx=null,sy=0;
+c.addEventListener('touchstart',function(e){sx=e.touches[0].clientX;sy=e.touches[0].clientY;stop()},{passive:true});
+c.addEventListener('touchend',function(e){if(sx===null)return;var dx=e.changedTouches[0].clientX-sx,dy=e.changedTouches[0].clientY-sy;sx=null;if(Math.abs(dx)>40&&Math.abs(dx)>Math.abs(dy))go(dx<0?i+1:i-1);start()},{passive:true});
+var ap=parseInt(c.getAttribute('data-od-autoplay'),10),iv=null;
+function start(){if(ap>0&&!RM&&n>1&&!iv)iv=setInterval(function(){if(!document.hidden)go(i+1)},ap)}
+function stop(){if(iv){clearInterval(iv);iv=null}}
+function restart(){stop();start()}
+c.addEventListener('mouseenter',stop);c.addEventListener('mouseleave',start);c.addEventListener('focusin',stop);c.addEventListener('focusout',start);
+go(0);start();
 });
 // scroll reveal + count-up
 var REV='[data-od-reveal],[data-od-reveal-stagger]';
@@ -2255,6 +2266,9 @@ ${scope} [data-od-tab]{cursor:pointer}
 ${scope} [data-od-prev],${scope} [data-od-next]{cursor:pointer;user-select:none}
 ${scope} [data-od-carousel]{overflow:hidden}
 ${scope} [data-od-track]{flex-wrap:nowrap!important}
+${scope} [data-od-dots]{display:flex;gap:8px;justify-content:center}
+${scope} [data-od-dots] button{width:8px;height:8px;padding:0;border:0;border-radius:99px;background:currentColor;opacity:.35;cursor:pointer;transition:opacity .2s,width .25s}
+${scope} [data-od-dots] button[aria-current]{opacity:1;width:22px}
 ${scope} [data-od-reveal]{opacity:0;transform:translateY(24px);transition:opacity .6s ease,transform .6s cubic-bezier(.4,0,.2,1)}
 ${scope} [data-od-reveal="fade"]{transform:none}
 ${scope} [data-od-reveal="scale"]{transform:scale(.94)}
