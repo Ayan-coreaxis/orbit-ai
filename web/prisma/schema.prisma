@@ -152,6 +152,7 @@ model Business {
   shippingZones         ShippingZone[]
   members               BusinessMember[]
   mediaAssets MediaAsset[]
+  studioJobs  StudioJob[]
 }
 
 /** A staff account with dashboard access to a business it doesn't own — invited by email. If the
@@ -421,6 +422,36 @@ model MediaAsset {
 
   @@index([businessId, createdAt])
   @@index([businessId, hash])
+}
+
+/**
+ * Orbit Studio: one AI image or video the seller (or the Orchestrator, after Apply) asked for.
+ * draft = the director's plan is ready but nothing has been paid for yet; queued/generating = the
+ * image/video model is working; done = the result is in the media library (resultMediaId).
+ * Only queued/generating/done jobs count against the plan's monthly limit — failed ones don't.
+ */
+model StudioJob {
+  id              String   @id @default(cuid())
+  businessId      String
+  business        Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  format          String // lib/studio/formats.ts id, e.g. "product-reel"
+  kind            String // image | video
+  status          String   @default("draft") // draft | queued | generating | done | failed
+  input           String // JSON: what the seller gave (product, photos, choices, note)
+  brief           String? // JSON: the director's plan (storyboard, prompts, caption)
+  stage           String? // what's running now: keyframe | video
+  providerTaskId  String? // video model's task id while it renders
+  keyframeMediaId String? // first frame made for a video
+  resultMediaId   String?
+  error           String?
+  costUsd         Float    @default(0)
+  source          String   @default("content") // content | orchestrator
+  startedAt       DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([businessId, createdAt])
+  @@index([businessId, status])
 }
 
 model Competitor {

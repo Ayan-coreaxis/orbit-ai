@@ -3,7 +3,7 @@
 > **Every Claude session (local or cloud) reads this first and updates it before finishing.**
 > It is the single source of truth shared between sessions. See "How to update this file" at the bottom.
 
-_Last updated: 2026-09-26 by the cloud session._
+_Last updated: 2026-09-26 by the cloud session (Orbit Studio)._
 
 ---
 
@@ -50,6 +50,7 @@ npm run dev                       # http://localhost:3000
 | Connections: MCP pool, Skills, OAuth, Plugins | `/dashboard/settings/connections`, `lib/mcp-pool.ts`, `agent-tools.ts`, `skills.ts`, `mcp-oauth.ts` |
 | Meta (FB/IG/Ads) connect | `lib/meta-oauth.ts` (Graph v26.0, Login-for-Business `config_id`) — dev mode; App Review still needed |
 | Platform map + live store status given to the Orchestrator | `lib/platform-map.ts` |
+| **Orbit Studio** (AI images, reels, UGC, try-on, ads — Content page) | `lib/studio/*` (formats, director + director-guide, engine, providers, refs, ops, config), `components/studio/*`, `app/api/studio/*`, admin `/admin/studio` |
 
 ## 4. How the Orchestrator works (key rules)
 
@@ -59,6 +60,7 @@ npm run dev                       # http://localhost:3000
   - products: edit price/cost/stock/name/description/photos/variants, add new, delete (`lib/product-ops.ts`)
   - storefront: Orbit Design edits + publish (`lib/design-ops.ts`; runs in the background after Apply and posts the result back to the chat)
   - growth-plan edits on an ACTIVE plan (draft-plan edits apply immediately)
+  - Orbit Studio content (`create_content` → `studio_job` op; after Apply it's planned + made in the background and the image/reel is posted back into the chat as an attachment)
 - Past proposals carry `[SYSTEM: applied / dismissed / pending / failed]` notes in history so it never claims a dismissed change is coming.
 - Tools in its loop: `web_search` + `read_page` (Brave, within limits), `open_media` (re-open a library file). Max 3 searches, 2 page reads, 2 file opens per reply.
 - Attachments: images & PDFs go to Claude directly; videos as browser-captured frames; voice notes transcribed by the browser; catalog PDFs have their product photos extracted (embedded images or linked image URLs, SSRF-guarded) and referenced as `M1, M2…`.
@@ -74,21 +76,23 @@ npm run dev                       # http://localhost:3000
 - **Web search:** Brave API ($5/1k, ~1k free/month); per-plan monthly limits (Starter 300 / Growth 600 / Scale 1500). Rejected: self-hosted SearXNG, headless-Chrome Google scraping as the main path.
 - **Storage:** Cloudflare R2 before going to a VPS; admin can migrate local files → R2 (`/admin/storage`).
 - Safety: never enter the owner's passwords/API keys/App Secret for them; they paste keys into the admin panel themselves.
+- **Orbit Studio:** own thin wrapper, models called directly (not Higgsfield — it's a wrapper with a margin). Images = Google Nano Banana 2 (Gemini image model), videos = ByteDance Seedance 2.0 on BytePlus ModelArk (voice/sound included). Only `lib/studio/providers.ts` talks to models, so they can be swapped. **Growth ($75) and Scale ($150) only**: 50 images + 5 reels / 100 images + 12 reels a month (admin-editable). Failed jobs don't count; regenerating does. Studio spend is excluded from the AI-chat usage cap. Every video starts from a still frame made with the real product photo. The director (Claude) shows the plan — storyboard, script, caption — before anything is paid for.
 
 ## 6. Status
 
 **Done (recent, 2026-09-25 → 26):** onboarding extracts WhatsApp/socials (+AI web lookup) and sets store currency from `.pk`/`+92`; thinking-orb animation + chat redesign; Orchestrator store-settings / product / variant / add / delete powers; media library + chat attachments + voice notes + catalog-PDF photo extraction + `open_media`; product photo upload in Store; Cloudflare R2 storage + admin page; Brave web search + limits + admin page; platform map + live store status; Orchestrator → Orbit Design (build/edit/publish via proposals).
 
-**Not yet verified live:** Apply → Orbit Design background build posting back to chat; real R2 bucket (no keys yet); real Brave search (no key yet); video & voice-note upload in a browser.
+**Not yet verified live:** Orbit Studio against the real Gemini / Seedance APIs (tested end-to-end only with a mock server — request shapes and model ids `gemini-3.1-flash-image-preview` / `dreamina-seedance-2-0-fast` must be confirmed with real keys via Super Admin > Studio > Test);  Apply → Orbit Design background build posting back to chat; real R2 bucket (no keys yet); real Brave search (no key yet); video & voice-note upload in a browser.
 
 **Open / next:**
-- Owner still to do: Cloudflare R2 account + keys, Brave API key, Meta App Review, WhatsApp connect.
+- Owner still to do: Cloudflare R2 account + keys, Brave API key, Meta App Review, WhatsApp connect, Google AI Studio key + BytePlus ModelArk key for Orbit Studio (then press Test in Super Admin > Studio).
 - Jev layer (on hold).
 - Decide whether to retire the old competitor-based weekly plan (`runCompetitorAnalysis` + "Your Weekly Plan").
 - Detailed task history: `TASKS.md`.
 
 ## 7. Changelog (newest first — add one entry per session/batch of work)
 
+- **2026-09-26 · cloud** — **Orbit Studio**: 21 formats as data (product shots, lifestyle, flat lay, placement, social post, sale poster, banner, background change, enhance, virtual try-on, brand face; product reel, animate photo, unboxing, UGC review, how-to, announcement, try-on haul, CGI, cinematic, 15s story ad). Each asks for exactly the material it needs; a Claude "director" (with `director-guide.ts` = the prompting skill) plans a storyboard/script/caption first; then Gemini image → (video) Seedance with sound. New `StudioJob` model (migration `20260926120000_orbit_studio`), Content page Studio UI, Orchestrator `create_content` proposals, Super Admin > Studio (keys, model ids, prices, limits, live tests, spend). Unit tests `lib/studio/studio.test.ts`; full flow checked with a mock AI server + Playwright.
 - **2026-09-26 · cloud** — Media dedupe: `MediaAsset.hash` (sha256 of uploaded bytes, migration `20260926090000_media_dedupe`). Same file uploaded again (chat / library / store / `/api/upload`) returns the existing item (`duplicate: true`); catalog-PDF photos already in the library are reused, not re-extracted. Deleting a PDF no longer deletes its extracted photos (they may be on products or shared). Old rows have no hash, so duplicates made before this stay. Tested locally via dev server + curl. Files: `lib/media.ts`, `app/api/media/route.ts`, `app/api/upload/route.ts`, `MediaLibrary.tsx`, `ChatAttachments.tsx`.
 - **2026-09-26 · local** — Pushed the project to a private GitHub repo; added this CONTEXT.md, root CLAUDE.md, `.gitignore`, `web/.env.example`.
 - **2026-09-26 · local** — Orchestrator ↔ Orbit Design (`design-ops.ts`, `platform-map.ts`); proposal-state notes in history; catalog PDF photo extraction (`pdf-extract.ts`), `open_media`; product add/delete/variants.

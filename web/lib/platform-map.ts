@@ -15,7 +15,7 @@ ORBIT DASHBOARD — where things are (send the owner to these exact places; neve
 - Store → tabs: Products (add/edit products, photos, variants), Storefront (publish status + quick store controls), Orders, Customers, Discounts (coupons, loyalty points, referrals, gift cards, bundles), Analytics, Messages (form submissions from the store).
 - Orbit Design: the store builder — design / redesign pages, add pages, edit text & images, logo, colours, fonts; Publish button makes the store live.
 - Media: every photo / video / voice note / PDF the owner gave Orbit.
-- Content: posts the AI writes. Ads: Meta campaigns (created paused). Inbox: customer messages.
+- Content: Orbit Studio (make product photos, posts, banners, try-ons, reels, UGC and ads — Growth/Scale plans) + posts the AI writes. Ads: Meta campaigns (created paused). Inbox: customer messages.
 - Money: real revenue & margins. Tax: tax owed. Returns: returns & disputes. Reviews: product reviews. Experiments: A/B tests. Competitors: competitor scans.
 - Connections (Settings → Connections & Skills): MCP connectors, skills and plugins for agents.
 - Settings & Billing: Facebook/Instagram connect, Payment method (COD / Stripe) + store currency, Delivery fee / free-delivery / tax (store operations), Shipping zones, Chat widget & checkout extra fields, Team, plan & usage.`;

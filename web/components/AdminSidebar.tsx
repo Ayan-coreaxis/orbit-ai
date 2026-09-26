@@ -15,6 +15,7 @@ import {
   Cpu,
   Cloud,
   Search,
+  Clapperboard,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -27,6 +28,7 @@ const nav = [
   { href: "/admin/api-keys", label: "API Keys", icon: KeyRound },
   { href: "/admin/storage", label: "Storage", icon: Cloud },
   { href: "/admin/web-search", label: "Web Search", icon: Search },
+  { href: "/admin/studio", label: "Studio", icon: Clapperboard },
   { href: "/admin/billing", label: "Billing & MRR", icon: CreditCard },
 ];
 

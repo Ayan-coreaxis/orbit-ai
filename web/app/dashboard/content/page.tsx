@@ -3,8 +3,8 @@ import { Card, Pill } from "@/components/ui";
 import { getRealPlan } from "@/lib/get-business";
 import { getActiveBusinessId } from "@/lib/get-active-business-id";
 import { prisma } from "@/lib/prisma";
-import { PenSquare } from "lucide-react";
 import { FacebookIcon } from "@/components/icons/BrandIcons";
+import { Studio } from "@/components/studio/Studio";
 
 export default async function ContentPage() {
   const plan = await getRealPlan();
@@ -19,19 +19,12 @@ export default async function ContentPage() {
   return (
     <div>
       <Topbar
-        title="What Your AI Is Posting"
-        subtitle={business?.metaPageId ? `Connected: ${business.metaPageName ?? "your Page"}` : "Not connected to a real Page yet"}
+        title="Content"
+        subtitle={`Images, reels and posts · ${business?.metaPageId ? `Connected: ${business.metaPageName ?? "your Page"}` : "Facebook Page not connected yet"}`}
       />
-      <div className="max-w-[1200px] p-10">
-        {!contentTask ? (
-          <Card className="flex flex-col items-center gap-3 p-12 text-center">
-            <PenSquare className="h-6 w-6 text-text-faint" />
-            <p className="max-w-md text-[13.5px] leading-relaxed text-text-faint">
-              No real weekly plan yet — the Content Agent&apos;s task shows up here once your first
-              cycle runs.
-            </p>
-          </Card>
-        ) : (
+      <div className="grid max-w-[1200px] gap-8 p-10">
+        <Studio />
+        {contentTask && (
           <Card className="p-7">
             <div className="flex items-center gap-2">
               <FacebookIcon size={16} />

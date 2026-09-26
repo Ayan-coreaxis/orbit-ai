@@ -111,7 +111,7 @@ export const DELETE_PRODUCTS_SCHEMA = {
 
 const MAX_LISTED = 80;
 
-async function listProducts(businessId: string) {
+export async function listProducts(businessId: string) {
   return prisma.product.findMany({
     where: { businessId },
     orderBy: { createdAt: "asc" },

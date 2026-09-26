@@ -70,7 +70,7 @@ export function splitPendingOps(raw: string | null | undefined): { planOps: unkn
   }
   const opOf = (o: unknown) => (o && typeof o === "object" ? (o as { op?: string }).op : undefined);
   return {
-    planOps: all.filter((o) => opOf(o) !== "store_setting" && !String(opOf(o) ?? "").startsWith("product_") && opOf(o) !== "design_request" && opOf(o) !== "publish_store"),
+    planOps: all.filter((o) => opOf(o) !== "store_setting" && !String(opOf(o) ?? "").startsWith("product_") && opOf(o) !== "design_request" && opOf(o) !== "publish_store" && opOf(o) !== "studio_job"),
     storeChanges: sanitizeStoreChanges(all.filter((o) => opOf(o) === "store_setting")),
     productChanges: sanitizeStoredProductChanges(all),
   };

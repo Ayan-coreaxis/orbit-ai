@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { STUDIO_AGENT_IDS } from "@/lib/studio/config";
 
 export const PLAN_LABELS: Record<string, string> = {
   starter: "Starter",
@@ -65,7 +66,9 @@ function startOfMonth(): Date {
 
 async function getUsageSince(businessId: string, since: Date): Promise<number> {
   const result = await prisma.agentUsage.aggregate({
-    where: { businessId, createdAt: { gte: since } },
+    // Orbit Studio's images/videos have their own monthly count limits (lib/studio/config.ts),
+    // so their spend doesn't eat into the AI-chat budget.
+    where: { businessId, createdAt: { gte: since }, agentId: { notIn: [STUDIO_AGENT_IDS.image, STUDIO_AGENT_IDS.video] } },
     _sum: { costUsd: true },
   });
   return result._sum.costUsd ?? 0;

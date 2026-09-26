@@ -31,6 +31,19 @@ export const KEY_ENV_MAP: Record<string, string> = {
   web_search_limit_starter: "WEB_SEARCH_LIMIT_STARTER",
   web_search_limit_growth: "WEB_SEARCH_LIMIT_GROWTH",
   web_search_limit_scale: "WEB_SEARCH_LIMIT_SCALE",
+  gemini_image: "GEMINI_API_KEY",
+  seedance_video: "SEEDANCE_API_KEY",
+  studio_enabled: "STUDIO_ENABLED",
+  studio_image_model: "STUDIO_IMAGE_MODEL",
+  studio_video_model: "STUDIO_VIDEO_MODEL",
+  studio_video_base_url: "SEEDANCE_BASE_URL",
+  studio_video_resolution: "STUDIO_VIDEO_RESOLUTION",
+  studio_image_cost: "STUDIO_IMAGE_COST_USD",
+  studio_video_cost_per_sec: "STUDIO_VIDEO_COST_PER_SEC_USD",
+  studio_limit_images_growth: "STUDIO_LIMIT_IMAGES_GROWTH",
+  studio_limit_videos_growth: "STUDIO_LIMIT_VIDEOS_GROWTH",
+  studio_limit_images_scale: "STUDIO_LIMIT_IMAGES_SCALE",
+  studio_limit_videos_scale: "STUDIO_LIMIT_VIDEOS_SCALE",
 };
 
 function readLines(): string[] {

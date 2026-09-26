@@ -553,6 +553,12 @@ export function OrchestratorChat({
                   </div>
                 )}
               </div>
+              {/* Files Orbit made for the owner (e.g. an Orbit Studio image or reel). */}
+              {!!m.attachments?.length && (
+                <div className="mt-2 pl-8">
+                  <MessageFiles files={m.attachments} align="start" />
+                </div>
+              )}
               {/* Only while this request is still open (the owner hasn't replied since) and only if it asks for a file. */}
               {m.needsUser && idx > lastUserIdx && fileNeedLabel(m.content) && (
                 <button

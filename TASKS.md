@@ -228,6 +228,17 @@ User feedback: a separate Strategy Lab page + separate plan chat was wrong — t
 - [x] Verified via API on TERRA: draft → approve → coupon order counted (1 vs 0) → pause → invalid transition rejected. Page renders 200, no server errors.
 - [ ] Not yet: chat-based plan editing/brainstorm (Hissa 2), Orbit executing its own steps automatically (Hissa 3), Jev (Hissa 4, Jev is down), agents-as-data (Hissa 5), events/review loop (Hissa 6). Old weekly `runCompetitorAnalysis` plan still runs in parallel, untouched.
 
+## ✅ Done (added 2026-09-26, Orbit Studio — AI images, reels, UGC, try-on & ads, Growth/Scale plans)
+- [x] 21 content formats (11 image, 10 video) defined as data in `lib/studio/formats.ts` — each shows the seller "what you'll get" and asks only for the material it needs
+- [x] Director (Claude + `lib/studio/director-guide.ts`) plans storyboard, script, caption and exact prompts before anything is spent; seller can change the plan
+- [x] Direct model calls (`lib/studio/providers.ts`): Nano Banana 2 for images, Seedance 2.0 for video with sound; videos start from a first frame made with the real product photo
+- [x] Monthly allowances per plan (Growth 50 images / 5 reels, Scale 100 / 12), failed jobs free, double-click safe; spend logged in AgentUsage but excluded from the AI-chat cap
+- [x] Content page Studio UI (gallery → material → director's plan → progress → result), "My creations", brand face reuse
+- [x] Orchestrator can propose content (`create_content`); after Apply the result is posted back into the chat
+- [x] Super Admin > Studio: keys, model ids, prices, limits, live test buttons, per-seller spend
+- [ ] Add real Google AI Studio + BytePlus ModelArk keys and confirm model ids with the Test buttons (only mock-tested so far)
+- [ ] Post a finished image/reel straight to Instagram/Facebook from Content (Meta posting code exists; needs a public media URL → R2)
+
 ## 🔲 Not done yet — next up
 
 - [ ] **Twilio credentials not yet added** — the WhatsApp send code is real and wired in, but nobody has added a Twilio Account SID / Auth Token / WhatsApp sender in Admin yet, so it's never actually fired. Get a Twilio account (they offer a free WhatsApp sandbox number for testing — no paid plan needed to try it) and add the 3 keys to test end-to-end.

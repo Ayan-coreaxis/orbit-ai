@@ -6,6 +6,7 @@ import { STORE_CHANGES_SCHEMA, applyStoreChanges, splitPendingOps } from "@/lib/
 import { after } from "next/server";
 import { STORE_DESIGN_SCHEMA, describeDesignJobs, runDesignJobs, sanitizeStoredDesignJobs } from "@/lib/design-ops";
 import { DELETE_PRODUCTS_SCHEMA, NEW_PRODUCTS_SCHEMA, PRODUCT_CHANGES_SCHEMA, applyProductChanges } from "@/lib/product-ops";
+import { CREATE_CONTENT_SCHEMA, describeStudioRequests, runStudioRequests, sanitizeStoredStudioRequests } from "@/lib/studio/ops";
 
 /**
  * The growth plan lives inside "Talk to your Orchestrator" — there is one chat, one Orchestrator.
@@ -57,6 +58,7 @@ export const ORCHESTRATOR_TOOL: Anthropic.Messages.Tool = {
       new_products: NEW_PRODUCTS_SCHEMA as unknown as Record<string, unknown>,
       store_design: STORE_DESIGN_SCHEMA as unknown as Record<string, unknown>,
       delete_products: DELETE_PRODUCTS_SCHEMA as unknown as Record<string, unknown>,
+      create_content: CREATE_CONTENT_SCHEMA as unknown as Record<string, unknown>,
       draft_new_plan: {
         type: "boolean",
         description: "True only when the owner asks for a (new) growth plan to be made. Orbit then drafts a full plan from their real numbers.",
@@ -277,6 +279,7 @@ export async function resolveProposal(businessId: string, messageId: string, act
     rawAll = [];
   }
   const designJobs = sanitizeStoredDesignJobs(Array.isArray(rawAll) ? rawAll : []);
+  const studioJobs = sanitizeStoredStudioRequests(Array.isArray(rawAll) ? rawAll : []);
   const ops = sanitizeOps(planOps);
   if (ops.length && !m.planId) throw new Error("That plan is no longer open.");
   const applied = [
@@ -284,9 +287,11 @@ export async function resolveProposal(businessId: string, messageId: string, act
     ...(await applyProductChanges(businessId, productChanges, (await prisma.business.findUnique({ where: { id: businessId }, select: { storeCurrency: true } }))?.storeCurrency || "usd")),
     ...(ops.length ? await applyPlanOps(businessId, m.planId!, ops) : []),
     ...describeDesignJobs(designJobs).map((d) => `${d} — Orbit Design is on it; I'll post here when it's done`),
+    ...describeStudioRequests(studioJobs).map((d) => `${d.replace(/ — uses 1 .*$/, "")} — being made; it'll show up here and in Content`),
   ];
   // Design work takes a minute or two — run it after the response and report back in the chat.
   if (designJobs.length) after(() => runDesignJobs(businessId, designJobs, m.planId));
+  if (studioJobs.length) after(() => runStudioRequests(businessId, studioJobs));
   await prisma.orchestratorMessage.update({ where: { id: m.id }, data: { opsState: "applied", opsSummary: JSON.stringify(applied) } });
   return applied;
 }
