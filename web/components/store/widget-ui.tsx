@@ -187,15 +187,17 @@ function Confetti() {
   const pieces = useMemo(
     () =>
       Array.from({ length: 18 }, (_, i) => {
-        const angle = (i / 18) * Math.PI * 2 + Math.random() * 0.4;
-        const dist = 90 + Math.random() * 110;
+        // Fixed scatter per piece (render must stay pure); still looks random.
+        const r = (n: number) => { const x = Math.sin((i + 1) * 12.9898 + n * 78.233) * 43758.5453; return x - Math.floor(x); };
+        const angle = (i / 18) * Math.PI * 2 + r(1) * 0.4;
+        const dist = 90 + r(2) * 110;
         return {
           key: i,
           x: Math.cos(angle) * dist,
           y: Math.sin(angle) * dist - 40,
-          rot: Math.round(Math.random() * 540 - 270),
-          delay: Math.random() * 0.15,
-          dur: 0.9 + Math.random() * 0.5,
+          rot: Math.round(r(3) * 540 - 270),
+          delay: r(4) * 0.15,
+          dur: 0.9 + r(5) * 0.5,
           color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
         };
       }),

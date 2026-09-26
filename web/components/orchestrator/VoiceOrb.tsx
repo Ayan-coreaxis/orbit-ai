@@ -18,7 +18,7 @@ export interface VoiceOrbHandle {
   setSpeaking: (speaking: boolean) => void;
 }
 
-function rmsLevel(analyser: AnalyserNode, data: Uint8Array): number {
+function rmsLevel(analyser: AnalyserNode, data: Uint8Array<ArrayBuffer>): number {
   analyser.getByteTimeDomainData(data);
   let sumSquares = 0;
   for (let i = 0; i < data.length; i++) {

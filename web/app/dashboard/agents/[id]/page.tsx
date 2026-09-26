@@ -110,6 +110,11 @@ const NO_AI_DESCRIPTION: Record<string, React.ReactNode> = {
   ),
 };
 
+/** Milliseconds since `d`, at request time (this is a server component, rendered per request). */
+function msSince(d: Date | string): number {
+  return Date.now() - new Date(d).getTime();
+}
+
 export default async function AgentDetailPage({
   params,
 }: {
@@ -130,7 +135,7 @@ export default async function AgentDetailPage({
 
   const realStatus = !usage?.lastRunAt
     ? ("never" as const)
-    : Date.now() - usage.lastRunAt.getTime() < 60 * 60 * 1000
+    : msSince(usage.lastRunAt) < 60 * 60 * 1000
       ? ("active" as const)
       : ("idle" as const);
 
@@ -171,7 +176,7 @@ export default async function AgentDetailPage({
           </div>
           {!agent.live ? (
             <p className="mt-4 text-[14px] text-text-faint">
-              This agent doesn't run yet — there's no real activity to show. It's on the roadmap.
+              This agent doesn&apos;t run yet — there&apos;s no real activity to show. It&apos;s on the roadmap.
             </p>
           ) : NO_AI_AGENTS.has(id) ? (
             <p className="mt-4 text-[14px] text-text-dim">{NO_AI_DESCRIPTION[id]}</p>

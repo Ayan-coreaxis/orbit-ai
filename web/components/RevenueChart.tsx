@@ -49,7 +49,7 @@ export function RevenueChart({ data }: { data: RevenuePoint[] }) {
           }}
           labelStyle={{ color: "var(--text-dim)" }}
           itemStyle={{ color: "var(--text)" }}
-          formatter={(v: number) => [`$${v.toLocaleString()}`, "Revenue"]}
+          formatter={(v) => [`$${Number(v).toLocaleString()}`, "Revenue"]}
         />
         <Area
           type="monotone"

@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { CART_EVENT, cartCount, cartTotal, lineKey, readCart, setQty, type CartLine } from "./cart-store";
+import { useState } from "react";
+import { lineKey, setQty, useCart } from "./cart-store";
 import { money } from "@/lib/money";
 
 /** Floating cart pill that opens a slide-out drawer (line items + checkout). */
@@ -31,29 +31,11 @@ export function StoreCartBar({
     ["--od-radius" as string]: `${t.radius ?? 12}px`,
     ["--od-font-body" as string]: t.fontBody || "system-ui, sans-serif",
   };
-  const [count, setCount] = useState(0);
-  const [total, setTotal] = useState(0);
-  const [lines, setLines] = useState<CartLine[]>([]);
-  const [open, setOpen] = useState(false);
-
-  useEffect(() => {
-    const sync = () => {
-      setCount(cartCount(businessId));
-      setTotal(cartTotal(businessId));
-      setLines(readCart(businessId));
-    };
-    sync();
-    window.addEventListener(CART_EVENT, sync);
-    window.addEventListener("storage", sync);
-    return () => {
-      window.removeEventListener(CART_EVENT, sync);
-      window.removeEventListener("storage", sync);
-    };
-  }, [businessId]);
-
-  useEffect(() => {
-    if (count === 0) setOpen(false);
-  }, [count]);
+  const lines = useCart(businessId);
+  const count = lines.reduce((s, l) => s + l.qty, 0);
+  const total = lines.reduce((s, l) => s + l.qty * l.price, 0);
+  const [openWanted, setOpen] = useState(false);
+  const open = openWanted && count > 0; // an emptied cart closes itself
 
   if (count === 0) return null;
 

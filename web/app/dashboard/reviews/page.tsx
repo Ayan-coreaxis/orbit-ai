@@ -1,5 +1,5 @@
 import { Topbar } from "@/components/Topbar";
-import { Card, SectionLabel, Pill } from "@/components/ui";
+import { Card, Pill } from "@/components/ui";
 import { getActiveBusinessId } from "@/lib/get-active-business-id";
 import { prisma } from "@/lib/prisma";
 import { Star, AlertTriangle } from "lucide-react";

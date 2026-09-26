@@ -33,7 +33,7 @@ export default async function OrderConfirmationPage({
     await finalizeStripeOrder(businessId, session_id, origin).catch(() => {});
   }
 
-  let order = await prisma.order.findUnique({ where: { id: orderId } });
+  const order = await prisma.order.findUnique({ where: { id: orderId } });
   if (!order || order.businessId !== businessId) notFound();
 
   const business = await prisma.business.findUnique({

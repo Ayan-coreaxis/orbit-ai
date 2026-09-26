@@ -21,7 +21,18 @@ export default function ApiKeysPage() {
   }
 
   useEffect(() => {
-    loadStatus();
+    let alive = true;
+    fetch("/api/admin/settings")
+      .then((r) => r.json())
+      .then((data) => {
+        if (!alive) return;
+        setStatus(data.status ?? {});
+        setLoaded(true);
+      })
+      .catch(() => alive && setLoaded(true));
+    return () => {
+      alive = false;
+    };
   }, []);
 
   async function save(id: string) {
@@ -99,7 +110,7 @@ export default function ApiKeysPage() {
         <Card className="p-6">
           <SectionLabel>Where these are used</SectionLabel>
           <p className="mt-2 text-[13.5px] leading-relaxed text-text-dim">
-            Saving here writes straight to the server's <code>.env.local</code> file — the same
+            Saving here writes straight to the server&apos;s <code>.env.local</code> file — the same
             place the Competitor Intelligence and Strategy Orchestrator agents already read from.
             Once Anthropic shows &quot;Connected&quot;, real onboarding reports start working
             immediately, no restart needed. Stripe, Meta, and Twilio are stored the same way, ready

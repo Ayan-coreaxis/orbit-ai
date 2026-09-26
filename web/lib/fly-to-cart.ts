@@ -52,7 +52,6 @@ export function flyToCart(sourceEl: HTMLElement | null, imageUrl: string | null 
     const badge = cartLink.querySelector<HTMLElement>("[data-od-cart-count]");
     if (badge) {
       badge.classList.remove("od-cart-badge-pop");
-      // eslint-disable-next-line @typescript-eslint/no-unused-expressions
       void badge.offsetWidth; // restart the animation if it's still mid-pop from a rapid add
       badge.classList.add("od-cart-badge-pop");
     }

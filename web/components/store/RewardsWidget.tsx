@@ -40,7 +40,7 @@ export function RewardsWidget({
   businessId,
   currency,
   widgetCopy = {},
-  widgetMotion = "standard",
+  widgetMotion: _widgetMotion = "standard",
 }: {
   businessId: string;
   currency?: string;
@@ -174,7 +174,7 @@ function GiftCardBlock({
   return (
     <div style={wCard}>
       <div style={{ fontSize: 13.5, fontWeight: 600 }}>{copyText("rewards.checkGiftCard", widgetCopy)}</div>
-      <p style={{ marginTop: 4, fontSize: 12.5, color: "var(--od-muted)" }}>Enter a gift card code to see what's left on it.</p>
+      <p style={{ marginTop: 4, fontSize: 12.5, color: "var(--od-muted)" }}>Enter a gift card code to see what&apos;s left on it.</p>
       <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
         <input
           value={code}

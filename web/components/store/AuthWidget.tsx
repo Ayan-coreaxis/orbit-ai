@@ -18,7 +18,7 @@ export function AuthWidget({
   onDone,
   initialTab = "in",
   widgetCopy = {},
-  widgetMotion = "standard",
+  widgetMotion: _widgetMotion = "standard",
 }: {
   businessId: string;
   authMode: AuthMode;

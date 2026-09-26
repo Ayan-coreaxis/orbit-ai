@@ -20,23 +20,22 @@ export function StoreAnalyticsCard({
 }) {
   const [range, setRange] = useState<number>(initial?.rangeDays ?? 30);
   const [data, setData] = useState<StoreAnalytics | null>(initial ?? null);
-  const [loading, setLoading] = useState(!initial);
+  const [loadedRange, setLoadedRange] = useState<number | null>(null);
+  const loading = loadedRange !== range; // true until the numbers for the picked range arrive
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
     fetch(`/api/store/${businessId}/admin/analytics?range=${range}`)
       .then((r) => r.json())
       .then((d: StoreAnalytics) => {
         if (!cancelled && d && Array.isArray(d.funnel)) setData(d);
       })
       .catch(() => {})
-      .finally(() => !cancelled && setLoading(false));
+      .finally(() => !cancelled && setLoadedRange(range));
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [range]);
+  }, [range, businessId]);
 
   if (!data) {
     return (

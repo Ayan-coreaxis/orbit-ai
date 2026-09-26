@@ -44,7 +44,7 @@ export async function PATCH(req: NextRequest) {
     const existing = await prisma.business.findUnique({ where: { id: businessId }, select: { stripeSecretKey: true, stripePublishableKey: true } });
     const willHaveSecret = secret ?? existing?.stripeSecretKey;
     const willHavePublishable = pub ?? existing?.stripePublishableKey;
-    if (hasNewKeys && (secret !== undefined && !secret.startsWith("sk_"))) {
+    if (hasNewKeys && secret != null && !secret.startsWith("sk_")) {
       return NextResponse.json({ error: "That doesn't look like a real Stripe secret key (should start with sk_)." }, { status: 400 });
     }
     if (!willHaveSecret || !willHavePublishable) {

@@ -54,6 +54,12 @@ interface LoyaltyInfo {
   minRedeem: number;
 }
 
+function newClientToken(): string {
+  // randomUUID needs a secure context (https / localhost); fall back so http custom domains still work.
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") return crypto.randomUUID();
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`;
+}
+
 export function CartWidget({
   businessId,
   storeName,
@@ -106,8 +112,8 @@ export function CartWidget({
   const [addrChoice, setAddrChoice] = useState<string>(""); // "" = new address, else an address id
   const prefilled = useRef(false);
   const [reloadMe, setReloadMe] = useState(0);
-  const clientToken = useRef<string>("");
-  if (!clientToken.current && typeof crypto !== "undefined") clientToken.current = crypto.randomUUID();
+  // One id per checkout attempt, so a double-submitted order is only created once.
+  const [clientToken] = useState(newClientToken);
 
   const items = useMemo(
     () =>
@@ -330,7 +336,7 @@ export function CartWidget({
           giftCardCode: quote?.giftCardCode ?? undefined,
           loyaltyPointsRedeem: quote?.loyaltyPointsRedeemed ?? undefined,
           payment,
-          clientToken: clientToken.current,
+          clientToken,
           customFields: customFieldValues,
         }),
       });

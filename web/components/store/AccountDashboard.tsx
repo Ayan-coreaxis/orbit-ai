@@ -85,7 +85,7 @@ export function AccountDashboard({
       .then((r) => r.json())
       .then((d) => setMe(d.customer ?? null))
       .catch(() => setMe(null));
-  }, [base]);
+  }, [base, setMe]);
 
   useEffect(loadMe, [loadMe]);
 

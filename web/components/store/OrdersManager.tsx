@@ -297,7 +297,8 @@ export function OrdersManager({
                     onChange={(e) =>
                       setSel((cur) => {
                         const next = new Set(cur);
-                        e.target.checked ? next.add(o.id) : next.delete(o.id);
+                        if (e.target.checked) next.add(o.id);
+                        else next.delete(o.id);
                         return next;
                       })
                     }

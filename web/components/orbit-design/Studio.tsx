@@ -972,17 +972,21 @@ function StudioIdentity({
   accent?: string;
 }) {
   const [swapped, setSwapped] = useState(initialWired);
-  const [animating, setAnimating] = useState(false);
+  const [animating, setAnimating] = useState(wired && !initialWired);
+  const [seenWired, setSeenWired] = useState(wired);
+  if (seenWired !== wired) {
+    setSeenWired(wired);
+    if (wired && !swapped) setAnimating(true); // just got wired — play the flip once
+  }
   useEffect(() => {
-    if (!wired || swapped) return;
-    setAnimating(true);
+    if (!animating) return;
     const a = setTimeout(() => setSwapped(true), 470); // flip apex — icon + wordmark cross here
     const b = setTimeout(() => setAnimating(false), 1000);
     return () => {
       clearTimeout(a);
       clearTimeout(b);
     };
-  }, [wired, swapped]);
+  }, [animating]);
 
   return (
     <div className="flex items-center gap-2.5" style={{ "--od-id-accent": accent || "#c9803f" } as React.CSSProperties}>
@@ -1111,10 +1115,14 @@ function HandoffOverlay({
   const running = phase === "wiring" || phase === "asking";
   const [step, setStep] = useState(0);
   const [revealing, setRevealing] = useState(false);
+  const [wasRunning, setWasRunning] = useState(running);
+  if (wasRunning !== running) {
+    setWasRunning(running);
+    if (running) setStep(0); // a new handoff starts from the first step
+  }
 
   useEffect(() => {
     if (!running) return;
-    setStep(0);
     const id = setInterval(() => setStep((s) => Math.min(s + 1, HANDOFF_STEPS.length - 2)), 1400);
     return () => clearInterval(id);
   }, [running]);

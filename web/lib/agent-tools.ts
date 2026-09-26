@@ -6,7 +6,7 @@ import type { McpConnection } from "@prisma/client";
 export interface AnthropicToolDef {
   name: string;
   description: string;
-  input_schema: Record<string, unknown>;
+  input_schema: { type: "object"; [key: string]: unknown };
 }
 
 interface ToolMapEntry {
@@ -72,7 +72,8 @@ export async function loadAgentTools(
           name,
           description: `[${conn.name}] ${t.description ?? t.name}`,
           input_schema:
-            t.inputSchema && Object.keys(t.inputSchema).length > 0 ? t.inputSchema : { type: "object", properties: {} },
+            // Anthropic requires a top-level object schema; MCP servers sometimes omit "type".
+            t.inputSchema && Object.keys(t.inputSchema).length > 0 ? { ...t.inputSchema, type: "object" } : { type: "object", properties: {} },
         });
         toolMap.set(name, { connection: conn, realToolName: t.name, sessionId, authToken: token });
       }

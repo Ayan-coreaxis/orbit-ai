@@ -34,7 +34,15 @@ export function SkillsManager() {
     }
   }
   useEffect(() => {
-    load();
+    let alive = true;
+    fetch("/api/skills")
+      .then((r) => r.json())
+      .then((data) => alive && setSkills(data.skills ?? []))
+      .catch(() => {})
+      .finally(() => alive && setLoading(false));
+    return () => {
+      alive = false;
+    };
   }, []);
 
   async function save() {

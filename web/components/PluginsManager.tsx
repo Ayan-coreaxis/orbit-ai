@@ -23,18 +23,16 @@ export function PluginsManager() {
   const [busy, setBusy] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
 
-  async function load() {
-    setLoading(true);
-    try {
-      const res = await fetch("/api/plugins");
-      const data = await res.json();
-      setPlugins(data.plugins ?? []);
-    } finally {
-      setLoading(false);
-    }
-  }
   useEffect(() => {
-    load();
+    let alive = true;
+    fetch("/api/plugins")
+      .then((r) => r.json())
+      .then((data) => alive && setPlugins(data.plugins ?? []))
+      .catch(() => {})
+      .finally(() => alive && setLoading(false));
+    return () => {
+      alive = false;
+    };
   }, []);
 
   async function toggle(p: Plugin) {

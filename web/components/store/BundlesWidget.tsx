@@ -28,7 +28,7 @@ export function BundlesWidget({
   businessId,
   currency,
   widgetCopy = {},
-  widgetMotion = "standard",
+  widgetMotion: _widgetMotion = "standard",
 }: {
   businessId: string;
   currency?: string;

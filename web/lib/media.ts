@@ -97,7 +97,7 @@ export async function saveMedia(
   const existing = await findDuplicate(businessId, hash);
   if (existing) return { ...existing, duplicate: true };
   let stored: { url: string; bytes: number };
-  let frames: string[] = [];
+  const frames: string[] = [];
   let text: string | null = null;
   let note: string | null = null;
 

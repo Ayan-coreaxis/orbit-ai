@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ChevronRight, Loader2, Eye, EyeOff, Trash2, ExternalLink } from "lucide-react";
-import type { DesignContent, DesignTokens, OrbitDesignDoc } from "@/lib/orbit-design";
+import type { DesignContent, OrbitDesignDoc } from "@/lib/orbit-design";
 import { scanImages, setImageSrc, splitTextRuns, replaceRun } from "@/lib/orbit-html-edit";
 import { ImageUpload } from "@/components/ImageUpload";
 
@@ -13,7 +13,7 @@ import { ImageUpload } from "@/components/ImageUpload";
  * stores never have the same sections, so this walks whatever `doc.pages[].sections[]` exist and
  * surfaces editable controls for the text runs and image slots found in each one.
  */
-export function StoreControl({ businessId }: { businessId: string }) {
+export function StoreControl({ businessId: _businessId }: { businessId: string }) {
   const [doc, setDoc] = useState<OrbitDesignDoc | null>(null);
   const [published, setPublished] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -431,7 +431,11 @@ function Text({
   busy?: boolean;
 }) {
   const [v, setV] = useState(value);
-  useEffect(() => setV(value), [value]);
+  const [seen, setSeen] = useState(value);
+  if (seen !== value) {
+    setSeen(value); // a new saved value came in — show it
+    setV(value);
+  }
   return (
     <div className="flex items-center gap-1.5">
       <input
@@ -449,7 +453,11 @@ function Text({
 
 function Colour({ value, onSave }: { value: string; onSave: (v: string) => void }) {
   const [v, setV] = useState(value);
-  useEffect(() => setV(value), [value]);
+  const [seen, setSeen] = useState(value);
+  if (seen !== value) {
+    setSeen(value); // a new saved value came in — show it
+    setV(value);
+  }
   const hex = /^#[0-9a-f]{3,8}$/i.test(v.trim()) ? v.trim() : "#000000";
   return (
     <div className="flex items-center gap-2">
@@ -490,7 +498,11 @@ function Slider({
   onSave: (v: number) => void;
 }) {
   const [v, setV] = useState(value);
-  useEffect(() => setV(value), [value]);
+  const [seen, setSeen] = useState(value);
+  if (seen !== value) {
+    setSeen(value); // a new saved value came in — show it
+    setV(value);
+  }
   return (
     <Row label={label}>
       <div className="flex items-center gap-3">
@@ -516,7 +528,11 @@ function Slider({
 
 function RawHtml({ label, value, onSave, busy }: { label: string; value: string; onSave: (v: string) => void; busy?: boolean }) {
   const [v, setV] = useState(value);
-  useEffect(() => setV(value), [value]);
+  const [seen, setSeen] = useState(value);
+  if (seen !== value) {
+    setSeen(value); // a new saved value came in — show it
+    setV(value);
+  }
   return (
     <div>
       {label && <div className="mb-1 text-[11px] font-medium uppercase tracking-wide text-text-faint">{label}</div>}

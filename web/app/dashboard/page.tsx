@@ -229,7 +229,7 @@ export default async function DashboardPage() {
                       <ProgressBar value={t.progress} />
                     </div>
                     <div className="mt-1.5 text-[12.5px] text-text-faint">
-                      {t.progress}% of this week's goal
+                      {t.progress}% of this week&apos;s goal
                     </div>
                   </div>
                 ))}
@@ -268,7 +268,7 @@ export default async function DashboardPage() {
         {/* Tasks this week */}
         {real && real.tasks.length > 0 && (
           <Card className="p-7">
-            <SectionLabel>What's happening this week</SectionLabel>
+            <SectionLabel>What&apos;s happening this week</SectionLabel>
             <div className="mt-4 divide-y divide-border">
               {real.tasks.map((t) => (
                 <div key={t.task} className="flex items-center gap-4 py-3.5">

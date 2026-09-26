@@ -23,7 +23,9 @@ const kindFromMime = (mime: string): PendingFile["kind"] =>
 export function usePendingFiles() {
   const [files, setFiles] = useState<PendingFile[]>([]);
   const filesRef = useRef(files);
-  filesRef.current = files;
+  useEffect(() => {
+    filesRef.current = files; // read by take() from event handlers, always after this commit
+  }, [files]);
 
   const add = useCallback((list: (File | { blob: Blob; name: string; transcript?: string })[]) => {
     for (const item of list.slice(0, 10)) {

@@ -131,7 +131,7 @@ export function normalizeSpec(raw: unknown): StoreBackendSpec {
   for (const c of (Array.isArray(r.collections) ? r.collections : []).slice(0, 24)) {
     if (!c || typeof c !== "object") continue;
     const cr = c as Record<string, unknown>;
-    let name = slugify(String(cr.name ?? cr.label ?? ""), 24);
+    const name = slugify(String(cr.name ?? cr.label ?? ""), 24);
     if (!name || RESERVED.has(name) || collSeen.has(name)) continue;
     collSeen.add(name);
     const fields = normFields(cr.fields);

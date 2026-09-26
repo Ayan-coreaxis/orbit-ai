@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useSyncExternalStore, type ReactNode } from "react";
 import { Package, Receipt, BarChart3, MessageSquare, Users, Ticket, LayoutTemplate } from "lucide-react";
 
 const TABS = [
@@ -13,6 +13,17 @@ const TABS = [
   { key: "messages", label: "Messages", icon: MessageSquare },
 ] as const;
 type TabKey = (typeof TABS)[number]["key"];
+
+const TAB_EVENT = "orbit-store-tab";
+
+function subscribeHash(onChange: () => void) {
+  window.addEventListener("hashchange", onChange);
+  window.addEventListener(TAB_EVENT, onChange);
+  return () => {
+    window.removeEventListener("hashchange", onChange);
+    window.removeEventListener(TAB_EVENT, onChange);
+  };
+}
 
 function readHash(): TabKey {
   if (typeof window === "undefined") return "products";
@@ -39,21 +50,12 @@ export function StoreTabs({
   messages: ReactNode;
   ordersBadge?: number;
 }) {
-  const [tab, setTab] = useState<TabKey>("products");
-
-  // hydrate from + sync to the URL hash so a tab is shareable and survives reload / back
-  useEffect(() => {
-    setTab(readHash());
-    const onHash = () => setTab(readHash());
-    window.addEventListener("hashchange", onHash);
-    return () => window.removeEventListener("hashchange", onHash);
-  }, []);
+  // The URL hash is the source of truth, so a tab is shareable and survives reload / back.
+  const tab = useSyncExternalStore(subscribeHash, readHash, () => "products" as TabKey);
 
   function select(key: TabKey) {
-    setTab(key);
-    if (typeof window !== "undefined") {
-      history.replaceState(null, "", key === "products" ? window.location.pathname : `#${key}`);
-    }
+    history.replaceState(null, "", key === "products" ? window.location.pathname : `#${key}`);
+    window.dispatchEvent(new Event(TAB_EVENT)); // replaceState doesn't fire hashchange
   }
 
   // Only the active panel is rendered, so OrdersManager / StoreAnalyticsCard don't mount

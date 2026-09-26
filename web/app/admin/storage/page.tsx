@@ -44,14 +44,23 @@ export default function StoragePage() {
   const [migration, setMigration] = useState<string | null>(null);
 
   async function load() {
-    const d = await (await fetch("/api/admin/storage")).json();
+    apply(await (await fetch("/api/admin/storage")).json());
+  }
+  function apply(d: { usage: Usage; pricing: Pricing; fields?: Record<string, Field> }) {
     setUsage(d.usage);
     setPricing(d.pricing);
     setFields(d.fields ?? {});
     setValues((v) => ({ ...v, r2_account_id: d.fields?.r2_account_id?.value ?? "", r2_bucket: d.fields?.r2_bucket?.value ?? "", r2_public_url: d.fields?.r2_public_url?.value ?? "" }));
   }
   useEffect(() => {
-    load();
+    let alive = true;
+    fetch("/api/admin/storage")
+      .then((r) => r.json())
+      .then((d) => alive && apply(d))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
   }, []);
 
   async function saveAll() {

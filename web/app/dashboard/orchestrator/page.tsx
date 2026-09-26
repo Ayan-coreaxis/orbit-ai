@@ -11,6 +11,11 @@ import { parseSummary } from "@/lib/strategy-chat";
 
 export const dynamic = "force-dynamic";
 
+/** Milliseconds since `d`, at request time (this is a server component, rendered per request). */
+function msSince(d: Date | string): number {
+  return Date.now() - new Date(d).getTime();
+}
+
 export default async function OrchestratorPage() {
   const real = await getRealPlan();
 
@@ -39,7 +44,7 @@ export default async function OrchestratorPage() {
   // Safety net: any running strategy whose Orbit steps never ran (e.g. approved before the
   // harness existed, or a background run died) gets carried out now.
   const died = (s: NonNullable<typeof lab.active>["strategies"][number]) =>
-    !!s.executedAt && s.actions.length === 0 && s.steps.some((st) => st.owner === "orbit") && Date.now() - new Date(s.executedAt).getTime() > 10 * 60 * 1000;
+    !!s.executedAt && s.actions.length === 0 && s.steps.some((st) => st.owner === "orbit") && msSince(s.executedAt) > 10 * 60 * 1000;
   if (lab.active?.strategies.some((s) => s.status === "running" && (!s.executedAt || died(s)))) {
     after(() => executeActivePlan(real.businessId));
   }

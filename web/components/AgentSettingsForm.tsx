@@ -116,7 +116,7 @@ export function AgentSettingsForm({
           <div>
             <label className="text-[13.5px] font-medium">Target-setting style</label>
             <p className="mt-0.5 text-[12.5px] text-text-faint">
-              How ambitious the Orchestrator should be when it sets this cycle's targets.
+              How ambitious the Orchestrator should be when it sets this cycle&apos;s targets.
             </p>
             <div className="mt-2.5 flex gap-2">
               {(["conservative", "balanced", "aggressive"] as const).map((v) => (
@@ -141,7 +141,7 @@ export function AgentSettingsForm({
           <div>
             <label className="text-[13.5px] font-medium">Review strictness</label>
             <p className="mt-0.5 text-[12.5px] text-text-faint">
-              How aggressively Manager/QA rewrites a specialist's task before it ships.
+              How aggressively Manager/QA rewrites a specialist&apos;s task before it ships.
             </p>
             <div className="mt-2.5 flex gap-2">
               {(["lenient", "standard", "strict"] as const).map((v) => (
@@ -285,7 +285,7 @@ export function AgentSettingsForm({
             <div>
               <div className="text-[13.5px] font-medium">WhatsApp weekly-plan notification</div>
               <p className="mt-0.5 text-[12.5px] text-text-faint">
-                Send the finished weekly plan to the business's WhatsApp number via Twilio, if one is on file.
+                Send the finished weekly plan to the business&apos;s WhatsApp number via Twilio, if one is on file.
               </p>
             </div>
             <button
@@ -335,7 +335,7 @@ export function AgentSettingsForm({
 
         {agentId === "competitor" && (
           <p className="text-[13px] text-text-faint">
-            No configurable settings for this agent yet — it scans every competitor you've added at
+            No configurable settings for this agent yet — it scans every competitor you&apos;ve added at
             onboarding, every cycle.
           </p>
         )}

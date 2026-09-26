@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { Send, Mic, Square, Volume2, VolumeX, Compass, ClipboardCheck, Paperclip, AudioLines, Upload, X } from "lucide-react";
 import { MessageFiles, PendingFiles, usePendingFiles, useVoiceNote } from "@/components/orchestrator/ChatAttachments";
@@ -101,6 +101,8 @@ function pickBestVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | n
   return [...pool].sort((a, b) => rank(a) - rank(b))[0];
 }
 
+const noSubscribe = () => () => {};
+
 export function OrchestratorChat({
   reportId,
   wantsToDiscuss,
@@ -135,7 +137,8 @@ export function OrchestratorChat({
   const [listening, setListening] = useState(false);
   const [speaking, setSpeaking] = useState(false);
   const [ttsEnabled, setTtsEnabled] = useState(true);
-  const [voiceSupported, setVoiceSupported] = useState(false);
+  // Browser-only capability: false on the server, real value once in the browser.
+  const voiceSupported = useSyncExternalStore(noSubscribe, () => !!getSpeechRecognition() && "speechSynthesis" in window, () => false);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const orbRef = useRef<VoiceOrbHandle>(null);
@@ -181,15 +184,18 @@ export function OrchestratorChat({
     };
   }, []);
 
+  const [wasSending, setWasSending] = useState(sending);
+  if (wasSending !== sending) {
+    setWasSending(sending);
+    if (sending) setStage(0); // each new reply starts the "thinking" stages over
+  }
   useEffect(() => {
     if (!sending) return;
-    setStage(0);
     const timers = THINKING_STAGES.slice(1).map((s, i) => window.setTimeout(() => setStage(i + 1), s.after));
     return () => timers.forEach((t) => window.clearTimeout(t));
   }, [sending]);
 
   useEffect(() => {
-    setVoiceSupported(!!getSpeechRecognition() && "speechSynthesis" in window);
     fetch("/api/orchestrator/seen", {
       method: "POST",
       headers: { "Content-Type": "application/json" },

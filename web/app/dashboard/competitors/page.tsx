@@ -73,7 +73,7 @@ export default async function CompetitorsPage() {
                 )}
                 <div className="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2">
                   <div>
-                    <div className="text-[12.5px] font-medium text-text-faint">What's trending for them</div>
+                    <div className="text-[12.5px] font-medium text-text-faint">What&apos;s trending for them</div>
                     <div className="mt-1 text-[14.5px] text-text-dim">{c.trending}</div>
                     {c.whyTrending && (
                       <div className="mt-2 flex items-start gap-1.5">

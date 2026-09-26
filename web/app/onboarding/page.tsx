@@ -253,10 +253,10 @@ export default function Onboarding() {
             <div ref={stepContentRef}>
               {step === 0 && (
                 <div>
-                  <h2 className="text-xl font-semibold text-white">What's your website?</h2>
+                  <h2 className="text-xl font-semibold text-white">What&apos;s your website?</h2>
                   <p className="mt-1.5 text-[14.5px] text-zinc-400">
                     Give us your real site and AI reads it — business name, what you sell, and your
-                    Instagram if it's linked — then does a real search to find your real competitors.
+                    Instagram if it&apos;s linked — then does a real search to find your real competitors.
                     Nothing here is guessed; you can edit anything before we generate your plan.
                   </p>
                   <div className="mt-6 space-y-4">
@@ -325,7 +325,7 @@ export default function Onboarding() {
                         onClick={() => setManualMode(true)}
                         className="text-[13px] font-medium text-zinc-500 hover:text-zinc-300"
                       >
-                        No website, or I'd rather type this myself →
+                        No website, or I&apos;d rather type this myself →
                       </button>
                     )}
                   </div>

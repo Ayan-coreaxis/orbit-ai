@@ -90,7 +90,7 @@ export function ReferralManager({ businessId }: { businessId: string }) {
         </button>
       </div>
       <p className="mt-1 text-[12.5px] text-text-dim">
-        Shoppers get their own referral link. A new customer gets a welcome bonus on signup; the referrer gets rewarded once that friend's first order is confirmed.
+        Shoppers get their own referral link. A new customer gets a welcome bonus on signup; the referrer gets rewarded once that friend&apos;s first order is confirmed.
       </p>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">

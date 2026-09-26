@@ -160,7 +160,7 @@ export function BundlesManager({ businessId, currency }: { businessId: string; c
         </Button>
       </div>
       <p className="mt-1 text-[12.5px] text-text-dim">
-        Sell a fixed set of real products together at one flat price. Each product's own stock is still tracked individually.
+        Sell a fixed set of real products together at one flat price. Each product&apos;s own stock is still tracked individually.
       </p>
       {products.length === 0 && <p className="mt-2 text-[12px] text-text-faint">Add some products first, then come back to bundle them.</p>}
 

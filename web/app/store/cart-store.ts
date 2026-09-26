@@ -1,5 +1,7 @@
 "use client";
 
+import { useMemo, useSyncExternalStore } from "react";
+
 /** Guest cart, per store, in localStorage. No accounts — this is the whole cart system. */
 
 export interface CartLine {
@@ -22,15 +24,45 @@ export function lineKey(l: { productId?: string; bundleId?: string; variantId?: 
   return `${l.productId ?? `bundle:${l.bundleId}`}::${l.variantId ?? ""}`;
 }
 
-export function readCart(businessId: string): CartLine[] {
-  if (typeof window === "undefined") return [];
+function parseCart(raw: string | null): CartLine[] {
   try {
-    const raw = localStorage.getItem(key(businessId));
     const parsed = raw ? (JSON.parse(raw) as CartLine[]) : [];
     return Array.isArray(parsed) ? parsed.filter((l) => l && (l.productId || l.bundleId) && l.qty > 0) : [];
   } catch {
     return [];
   }
+}
+
+export function readCart(businessId: string): CartLine[] {
+  if (typeof window === "undefined") return [];
+  try {
+    return parseCart(localStorage.getItem(key(businessId)));
+  } catch {
+    return [];
+  }
+}
+
+function rawCart(businessId: string): string {
+  try {
+    return localStorage.getItem(key(businessId)) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function subscribeCart(onChange: () => void) {
+  window.addEventListener(CART_EVENT, onChange);
+  window.addEventListener("storage", onChange);
+  return () => {
+    window.removeEventListener(CART_EVENT, onChange);
+    window.removeEventListener("storage", onChange);
+  };
+}
+
+/** The live cart for a component — re-renders on any change (this tab or another). Empty on the server. */
+export function useCart(businessId: string): CartLine[] {
+  const raw = useSyncExternalStore(subscribeCart, () => rawCart(businessId), () => "");
+  return useMemo(() => parseCart(raw), [raw]);
 }
 
 function write(businessId: string, lines: CartLine[]) {

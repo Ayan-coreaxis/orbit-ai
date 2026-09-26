@@ -32,7 +32,12 @@ function ModelPicker({
   justSaved: boolean;
 }) {
   const [selected, setSelected] = useState(value);
-  useEffect(() => setSelected(value), [value]);
+  // Follow a new saved value from the server (adjusting state during render, not in an effect).
+  const [seen, setSeen] = useState(value);
+  if (seen !== value) {
+    setSeen(value);
+    setSelected(value);
+  }
 
   const grouped = ["Latest", "Previous generation"] as const;
 
@@ -99,19 +104,23 @@ export default function AiModelPage() {
   const [justSavedRole, setJustSavedRole] = useState<"primary" | "fast" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  async function load() {
-    const res = await fetch("/api/admin/ai-model");
-    const data = await res.json();
-    if (res.ok) {
-      setModels(data.models);
-      setPrimary(data.primary);
-      setFast(data.fast);
-    }
-    setLoaded(true);
-  }
-
   useEffect(() => {
-    load();
+    let alive = true;
+    fetch("/api/admin/ai-model")
+      .then(async (res) => ({ ok: res.ok, data: await res.json() }))
+      .then(({ ok, data }) => {
+        if (!alive) return;
+        if (ok) {
+          setModels(data.models);
+          setPrimary(data.primary);
+          setFast(data.fast);
+        }
+        setLoaded(true);
+      })
+      .catch(() => alive && setLoaded(true));
+    return () => {
+      alive = false;
+    };
   }, []);
 
   async function save(role: "primary" | "fast", modelId: string) {

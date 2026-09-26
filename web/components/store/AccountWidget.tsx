@@ -64,6 +64,10 @@ export function AccountWidget({
       .catch(() => {});
   }, [businessId, me?.customer]);
 
+  // Hooks must run on every render, before the early returns below.
+  const [acting, setActing] = useState<string | null>(null);
+  const [toasts, toast] = useToast();
+
   if (me && !me.customer) {
     return <AuthWidget businessId={businessId} authMode={me.authMode} widgetCopy={widgetCopy} widgetMotion={widgetMotion} />;
   }
@@ -73,9 +77,6 @@ export function AccountWidget({
     await fetch(`/api/store/${businessId}/auth/logout`, { method: "POST" });
     router.refresh();
   }
-
-  const [acting, setActing] = useState<string | null>(null);
-  const [toasts, toast] = useToast();
 
   function reorder(o: AcctOrder) {
     for (const it of o.items) {

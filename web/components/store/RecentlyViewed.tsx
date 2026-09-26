@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useSyncExternalStore } from "react";
 import { money } from "@/lib/money";
 
 interface Item {
@@ -13,6 +13,25 @@ interface Item {
 const KEY = (b: string) => `od_recent_${b}`;
 const MAX = 8;
 
+const noSubscribe = () => () => {};
+
+function readRaw(businessId: string): string {
+  try {
+    return localStorage.getItem(KEY(businessId)) || "[]";
+  } catch {
+    return "[]";
+  }
+}
+
+function parse(raw: string): Item[] {
+  try {
+    const v = JSON.parse(raw);
+    return Array.isArray(v) ? v : [];
+  } catch {
+    return [];
+  }
+}
+
 /** Records the current product into a per-browser "recently viewed" list, and renders the rest. */
 export function RecentlyViewed({
   businessId,
@@ -23,26 +42,18 @@ export function RecentlyViewed({
   current?: Item;
   currency?: string;
 }) {
-  const [items, setItems] = useState<Item[]>([]);
+  // Read this browser's list (empty on the server), and record the current product after render.
+  const raw = useSyncExternalStore(noSubscribe, () => readRaw(businessId), () => "[]");
+  const items = useMemo(() => parse(raw).filter((x) => !current || x.id !== current.id).slice(0, 6), [raw, current]);
 
   useEffect(() => {
-    let list: Item[] = [];
+    if (!current) return;
+    const list = [current, ...parse(readRaw(businessId)).filter((x) => x.id !== current.id)].slice(0, MAX);
     try {
-      list = JSON.parse(localStorage.getItem(KEY(businessId)) || "[]");
+      localStorage.setItem(KEY(businessId), JSON.stringify(list));
     } catch {
-      list = [];
+      /* ignore */
     }
-    if (!Array.isArray(list)) list = [];
-
-    if (current) {
-      list = [current, ...list.filter((x) => x.id !== current.id)].slice(0, MAX);
-      try {
-        localStorage.setItem(KEY(businessId), JSON.stringify(list));
-      } catch {
-        /* ignore */
-      }
-    }
-    setItems(list.filter((x) => !current || x.id !== current.id).slice(0, 6));
   }, [businessId, current]);
 
   if (items.length < 2) return null;

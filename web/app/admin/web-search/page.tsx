@@ -39,7 +39,9 @@ export default function WebSearchAdminPage() {
   const [test, setTest] = useState<{ ok: boolean; reason?: string; results?: { title: string; url: string; snippet: string }[] } | null>(null);
 
   async function load() {
-    const d = (await (await fetch("/api/admin/web-search")).json()) as Data;
+    apply((await (await fetch("/api/admin/web-search")).json()) as Data);
+  }
+  function apply(d: Data) {
     setData(d);
     setEnabled(d.config.enabled || !d.config.configured);
     setCountry(d.config.country);
@@ -47,7 +49,14 @@ export default function WebSearchAdminPage() {
     setLimits(Object.fromEntries(PLANS.map((p) => [p.id, String(d.config.limits[p.id] ?? d.defaults[p.id])])));
   }
   useEffect(() => {
-    load();
+    let alive = true;
+    fetch("/api/admin/web-search")
+      .then((r) => r.json())
+      .then((d: Data) => alive && apply(d))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
   }, []);
 
   async function save() {

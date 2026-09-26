@@ -36,9 +36,11 @@ export function AuditOverlay({
   onClose: () => void;
 }) {
   const [checked, setChecked] = useState<Set<string>>(() => new Set(findings.filter((f) => f.fix).map((f) => f.id)));
-  useEffect(() => {
+  const [seenFindings, setSeenFindings] = useState(findings);
+  if (seenFindings !== findings) {
+    setSeenFindings(findings); // new audit results — pre-tick every fixable finding again
     setChecked(new Set(findings.filter((f) => f.fix).map((f) => f.id)));
-  }, [findings]);
+  }
 
   const scanning = phase === "scanning" || phase === "applying";
   const toggle = (id: string) =>
@@ -50,9 +52,13 @@ export function AuditOverlay({
     });
 
   const [stepIdx, setStepIdx] = useState(0);
+  const [seenPhase, setSeenPhase] = useState(phase);
+  if (seenPhase !== phase) {
+    setSeenPhase(phase);
+    if (phase === "scanning") setStepIdx(0); // a new scan starts from the first step
+  }
   useEffect(() => {
     if (phase !== "scanning") return;
-    setStepIdx(0);
     const id = setInterval(() => setStepIdx((s) => Math.min(s + 1, AUDIT_STEPS.length - 1)), 1600);
     return () => clearInterval(id);
   }, [phase]);

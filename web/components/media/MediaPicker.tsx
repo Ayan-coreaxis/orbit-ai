@@ -8,10 +8,15 @@ import type { UploadedMedia } from "@/lib/media-client";
 export function MediaPicker({ open, onClose, onPick }: { open: boolean; onClose: () => void; onPick: (m: UploadedMedia) => void }) {
   const [items, setItems] = useState<UploadedMedia[] | null>(null);
 
+  const [wasOpen, setWasOpen] = useState(open);
+  if (wasOpen !== open) {
+    setWasOpen(open);
+    if (open) setItems(null); // show the spinner while re-loading on every open
+  }
+
   useEffect(() => {
     if (!open) return;
     let alive = true;
-    setItems(null);
     fetch("/api/media?kind=image")
       .then((r) => r.json())
       .then((d) => alive && setItems((d.media as UploadedMedia[]) ?? []))
