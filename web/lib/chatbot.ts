@@ -44,7 +44,7 @@ export async function getChatbotReply(
 
   const business = await prisma.business.findUnique({
     where: { id: businessId },
-    include: { products: { include: { variants: true } }, pages: true, shippingZones: { orderBy: { priority: "desc" } } },
+    include: { products: { include: { variants: true } }, pages: true, shippingZones: { orderBy: { priority: "asc" } } },
   });
   if (!business) return { reply: "Sorry, this store couldn't be found.", error: "Business not found" };
 
