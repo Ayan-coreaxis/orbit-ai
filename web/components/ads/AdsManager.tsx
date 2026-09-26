@@ -23,6 +23,9 @@ type Campaign = {
   spend: number | null;
   impressions: number | null;
   clicks: number | null;
+  objective: string | null;
+  purchases: number | null;
+  purchaseValue: number | null;
   endsAt: string | null;
   source: string;
   createdAt: string;
@@ -184,6 +187,7 @@ export function AdsManager() {
                     <span className="text-[14px] font-semibold">{c.name}</span>
                     <Pill tone={c.status === "active" ? "good" : c.status === "error" ? "bad" : "warn"}>{c.status === "active" ? "Active" : c.status === "error" ? "Error" : "Paused"}</Pill>
                     {ms && ms.label !== "Paused" && ms.label !== "Running" && <Pill tone={ms.tone}>{ms.label}</Pill>}
+                    {c.objective && <span className="text-[11.5px] text-text-faint">{c.objective === "sales" ? "Optimised for sales" : "Optimised for clicks"}</span>}
                     {c.source !== "owner" && <span className="text-[11.5px] text-text-faint">by {c.source === "ads-agent" ? "Ads Agent" : "Orchestrator"}</span>}
                   </div>
                   {c.headline && <div className="mt-1 text-[13px] font-medium">{c.headline}</div>}
@@ -200,6 +204,13 @@ export function AdsManager() {
                     <Stat label="Seen" value={c.impressions != null ? c.impressions.toLocaleString() : "—"} />
                     <Stat label="Clicks" value={c.clicks != null ? c.clicks.toLocaleString() : "—"} />
                     <Stat label="Click rate" value={ctr ? `${ctr}%` : "—"} />
+                    {c.objective === "sales" && (
+                      <>
+                        <Stat label="Sales" value={c.purchases != null ? c.purchases.toLocaleString() : "—"} />
+                        <Stat label="Sales value" value={money(c.purchaseValue, c.currency)} />
+                        <Stat label="Return" value={c.purchaseValue != null && c.spend ? `${(c.purchaseValue / c.spend).toFixed(1)}×` : "—"} />
+                      </>
+                    )}
                   </div>
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     {c.status !== "active" && c.hasAd && (

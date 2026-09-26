@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { firePixel } from "@/lib/pixel-client";
 
 /**
  * Fires a single storefront analytics event on mount (a page view). `add_to_cart` and
@@ -22,6 +23,7 @@ export function StoreAnalyticsBeacon({
       const url = `/api/store/${businessId}/event`;
       // keepalive so it still lands if the user navigates away immediately
       fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body, keepalive: true }).catch(() => {});
+      if (type === "view_product" && productId) firePixel("view_product", { content_ids: [productId] });
     } catch {
       /* never break the page */
     }

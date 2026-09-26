@@ -131,7 +131,7 @@ async function uploadVideo(accountId: string, token: string, data: Buffer, name:
 export async function createPausedAd(d: AdDraft, f: Fetch = fetch) {
   const b = await prisma.business.findUnique({
     where: { id: d.businessId },
-    select: { name: true, metaAdAccountId: true, metaUserToken: true, metaAccessToken: true, metaPageId: true, metaInstagramUserId: true },
+    select: { name: true, metaAdAccountId: true, metaUserToken: true, metaAccessToken: true, metaPageId: true, metaInstagramUserId: true, metaPixelId: true },
   });
   if (!b?.metaPageId || !b.metaAccessToken) throw new MetaAdError("Connect your Facebook Page first (Settings > Instagram & Facebook).");
   if (!b.metaAdAccountId) throw new MetaAdError("No Meta ad account is connected — reconnect Meta in Settings and allow ads access.");
@@ -163,41 +163,75 @@ export async function createPausedAd(d: AdDraft, f: Fetch = fetch) {
   const name = d.name.trim().slice(0, 80) || `${b.name} — ${new Date().toISOString().slice(0, 10)}`;
   const endsAt = d.days && d.days > 0 ? new Date(Date.now() + d.days * 86400000) : null;
 
-  const created: string[] = []; // for clean-up, newest last
-  try {
+  // With the seller's pixel, optimise for purchases (Meta finds buyers, not just clickers).
+  const pixel = b.metaPixelId && /^\d{6,20}$/.test(b.metaPixelId.trim()) ? b.metaPixelId.trim() : null;
+
+  /** Campaign + ad set for one goal. Returns their ids; on failure deletes the campaign it made. */
+  const buildCampaign = async (goal: "sales" | "traffic") => {
     const campaign = await graph<{ id: string }>(
       `${account.id}/campaigns`,
       token,
-      { body: { name, objective: "OUTCOME_TRAFFIC", status: "PAUSED", special_ad_categories: [], is_adset_budget_sharing_enabled: false } },
-      f,
-    );
-    created.push(campaign.id);
-
-    const adset = await graph<{ id: string }>(
-      `${account.id}/adsets`,
-      token,
       {
         body: {
-          name: `${name} — ad set`,
-          campaign_id: campaign.id,
-          daily_budget: minorUnits(d.dailyBudget, account.currency),
-          billing_event: "IMPRESSIONS",
-          optimization_goal: "LINK_CLICKS",
-          bid_strategy: "LOWEST_COST_WITHOUT_CAP",
-          destination_type: "WEBSITE",
-          targeting: {
-            geo_locations: { countries },
-            age_min: Math.max(18, Math.min(65, d.ageMin ?? 18)),
-            age_max: Math.max(18, Math.min(65, d.ageMax ?? 65)),
-            targeting_automation: { advantage_audience: 1 },
-          },
-          ...(endsAt ? { end_time: endsAt.toISOString() } : {}),
+          name,
+          objective: goal === "sales" ? "OUTCOME_SALES" : "OUTCOME_TRAFFIC",
           status: "PAUSED",
+          special_ad_categories: [],
+          is_adset_budget_sharing_enabled: false,
         },
       },
       f,
     );
-    created.push(adset.id);
+    try {
+      const adset = await graph<{ id: string }>(
+        `${account.id}/adsets`,
+        token,
+        {
+          body: {
+            name: `${name} — ad set`,
+            campaign_id: campaign.id,
+            daily_budget: minorUnits(d.dailyBudget, account.currency),
+            billing_event: "IMPRESSIONS",
+            ...(goal === "sales"
+              ? { optimization_goal: "OFFSITE_CONVERSIONS", promoted_object: { pixel_id: pixel, custom_event_type: "PURCHASE" } }
+              : { optimization_goal: "LINK_CLICKS" }),
+            bid_strategy: "LOWEST_COST_WITHOUT_CAP",
+            destination_type: "WEBSITE",
+            targeting: {
+              geo_locations: { countries },
+              age_min: Math.max(18, Math.min(65, d.ageMin ?? 18)),
+              age_max: Math.max(18, Math.min(65, d.ageMax ?? 65)),
+              targeting_automation: { advantage_audience: 1 },
+            },
+            ...(endsAt ? { end_time: endsAt.toISOString() } : {}),
+            status: "PAUSED",
+          },
+        },
+        f,
+      );
+      return { campaign, adset };
+    } catch (e) {
+      await graph(campaign.id, token, { method: "DELETE" }, f).catch(() => {});
+      throw e;
+    }
+  };
+
+  const created: string[] = []; // for clean-up, newest last
+  try {
+    let goal: "sales" | "traffic" = pixel ? "sales" : "traffic";
+    let fallbackNote = "";
+    let built: Awaited<ReturnType<typeof buildCampaign>>;
+    try {
+      built = await buildCampaign(goal);
+    } catch (e) {
+      // Usually the pixel isn't shared with this ad account — still run the ad, optimised for clicks.
+      if (goal !== "sales") throw e;
+      goal = "traffic";
+      fallbackNote = ` (Optimised for clicks: Meta wouldn't use pixel ${pixel} with this ad account — ${e instanceof Error ? e.message : "unknown error"}. Share the pixel with the ad account in Business Settings to optimise for sales.)`;
+      built = await buildCampaign(goal);
+    }
+    const { campaign, adset } = built;
+    created.push(campaign.id, adset.id);
 
     const link = withUtm(landing, `orbit-${campaign.id}`);
     const file = await readStoredFile(media.url);
@@ -232,7 +266,8 @@ export async function createPausedAd(d: AdDraft, f: Fetch = fetch) {
         name,
         dailyBudget: d.dailyBudget,
         currency: account.currency,
-        reasoning: (d.reasoning ?? "Created by you in Orbit.").slice(0, 1000),
+        reasoning: ((d.reasoning ?? "Created by you in Orbit.") + fallbackNote).slice(0, 1000),
+        objective: goal,
         status: "paused",
         mediaId: media.id,
         thumbUrl: media.kind === "video" ? (parseList(media.frames)[0] ?? null) : media.url,
@@ -297,10 +332,20 @@ export async function syncAd(row: Row, f: Fetch = fetch) {
     {},
     f,
   );
-  const ins = await graph<{ data?: { spend?: string; impressions?: string; clicks?: string }[] }>(`${row.metaCampaignId}/insights?fields=spend,impressions,clicks&date_preset=maximum`, token, {}, f).catch(
-    () => ({ data: [] }),
-  );
+  type Act = { action_type?: string; value?: string }[];
+  const ins = await graph<{ data?: { spend?: string; impressions?: string; clicks?: string; actions?: Act; action_values?: Act }[] }>(
+    `${row.metaCampaignId}/insights?fields=spend,impressions,clicks,actions,action_values&date_preset=maximum`,
+    token,
+    {},
+    f,
+  ).catch(() => ({ data: [] }));
   const i = ins.data?.[0];
+  const pick = (list?: Act) => {
+    const hit = list?.find((a) => a.action_type === "offsite_conversion.fb_pixel_purchase") ?? list?.find((a) => a.action_type === "purchase");
+    return hit?.value != null ? Number(hit.value) : null;
+  };
+  const purchases = pick(i?.actions);
+  const purchaseValue = pick(i?.action_values);
   const review = Object.values(status.ad_review_feedback?.global ?? {})[0] ?? status.issues_info?.[0]?.error_message ?? null;
   return prisma.adCampaign.update({
     where: { id: row.id },
@@ -310,6 +355,8 @@ export async function syncAd(row: Row, f: Fetch = fetch) {
       spend: i?.spend != null ? Number(i.spend) : row.spend,
       impressions: i?.impressions != null ? Number(i.impressions) : row.impressions,
       clicks: i?.clicks != null ? Number(i.clicks) : row.clicks,
+      ...(purchases != null ? { purchases: Math.round(purchases) } : {}),
+      ...(purchaseValue != null ? { purchaseValue } : {}),
       syncedAt: new Date(),
     },
   });

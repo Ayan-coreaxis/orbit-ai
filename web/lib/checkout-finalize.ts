@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { getStoreStripe } from "@/lib/store-stripe";
 import { recordEvent } from "@/lib/store-analytics";
 import { notifyOrder } from "@/lib/order-notify";
+import { sendPurchaseEvent } from "@/lib/meta-capi";
 import { applyStockDelta, OutOfStockError } from "@/lib/checkout";
 import { earnPointsForOrder, redeemPoints, LoyaltyError } from "@/lib/loyalty";
 import { qualifyReferralForOrder } from "@/lib/referral";
@@ -111,6 +112,7 @@ export async function finalizeStripeOrder(
   // the order id — still one distinct "order_complete" per purchase.
   await recordEvent(businessId, `order:${order.id}`, "order_complete");
   await notifyOrder(order.id, "order_placed", origin).catch(() => {});
+  await sendPurchaseEvent(order.id).catch(() => {});
   await earnPointsForOrder(order.id).catch(() => {});
   await qualifyReferralForOrder(order.id).catch(() => {});
 

@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { getStoreCustomer } from "@/lib/store-auth";
 import { recordEvent } from "@/lib/store-analytics";
 import { notifyOrder, originFromRequest } from "@/lib/order-notify";
+import { adContextFrom, sendPurchaseEvent } from "@/lib/meta-capi";
 import { notifyCustomer, notifySeller } from "@/lib/notify";
 import { quoteCheckout, applyStockDelta, OutOfStockError } from "@/lib/checkout";
 import { getStoreStripe, paymentOptions } from "@/lib/store-stripe";
@@ -119,8 +120,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ bus
     items: quote.lineItems,
   });
 
+  const jar = await cookies();
   const baseData = {
     businessId,
+    adContext: JSON.stringify(adContextFrom(req, (n) => jar.get(n)?.value)),
     customerId: customer?.id ?? null,
     customerName: name.slice(0, 120),
     customerPhone: phone.slice(0, 40),
@@ -299,6 +302,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ bus
         await notifyOrder(order.id, "order_placed", origin);
       }
     }, { orderId: order.id });
+
+    await bestEffort("checkout.metaPurchase", () => sendPurchaseEvent(order.id), { orderId: order.id });
 
     if (order.verified) {
       await bestEffort("checkout.earnLoyalty", () => earnPointsForOrder(order.id), { orderId: order.id });

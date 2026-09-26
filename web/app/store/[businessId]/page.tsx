@@ -9,7 +9,6 @@ import { parseWidgetCopy } from "@/lib/widget-copy";
 import { StoreWidgets } from "@/components/store/StoreWidgets";
 import { StoreAnalyticsBeacon } from "@/components/store/StoreAnalyticsBeacon";
 import { CartSync } from "@/components/store/CartSync";
-import { StorePixels } from "@/components/store/StorePixels";
 import { StoreCartBar } from "../StoreCartBar";
 
 export const dynamic = "force-dynamic";
@@ -88,7 +87,6 @@ export default async function StorefrontPage({ params }: { params: Promise<{ bus
       />
       <script dangerouslySetInnerHTML={{ __html: storefrontRuntimeJs(businessId, sfProducts) }} />
       <CartSync businessId={businessId} />
-      <StorePixels ga4={business.ga4MeasurementId} metaPixel={business.metaPixelId} />
       <StoreCartBar businessId={businessId} accent={doc.tokens.accent} accentText={doc.tokens.accentText} currency={business.storeCurrency} tokens={doc.tokens} />
     </>
   );

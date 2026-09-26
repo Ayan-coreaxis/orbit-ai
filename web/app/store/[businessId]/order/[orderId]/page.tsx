@@ -5,10 +5,12 @@ import { tokenCss, defaultTokens, type OrbitDesignDoc } from "@/lib/orbit-design
 import { money } from "@/lib/money";
 import { finalizeStripeOrder } from "@/lib/checkout-finalize";
 import { copyText, parseWidgetCopy, statusLabel } from "@/lib/widget-copy";
+import { PixelPurchase } from "@/components/store/PixelPurchase";
 
 export const dynamic = "force-dynamic";
 
 interface Line {
+  productId?: string;
   name: string;
   price: number;
   qty: number;
@@ -67,6 +69,16 @@ export default async function OrderConfirmationPage({
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: css }} />
+      {!awaitingPayment && !cancelled && (
+        <PixelPurchase
+          orderId={order.id}
+          placedAt={order.createdAt.getTime()}
+          value={order.total}
+          currency={(business?.storeCurrency || "PKR").toUpperCase()}
+          contentIds={lines.map((l) => l.productId).filter((x): x is string => !!x)}
+          numItems={lines.reduce((s, l) => s + l.qty, 0)}
+        />
+      )}
       <div style={{ maxWidth: 560, margin: "0 auto", padding: "72px var(--od-gutter) 96px" }}>
         <div style={{ fontSize: 40 }} aria-hidden>
           {awaitingPayment ? "⏳" : cancelled ? "✕" : "🎉"}

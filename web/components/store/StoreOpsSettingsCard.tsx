@@ -15,6 +15,8 @@ interface Ops {
   courierApiKeySet: boolean;
   ga4MeasurementId: string | null;
   metaPixelId: string | null;
+  metaCapiTokenSet: boolean;
+  metaCapiNote: string | null;
   relatedProductsEnabled: boolean;
   recentlyViewedEnabled: boolean;
   currency: string;
@@ -40,10 +42,12 @@ export function StoreOpsSettingsCard({ initial }: { initial: Ops }) {
     courierApiKey: "",
     ga4MeasurementId: initial.ga4MeasurementId ?? "",
     metaPixelId: initial.metaPixelId ?? "",
+    metaCapiToken: "",
     relatedProductsEnabled: initial.relatedProductsEnabled,
     recentlyViewedEnabled: initial.recentlyViewedEnabled,
   });
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const cur = initial.currency.toUpperCase();
 
@@ -65,6 +69,7 @@ export function StoreOpsSettingsCard({ initial }: { initial: Ops }) {
       recentlyViewedEnabled: f.recentlyViewedEnabled,
     };
     if (f.courierApiKey.trim()) body.courierApiKey = f.courierApiKey.trim();
+    if (f.metaCapiToken.trim()) body.metaCapiToken = f.metaCapiToken.trim();
     const r = await fetch("/api/business/store-ops-settings", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -73,7 +78,10 @@ export function StoreOpsSettingsCard({ initial }: { initial: Ops }) {
     setBusy(false);
     if (r.ok) {
       setSaved(true);
-      setF((s) => ({ ...s, courierApiKey: "" }));
+      setError(null);
+      setF((s) => ({ ...s, courierApiKey: "", metaCapiToken: "" }));
+    } else {
+      setError(((await r.json().catch(() => ({}))) as { error?: string }).error ?? "Couldn't save.");
     }
   }
 
@@ -159,6 +167,27 @@ export function StoreOpsSettingsCard({ initial }: { initial: Ops }) {
           <span className="text-[12px] font-medium text-text-dim">Meta Pixel ID</span>
           <input className={input} value={f.metaPixelId} onChange={(e) => setF({ ...f, metaPixelId: e.target.value })} placeholder="1234567890" />
         </label>
+        <label className="grid gap-1.5 sm:col-span-2">
+          <span className="text-[12px] font-medium text-text-dim">Meta Conversions API token {initial.metaCapiTokenSet && <span className="text-good">· saved</span>}</span>
+          <input
+            className={input}
+            type="password"
+            value={f.metaCapiToken}
+            onChange={(e) => setF({ ...f, metaCapiToken: e.target.value })}
+            placeholder={initial.metaCapiTokenSet ? "Saved — paste a new one to replace it" : "Events Manager > your pixel > Settings > Generate access token"}
+          />
+          <span className="text-[11.5px] leading-relaxed text-text-faint">
+            With the Pixel ID set, every order is sent to Meta as a Purchase (from the shopper&apos;s browser and from Orbit&apos;s server), and ads made in Orbit optimise for sales
+            instead of clicks. The token makes the server side reliable; without it Orbit uses your Meta connection.
+          </span>
+          {initial.metaCapiNote && (
+            <span className={`text-[12px] ${initial.metaCapiNote.startsWith("ok:") ? "text-good" : "text-bad"}`}>
+              {initial.metaCapiNote.startsWith("ok:")
+                ? `Last purchase reached Meta ${new Date(initial.metaCapiNote.slice(3)).toLocaleString()}.`
+                : initial.metaCapiNote}
+            </span>
+          )}
+        </label>
       </div>
 
       <div className="mt-5 flex items-center gap-3">
@@ -170,6 +199,7 @@ export function StoreOpsSettingsCard({ initial }: { initial: Ops }) {
           {busy ? "Saving…" : "Save"}
         </button>
         {saved && <span className="text-[12.5px] text-good">Saved</span>}
+        {error && <span className="text-[12.5px] text-bad">{error}</span>}
       </div>
     </Card>
   );

@@ -1,5 +1,6 @@
 "use client";
 
+import { firePixel } from "@/lib/pixel-client";
 import { useMemo, useRef, useState } from "react";
 import { addToCart } from "../../app/store/cart-store";
 import { money } from "@/lib/money";
@@ -116,6 +117,7 @@ export function ProductWidget({
       body: JSON.stringify({ type: "add_to_cart", productId: product.id, referrer: document.referrer || undefined }),
       keepalive: true,
     }).catch(() => {});
+    firePixel("add_to_cart", { content_ids: [product.id], ...(currency ? { value: price * qty, currency } : {}) });
   }
 
   const canBuy = hasOpts ? !!selected && selected.stock > 0 : product.stock > 0;

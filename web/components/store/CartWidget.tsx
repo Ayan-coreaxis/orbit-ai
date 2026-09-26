@@ -1,5 +1,6 @@
 "use client";
 
+import { firePixel } from "@/lib/pixel-client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CART_EVENT, clearCart, lineKey, readCart, setQty, type CartLine } from "../../app/store/cart-store";
@@ -254,6 +255,12 @@ export function CartWidget({
       body: JSON.stringify({ type: "checkout_start", referrer: document.referrer || undefined }),
       keepalive: true,
     }).catch(() => {});
+    firePixel("checkout_start", {
+      content_ids: lines.map((l) => l.productId).filter((x): x is string => !!x),
+      num_items: lines.reduce((s, l) => s + l.qty, 0),
+      ...(currency ? { value: lines.reduce((s, l) => s + l.price * l.qty, 0), currency } : {}),
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [businessId, lines.length]);
 
   async function applyCoupon() {

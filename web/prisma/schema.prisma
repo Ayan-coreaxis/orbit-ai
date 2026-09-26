@@ -77,6 +77,8 @@ model Business {
   courierApiKey        String? // seller's own courier API token
   ga4MeasurementId     String? // seller's Google Analytics 4 id (G-XXXX), injected into their storefront
   metaPixelId          String? // seller's Meta Pixel id
+  metaCapiToken        String? // Conversions API token from Meta Events Manager (server-side purchase events)
+  metaCapiNote         String? // last Conversions API result: "ok:<iso time>" or the error to show the seller
 
   // Real platform-injected product-page sections — NOT part of the Orbit Design doc (they render
   // live personalised data per shopper), so a seller can't hide/reorder them by editing the design
@@ -310,6 +312,9 @@ model AdCampaign {
   spend          Float? // lifetime, from Meta insights, in `currency`
   impressions    Int?
   clicks         Int?
+  objective      String? // sales (optimised for Purchase on the seller's pixel) | traffic (link clicks)
+  purchases      Int? // from Meta insights, when the pixel reports purchases
+  purchaseValue  Float? // revenue Meta attributes to this ad, in `currency`
   syncedAt       DateTime?
   source         String    @default("ads-agent") // ads-agent | owner | orchestrator
   activatedAt    DateTime?
@@ -795,6 +800,8 @@ model Order {
   paymentProvider         String         @default("cod") // cod | stripe
   paymentStatus           String         @default("paid") // paid | pending | failed — cod is treated as "paid" (paid on delivery); real Stripe orders start "pending" and flip to "paid" only once a real Checkout Session is confirmed
   stripeSessionId         String? // real Stripe Checkout Session id, for real Stripe orders only
+  adContext               String? // JSON {fbp, fbc, ip, ua, url} from the checkout request — matches the Conversions API purchase to the shopper
+  capiSentAt              DateTime? // when the Purchase reached Meta's Conversions API
   flagged                 Boolean        @default(false) // real heuristic screen at checkout — never fabricated, only set when a real rule actually matched
   flagReason              String?
   confirmedAt             DateTime? // set the moment a real order auto-confirms (passed the real fraud screen) or a seller manually confirms one that was flagged

@@ -5,7 +5,6 @@ import { migrateDoc, renderPageParts, resolvePage, storefrontRuntimeJs, type Orb
 import { parseSpec } from "@/lib/orbit-backend-spec";
 import { getStoreCustomer } from "@/lib/store-auth";
 import { CartSync } from "@/components/store/CartSync";
-import { StorePixels } from "@/components/store/StorePixels";
 import { StoreCartBar } from "../../../StoreCartBar";
 import { StoreWidgets } from "@/components/store/StoreWidgets";
 import { StoreAnalyticsBeacon } from "@/components/store/StoreAnalyticsBeacon";
@@ -92,7 +91,6 @@ export default async function StorefrontSubPage({ params }: { params: Promise<{ 
       />
       <script dangerouslySetInnerHTML={{ __html: storefrontRuntimeJs(businessId, sfProducts) }} />
       <CartSync businessId={businessId} />
-      <StorePixels ga4={data.business.ga4MeasurementId} metaPixel={data.business.metaPixelId} />
       <StoreCartBar businessId={businessId} accent={doc.tokens.accent} accentText={doc.tokens.accentText} currency={data.business.storeCurrency} tokens={doc.tokens} />
     </>
   );

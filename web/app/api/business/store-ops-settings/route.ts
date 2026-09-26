@@ -23,6 +23,7 @@ export async function PATCH(req: NextRequest) {
     courierApiKey?: string | null;
     ga4MeasurementId?: string | null;
     metaPixelId?: string | null;
+    metaCapiToken?: string | null;
     relatedProductsEnabled?: boolean;
     recentlyViewedEnabled?: boolean;
     widgetMotion?: string;
@@ -44,7 +45,15 @@ export async function PATCH(req: NextRequest) {
   if (b.courierProvider !== undefined && COURIERS.includes(b.courierProvider)) data.courierProvider = b.courierProvider;
   if (b.courierApiKey !== undefined) data.courierApiKey = b.courierApiKey ? String(b.courierApiKey).trim().slice(0, 300) : null;
   if (b.ga4MeasurementId !== undefined) data.ga4MeasurementId = b.ga4MeasurementId ? String(b.ga4MeasurementId).trim().slice(0, 40) : null;
-  if (b.metaPixelId !== undefined) data.metaPixelId = b.metaPixelId ? String(b.metaPixelId).trim().slice(0, 40) : null;
+  if (b.metaPixelId !== undefined) {
+    const px = b.metaPixelId ? String(b.metaPixelId).trim() : "";
+    if (px && !/^\d{6,20}$/.test(px)) return NextResponse.json({ error: "A Meta Pixel ID is only digits — copy it from Meta Events Manager." }, { status: 400 });
+    data.metaPixelId = px || null;
+  }
+  if (b.metaCapiToken !== undefined) {
+    data.metaCapiToken = b.metaCapiToken ? String(b.metaCapiToken).trim().slice(0, 600) : null;
+    data.metaCapiNote = null;
+  }
   if (b.relatedProductsEnabled !== undefined) data.relatedProductsEnabled = !!b.relatedProductsEnabled;
   if (b.recentlyViewedEnabled !== undefined) data.recentlyViewedEnabled = !!b.recentlyViewedEnabled;
   if (b.widgetMotion !== undefined && WIDGET_MOTIONS.includes(b.widgetMotion)) data.widgetMotion = b.widgetMotion;
