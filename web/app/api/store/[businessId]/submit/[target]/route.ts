@@ -1,3 +1,4 @@
+import { throttle } from "@/lib/guard";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getStoreCustomer } from "@/lib/store-auth";
@@ -12,6 +13,8 @@ const esc = (s: string) =>
  * /records/[collection]; the cart posts to /order.)
  */
 export async function POST(req: NextRequest, { params }: { params: Promise<{ businessId: string; target: string }> }) {
+  const limited = await throttle(req, "shop-submit", 10, 600000);
+  if (limited) return limited;
   const { businessId, target } = await params;
   if (!(await storeExists(businessId))) return NextResponse.json({ error: "Store not found." }, { status: 404 });
 

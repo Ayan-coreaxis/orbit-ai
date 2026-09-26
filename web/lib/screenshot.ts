@@ -1,4 +1,5 @@
 import { REALISTIC_HEADERS } from "@/lib/scrape";
+import { assertPublicUrl, guardBrowserPage, safeFetch } from "@/lib/safe-fetch";
 
 export interface SiteShot {
   /** base64 JPEG (no data: prefix), ready for an Anthropic image block */
@@ -27,6 +28,8 @@ export async function screenshotSite(rawUrl: string): Promise<SiteShot | null> {
         locale: "en-US",
       });
       const page = await context.newPage();
+      await assertPublicUrl(url);
+      await guardBrowserPage(page);
       await page.goto(url, { waitUntil: "domcontentloaded", timeout: 20000 });
       await page.waitForTimeout(2500); // let hero images / lazy content settle
       shot = await page.screenshot({ type: "jpeg", quality: 70 }); // viewport only — bounded size
@@ -40,7 +43,7 @@ export async function screenshotSite(rawUrl: string): Promise<SiteShot | null> {
 
   let hint = "";
   try {
-    const res = await fetch(url, { headers: REALISTIC_HEADERS, signal: AbortSignal.timeout(8000) });
+    const res = await safeFetch(url, { headers: REALISTIC_HEADERS, signal: AbortSignal.timeout(8000) });
     const html = await res.text();
     const freq = new Map<string, number>();
     for (const m of html.matchAll(/#[0-9a-fA-F]{6}\b/g)) {
@@ -95,6 +98,7 @@ export async function renderDocShots(pages: { label: string; html: string }[]): 
         ] as const) {
           const ctx = await browser.newContext({ viewport: { width: view.width, height: view.height }, deviceScaleFactor: 1 });
           const page = await ctx.newPage();
+          await guardBrowserPage(page);
           try {
             await page.setContent(html, { waitUntil: "load", timeout: 15000 });
             await page.waitForTimeout(1400); // fonts + scroll-reveal + marquee settle

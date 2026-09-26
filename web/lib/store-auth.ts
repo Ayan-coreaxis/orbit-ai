@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import crypto from "crypto";
+import { secureCookie, signToken, verifyToken } from "@/lib/signed-token";
 import { prisma } from "@/lib/prisma";
 import { hashPassword, verifyPassword } from "@/lib/auth";
 import { sendWhatsAppMessage } from "@/lib/whatsapp";
@@ -20,37 +21,13 @@ const OTP_MAX_PER_HOUR = 5; // per phone / email — stops code spam (every What
 const OTP_MIN_GAP_MS = 45 * 1000;
 const OTP_MAX_ATTEMPTS = 5; // wrong guesses before a code stops working
 
-function secret(): string {
-  const s = process.env.AUTH_SECRET;
-  if (!s) throw new Error("AUTH_SECRET is not set in .env.local");
-  return s;
-}
-function sign(v: string): string {
-  return crypto.createHmac("sha256", secret()).update(v).digest("hex");
-}
-function makeToken(customerId: string): string {
-  return Buffer.from(`${customerId}.${sign(customerId)}`).toString("base64url");
-}
-function readToken(token: string): string | null {
-  try {
-    const [id, sig] = Buffer.from(token, "base64url").toString("utf-8").split(".");
-    if (!id || !sig) return null;
-    const expected = sign(id);
-    const a = Buffer.from(sig);
-    const b = Buffer.from(expected);
-    if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
-    return id;
-  } catch {
-    return null;
-  }
-}
-
 const cookieName = (businessId: string) => `sc_${businessId}`;
 
 export async function setCustomerCookie(businessId: string, customerId: string): Promise<void> {
   const store = await cookies();
-  store.set(cookieName(businessId), makeToken(customerId), {
+  store.set(cookieName(businessId), signToken(`shop:${businessId}`, customerId, MAX_AGE), {
     httpOnly: true,
+    secure: secureCookie(),
     sameSite: "lax",
     path: "/",
     maxAge: MAX_AGE,
@@ -74,7 +51,7 @@ export async function getStoreCustomer(businessId: string): Promise<StoreCustome
   const store = await cookies();
   const token = store.get(cookieName(businessId))?.value;
   if (!token) return null;
-  const id = readToken(token);
+  const id = verifyToken(`shop:${businessId}`, token);
   if (!id) return null;
   const c = await prisma.storeCustomer.findFirst({
     where: { id, businessId },

@@ -1,3 +1,4 @@
+import { throttle } from "@/lib/guard";
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { after } from "next/server";
@@ -39,6 +40,8 @@ function formatAddress(a: AddressInput, fallback: string): string {
  * run after the response so a slow Twilio never slows checkout.
  */
 export async function POST(req: NextRequest, { params }: { params: Promise<{ businessId: string }> }) {
+  const limited = await throttle(req, "shop-checkout", 20, 600000);
+  if (limited) return limited;
   const { businessId } = await params;
 
   const business = await prisma.business.findUnique({

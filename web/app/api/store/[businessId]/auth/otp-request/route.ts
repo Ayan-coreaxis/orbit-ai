@@ -1,3 +1,4 @@
+import { throttle } from "@/lib/guard";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { issueOtp } from "@/lib/store-auth";
@@ -6,6 +7,8 @@ import { getAuthMethods } from "@/lib/store-auth-methods";
 
 /** Send a login code. Signup + login are the same step for code sign-in — a new phone/email just gets a customer row. */
 export async function POST(req: NextRequest, { params }: { params: Promise<{ businessId: string }> }) {
+  const limited = await throttle(req, "shop-otp", 10, 600000);
+  if (limited) return limited;
   const { businessId } = await params;
   if (!(await storeExists(businessId))) return NextResponse.json({ error: "Store not found." }, { status: 404 });
 

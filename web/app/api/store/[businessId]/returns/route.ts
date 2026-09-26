@@ -1,9 +1,12 @@
+import { throttle } from "@/lib/guard";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getStoreCustomer } from "@/lib/store-auth";
 
 /** A signed-in customer requests a return on their own delivered order. Seller sees it in Returns. */
 export async function POST(req: NextRequest, { params }: { params: Promise<{ businessId: string }> }) {
+  const limited = await throttle(req, "shop-returns", 10, 600000);
+  if (limited) return limited;
   const { businessId } = await params;
   const customer = await getStoreCustomer(businessId);
   if (!customer) return NextResponse.json({ error: "Sign in first." }, { status: 401 });

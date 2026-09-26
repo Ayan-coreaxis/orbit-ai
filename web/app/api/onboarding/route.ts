@@ -1,3 +1,5 @@
+import { throttle } from "@/lib/guard";
+import { secureCookie } from "@/lib/signed-token";
 import { NextRequest, NextResponse, after } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { scanCompetitors } from "@/lib/competitor-intel";
@@ -22,6 +24,8 @@ interface OnboardingBody {
 }
 
 export async function POST(req: NextRequest) {
+  const limited = await throttle(req, "onboarding", 5, 86400000);
+  if (limited) return limited;
   if (!process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY === "paste_your_key_here") {
     return NextResponse.json(
       { error: "ANTHROPIC_API_KEY is not set in .env.local yet." },
@@ -88,7 +92,7 @@ export async function POST(req: NextRequest) {
       await draftGrowthPlan(business.id).catch((err) => console.warn("[onboarding] first plan draft failed", err));
     });
     const response = NextResponse.json({ businessId: business.id, productsImported });
-    response.cookies.set("businessId", business.id, { httpOnly: true, sameSite: "lax", path: "/" });
+    response.cookies.set("businessId", business.id, { httpOnly: true, secure: secureCookie(), sameSite: "lax", path: "/" });
     return response;
   } catch (e) {
     if (e instanceof UsageCapExceededError) {

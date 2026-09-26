@@ -1,3 +1,4 @@
+import { safeFetch } from "@/lib/safe-fetch";
 /**
  * A real MCP (Model Context Protocol) client — speaks JSON-RPC 2.0 over the "Streamable HTTP"
  * transport to a real remote MCP server (e.g. Higgsfield's real server at mcp.higgsfield.ai).
@@ -52,7 +53,7 @@ export async function connectMcp(serverUrl: string, authToken?: string | null): 
   };
   if (authToken) headers.Authorization = `Bearer ${authToken}`;
 
-  const res = await fetch(serverUrl, {
+  const res = await safeFetch(serverUrl, {
     method: "POST",
     headers,
     body: JSON.stringify({
@@ -93,7 +94,7 @@ export async function listMcpTools(serverUrl: string, authToken: string | null |
   };
   if (authToken) headers.Authorization = `Bearer ${authToken}`;
 
-  const res = await fetch(serverUrl, {
+  const res = await safeFetch(serverUrl, {
     method: "POST",
     headers: withSession(headers, sessionId),
     body: JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/list", params: {} }),
@@ -119,7 +120,7 @@ export async function callMcpTool(
   };
   if (authToken) headers.Authorization = `Bearer ${authToken}`;
 
-  const res = await fetch(serverUrl, {
+  const res = await safeFetch(serverUrl, {
     method: "POST",
     headers: withSession(headers, sessionId),
     body: JSON.stringify({ jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: toolName, arguments: args } }),

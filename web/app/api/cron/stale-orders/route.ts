@@ -1,3 +1,4 @@
+import { cronAllowed } from "@/lib/guard";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { applyStockDelta } from "@/lib/checkout";
@@ -16,10 +17,7 @@ interface Item {
 }
 
 export async function GET(req: NextRequest) {
-  const auth = req.headers.get("authorization");
-  if (process.env.CRON_SECRET && auth !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  if (!cronAllowed(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const cutoff = new Date(Date.now() - VERIFY_TTL_MS);
   const stale = await prisma.order.findMany({

@@ -1,4 +1,6 @@
+import { throttle } from "@/lib/guard";
 import { NextRequest, NextResponse } from "next/server";
+import { getCurrentUser } from "@/lib/auth";
 import { anthropic, MODEL_FAST } from "@/lib/anthropic";
 import { scrapePage } from "@/lib/scrape";
 import { searchWeb } from "@/lib/search";
@@ -14,6 +16,10 @@ function stripJsonFences(text: string): string {
 }
 
 export async function POST(req: NextRequest) {
+  // Signed-in sellers only — this spends AI credits and fetches websites on the server.
+  if (!(await getCurrentUser())) return NextResponse.json({ error: "Sign up first." }, { status: 401 });
+  const limited = await throttle(req, "discover", 15, 3600000);
+  if (limited) return limited;
   if (!process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY === "paste_your_key_here") {
     return NextResponse.json({ error: "ANTHROPIC_API_KEY is not set in .env.local yet." }, { status: 400 });
   }

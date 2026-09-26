@@ -1,3 +1,4 @@
+import { throttle } from "@/lib/guard";
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
@@ -9,6 +10,8 @@ import { quoteCheckout } from "@/lib/checkout";
  * (`app/api/cron/abandoned-cart-recovery`) then nudges them.
  */
 export async function POST(req: NextRequest, { params }: { params: Promise<{ businessId: string }> }) {
+  const limited = await throttle(req, "shop-abandoned", 30, 600000);
+  if (limited) return limited;
   const { businessId } = await params;
   const sess = (await cookies()).get("sc_sess")?.value;
   if (!sess) return NextResponse.json({ ok: false });

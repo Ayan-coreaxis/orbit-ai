@@ -1,3 +1,4 @@
+import { throttle } from "@/lib/guard";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyPassword, setCustomerCookie } from "@/lib/store-auth";
@@ -6,6 +7,8 @@ import { getAuthMethods } from "@/lib/store-auth-methods";
 
 /** Password sign in. Code sign-in uses /auth/otp-request + /auth/otp-verify instead. */
 export async function POST(req: NextRequest, { params }: { params: Promise<{ businessId: string }> }) {
+  const limited = await throttle(req, "shop-login", 15, 600000);
+  if (limited) return limited;
   const { businessId } = await params;
   if (!(await storeExists(businessId))) return NextResponse.json({ error: "Store not found." }, { status: 404 });
 

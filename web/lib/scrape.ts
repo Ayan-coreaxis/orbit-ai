@@ -1,4 +1,5 @@
 import { extractProductsFromHtml, extractProductsFromJsonLdStrings, formatProductSummaries, type ProductSummary } from "@/lib/structured-data";
+import { assertPublicUrl, guardBrowserPage, safeFetch } from "@/lib/safe-fetch";
 import { isApifyConfigured, scrapeInstagramProfileReal, scrapeTiktokProfileReal } from "@/lib/apify-scrape";
 import { isAdLibraryConfigured, searchAdLibrary } from "@/lib/meta-ad-library";
 import { safeSlice } from "@/lib/utils";
@@ -64,7 +65,7 @@ async function fetchWithHttp(url: string): Promise<RawFetch> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 8000);
   try {
-    const res = await fetch(url, { signal: controller.signal, headers: REALISTIC_HEADERS });
+    const res = await safeFetch(url, { signal: controller.signal, headers: REALISTIC_HEADERS });
     const html = await res.text();
     const rawProducts = extractProductsFromHtml(html);
     const title = extractTitle(html);
@@ -94,6 +95,8 @@ async function fetchWithBrowser(url: string, waitMs = 3000): Promise<RawFetch> {
       locale: "en-US",
     });
     const page = await context.newPage();
+    await assertPublicUrl(url);
+    await guardBrowserPage(page);
     await page.goto(url, { waitUntil: "domcontentloaded", timeout: 20000 });
     // give a JS challenge / lazy content a moment to resolve
     await page.waitForTimeout(waitMs);
@@ -239,7 +242,7 @@ export async function scrapePageForProducts(rawUrl: string, waitMs = 3000): Prom
 export async function fetchRawHtml(rawUrl: string): Promise<string | null> {
   const url = rawUrl.startsWith("http") ? rawUrl : `https://${rawUrl}`;
   try {
-    const res = await fetch(url, { headers: REALISTIC_HEADERS, signal: AbortSignal.timeout(8000) });
+    const res = await safeFetch(url, { headers: REALISTIC_HEADERS, signal: AbortSignal.timeout(8000) });
     return await res.text();
   } catch {
     return null;

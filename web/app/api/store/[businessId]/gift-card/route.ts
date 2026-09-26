@@ -1,9 +1,12 @@
+import { throttle } from "@/lib/guard";
 import { NextRequest, NextResponse } from "next/server";
 import { lookupGiftCard, getGiftCardSettings } from "@/lib/gift-cards";
 
 /** Public balance check — anyone holding the code can look up what's left on it, no sign-in needed
  *  (same as a real physical gift card). */
 export async function GET(req: NextRequest, { params }: { params: Promise<{ businessId: string }> }) {
+  const limited = await throttle(req, "shop-giftcard", 20, 600000);
+  if (limited) return limited;
   const { businessId } = await params;
   const settings = await getGiftCardSettings(businessId);
   if (!settings.enabled) return NextResponse.json({ enabled: false });

@@ -1,3 +1,4 @@
+import { throttle } from "@/lib/guard";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
@@ -18,6 +19,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 }
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const limited = await throttle(req, "review", 10, 600000);
+  if (limited) return limited;
   const { id } = await params;
   const review = await prisma.review.findUnique({ where: { id } });
   if (!review) return NextResponse.json({ error: "Review request not found." }, { status: 404 });

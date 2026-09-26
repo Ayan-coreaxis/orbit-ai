@@ -1,8 +1,11 @@
+import { throttle } from "@/lib/guard";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 /** Public storefront contact form → one ContactMessage row the seller sees in their dashboard. */
 export async function POST(req: NextRequest, { params }: { params: Promise<{ businessId: string }> }) {
+  const limited = await throttle(req, "shop-contact", 5, 600000);
+  if (limited) return limited;
   const { businessId } = await params;
   const business = await prisma.business.findUnique({ where: { id: businessId }, select: { id: true } });
   if (!business) return NextResponse.json({ ok: false, error: "Store not found." }, { status: 404 });

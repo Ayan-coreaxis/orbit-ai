@@ -1,8 +1,11 @@
+import { throttle } from "@/lib/guard";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 /** Guest order tracking — no account. Match by order id + the phone on the order (both required). */
 export async function POST(req: NextRequest, { params }: { params: Promise<{ businessId: string }> }) {
+  const limited = await throttle(req, "shop-lookup", 15, 600000);
+  if (limited) return limited;
   const { businessId } = await params;
   const b = (await req.json()) as { orderId?: string; phone?: string };
   const orderId = (b.orderId ?? "").trim();

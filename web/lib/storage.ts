@@ -2,6 +2,7 @@ import { mkdir, readFile, readdir, stat, unlink, writeFile } from "fs/promises";
 import path from "path";
 import { AwsClient } from "aws4fetch";
 import { prisma } from "@/lib/prisma";
+import { safeFetch } from "@/lib/safe-fetch";
 
 /**
  * Where uploaded files live. With Cloudflare R2 configured (Super Admin > Storage) new files go to
@@ -109,7 +110,7 @@ export async function readStoredFile(url: string): Promise<Buffer> {
     if (!res.ok) throw new Error(`R2 read failed (${res.status})`);
     return Buffer.from(await res.arrayBuffer());
   }
-  const res = await fetch(url, { signal: AbortSignal.timeout(20000) });
+  const res = await safeFetch(url, { signal: AbortSignal.timeout(20000) });
   if (!res.ok) throw new Error(`fetch failed (${res.status})`);
   return Buffer.from(await res.arrayBuffer());
 }

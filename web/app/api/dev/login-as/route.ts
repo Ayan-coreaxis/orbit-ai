@@ -1,3 +1,4 @@
+import { secureCookie } from "@/lib/signed-token";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { setSessionCookie } from "@/lib/auth";
@@ -7,7 +8,8 @@ import { setSessionCookie } from "@/lib/auth";
  * the signup/onboarding flow. Refuses to run in production. Used for local end-to-end testing.
  */
 export async function GET(req: NextRequest) {
-  if (process.env.NODE_ENV === "production") return NextResponse.json({ error: "disabled" }, { status: 403 });
+  // Off unless explicitly switched on for local testing — never reachable on a real deployment.
+  if (process.env.NODE_ENV === "production" || process.env.ALLOW_DEV_LOGIN !== "1") return NextResponse.json({ error: "Not found." }, { status: 404 });
 
   const url = new URL(req.url);
   const userId = url.searchParams.get("userId");
@@ -19,6 +21,6 @@ export async function GET(req: NextRequest) {
 
   await setSessionCookie(user.id);
   const res = NextResponse.json({ ok: true, user, businessId });
-  if (businessId) res.cookies.set("businessId", businessId, { httpOnly: true, sameSite: "lax", path: "/" });
+  if (businessId) res.cookies.set("businessId", businessId, { httpOnly: true, secure: secureCookie(), sameSite: "lax", path: "/" });
   return res;
 }

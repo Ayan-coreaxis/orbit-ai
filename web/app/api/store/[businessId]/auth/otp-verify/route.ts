@@ -1,3 +1,4 @@
+import { throttle } from "@/lib/guard";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { consumeOtp, setCustomerCookie } from "@/lib/store-auth";
@@ -5,6 +6,8 @@ import { storeExists } from "@/lib/store-backend";
 
 /** Verify a login code → sign the customer in. Also captures their name if this was a first sign-in. */
 export async function POST(req: NextRequest, { params }: { params: Promise<{ businessId: string }> }) {
+  const limited = await throttle(req, "shop-otp-verify", 20, 600000);
+  if (limited) return limited;
   const { businessId } = await params;
   if (!(await storeExists(businessId))) return NextResponse.json({ error: "Store not found." }, { status: 404 });
 

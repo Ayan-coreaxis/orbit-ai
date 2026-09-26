@@ -1,9 +1,13 @@
+import { throttle } from "@/lib/guard";
+import { secureCookie } from "@/lib/signed-token";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { hashPassword, setSessionCookie } from "@/lib/auth";
 import { linkPendingInvites, getMemberBusinessIds } from "@/lib/team";
 
 export async function POST(req: NextRequest) {
+  const limited = await throttle(req, "signup", 5, 3600000);
+  if (limited) return limited;
   const { email, password } = (await req.json()) as { email?: string; password?: string };
 
   if (!email?.trim() || !password) {
@@ -32,7 +36,7 @@ export async function POST(req: NextRequest) {
   const response = NextResponse.json({ id: user.id, email: user.email });
   const memberBusinessIds = await getMemberBusinessIds(user.id);
   if (memberBusinessIds[0]) {
-    response.cookies.set("businessId", memberBusinessIds[0], { httpOnly: true, sameSite: "lax", path: "/" });
+    response.cookies.set("businessId", memberBusinessIds[0], { httpOnly: true, secure: secureCookie(), sameSite: "lax", path: "/" });
   }
   return response;
 }

@@ -1,7 +1,10 @@
+import { throttle } from "@/lib/guard";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 export async function POST(req: NextRequest) {
+  const limited = await throttle(req, "returns", 10, 600000);
+  if (limited) return limited;
   const { orderId, reason } = (await req.json()) as { orderId?: string; reason?: string };
   if (!orderId || !reason?.trim()) {
     return NextResponse.json({ error: "Order and reason are required." }, { status: 400 });
@@ -9,6 +12,8 @@ export async function POST(req: NextRequest) {
 
   const order = await prisma.order.findUnique({ where: { id: orderId } });
   if (!order) return NextResponse.json({ error: "Order not found." }, { status: 404 });
+  if (order.status === "cancelled" || order.status === "pending")
+    return NextResponse.json({ error: "A return can only be requested for an order that was sent." }, { status: 400 });
 
   const existing = await prisma.returnRequest.findFirst({ where: { orderId } });
   if (existing) return NextResponse.json({ error: "A return has already been requested for this order." }, { status: 400 });

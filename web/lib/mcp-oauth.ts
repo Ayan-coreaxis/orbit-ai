@@ -1,3 +1,4 @@
+import { safeFetch } from "@/lib/safe-fetch";
 import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
 import type { McpConnection } from "@prisma/client";
@@ -28,7 +29,7 @@ export class McpOAuthError extends Error {}
 
 async function fetchJson(url: string, init?: RequestInit): Promise<Record<string, unknown> | null> {
   try {
-    const res = await fetch(url, { ...init, signal: AbortSignal.timeout(12000) });
+    const res = await safeFetch(url, { ...init, signal: AbortSignal.timeout(12000) });
     if (!res.ok) return null;
     return (await res.json()) as Record<string, unknown>;
   } catch {
@@ -49,7 +50,7 @@ export async function discoverOAuth(mcpServerUrl: string): Promise<OAuthEndpoint
   // Probe the server — an unauthenticated MCP request should 401 with a pointer to its metadata.
   let resourceMetadataUrl: string | null = null;
   try {
-    const probe = await fetch(mcpServerUrl, {
+    const probe = await safeFetch(mcpServerUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "application/json, text/event-stream" },
       body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "orbit.ai", version: "1.0.0" } } }),
@@ -106,7 +107,7 @@ export async function registerClient(
       "This server requires a manually pre-registered OAuth client, which isn't supported yet. Use an API key instead if the server offers one.",
     );
   }
-  const res = await fetch(registrationEndpoint, {
+  const res = await safeFetch(registrationEndpoint, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -160,7 +161,7 @@ interface TokenResponse {
 }
 
 async function postToken(tokenUrl: string, body: Record<string, string>): Promise<TokenResponse> {
-  const res = await fetch(tokenUrl, {
+  const res = await safeFetch(tokenUrl, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
     body: new URLSearchParams(body).toString(),
