@@ -88,7 +88,7 @@ export default async function UsagePage() {
         title="AI Usage & Cost"
         subtitle="Real Anthropic API spend, per business — computed from actual token usage, not estimated"
       />
-      <div className="max-w-[1300px] space-y-6 p-10">
+      <div className="max-w-[1300px] space-y-6 p-5 sm:p-8 lg:p-10">
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
           <Card className="p-6">
             <div className="text-[12.5px] font-medium text-text-faint">Total real spend (all time)</div>

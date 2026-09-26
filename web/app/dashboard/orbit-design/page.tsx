@@ -13,7 +13,7 @@ export default async function OrbitDesignPage() {
 
   if (!businessId) {
     return (
-      <div className="p-10">
+      <div className="p-5 sm:p-8 lg:p-10">
         <Card className="p-6">
           <p className="text-[13.5px] text-text-faint">No business yet — complete onboarding first.</p>
         </Card>

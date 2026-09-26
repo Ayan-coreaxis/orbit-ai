@@ -109,7 +109,7 @@ export default function StudioAdminPage() {
   return (
     <div>
       <Topbar title="Studio" subtitle="AI images & reels for sellers — Google Nano Banana 2 (images) + ByteDance Seedance 2.0 (video with sound), Growth & Scale plans only" />
-      <div className="max-w-[1000px] space-y-5 p-10">
+      <div className="max-w-[1000px] space-y-5 p-5 sm:p-8 lg:p-10">
         <Card className="p-6">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>

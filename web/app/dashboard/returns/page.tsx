@@ -40,10 +40,10 @@ export default async function ReturnsPage() {
         title="Returns & Disputes"
         subtitle={businessId ? `${rows.length} real return request${rows.length === 1 ? "" : "s"}` : "No business yet"}
       />
-      <div className="max-w-[1000px] space-y-6 p-10">
+      <div className="max-w-[1000px] space-y-6 p-5 sm:p-8 lg:p-10">
         {!businessId ? (
           <Card className="p-6">
-            <p className="text-[13.5px] text-text-faint">No real business yet — complete onboarding first.</p>
+            <p className="text-[13.5px] text-text-faint">No business yet — finish setup first.</p>
           </Card>
         ) : (
           <>

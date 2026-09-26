@@ -10,11 +10,11 @@ import { MetaHealth } from "@/components/settings/MetaHealth";
 const META_BLUE = "#1877F2";
 
 const STATUS_MESSAGE: Record<string, { tone: "good" | "bad" | "warn"; text: string }> = {
-  connected: { tone: "good", text: "Connected — real Page linked just now." },
-  denied: { tone: "warn", text: "Connection cancelled — you didn't approve the real Facebook login." },
-  no_pages: { tone: "warn", text: "That Facebook account doesn't manage any real Pages — connect an account that has one." },
+  connected: { tone: "good", text: "Connected — your Page is linked." },
+  denied: { tone: "warn", text: "Connection cancelled — Facebook login wasn't approved." },
+  no_pages: { tone: "warn", text: "That Facebook account doesn't manage any Pages — connect an account that has one." },
   no_business: { tone: "bad", text: "No active business to connect this to." },
-  not_configured: { tone: "bad", text: "The platform owner hasn't added a real Meta App ID/Secret yet — see Admin > API Keys." },
+  not_configured: { tone: "bad", text: "Facebook connection isn't switched on yet — the Orbit team is setting it up." },
   error: { tone: "bad", text: "Something went wrong connecting to Meta — try again." },
 };
 

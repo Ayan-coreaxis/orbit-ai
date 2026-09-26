@@ -197,7 +197,7 @@ export function AgentSettingsForm({
 
         {agentId === "ads" && (
           <div>
-            <label className="text-[13.5px] font-medium">Real daily budget cap</label>
+            <label className="text-[13.5px] font-medium">Daily budget cap</label>
             <p className="mt-0.5 text-[12.5px] text-text-faint">
               In your ad account&apos;s own currency (e.g. PKR). Sent to Meta itself as the ad&apos;s
               daily budget — Meta enforces it, not just our code. Every real ad is created PAUSED;
@@ -259,7 +259,7 @@ export function AgentSettingsForm({
         {autoApply && (
           <div className="flex items-center justify-between border-t border-border pt-5">
             <div>
-              <div className="text-[13.5px] font-medium">Auto-apply real changes</div>
+              <div className="text-[13.5px] font-medium">Apply changes automatically</div>
               <p className="mt-0.5 max-w-sm text-[12.5px] text-text-faint">{autoApply.description}</p>
             </div>
             <button
@@ -348,7 +348,7 @@ export function AgentSettingsForm({
 
       <p className="mt-6 flex items-center gap-2 text-[11.5px] text-text-faint">
         <Pill tone="neutral">
-          {agentId === "fraud" ? "Applies from your next real order" : "Applies from your next weekly cycle"}
+          {agentId === "fraud" ? "Applies from your next order" : "Applies from your next weekly cycle"}
         </Pill>
         Settings save immediately but only affect {agentId === "fraud" ? "orders" : "runs"} that haven&apos;t started yet.
       </p>

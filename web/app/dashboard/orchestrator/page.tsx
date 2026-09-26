@@ -23,7 +23,7 @@ export default async function OrchestratorPage() {
     return (
       <div>
         <Topbar title="Talk to your Orchestrator" subtitle="No business yet" />
-        <div className="mx-10 mt-6 rounded-xl border border-border bg-panel-2 px-4 py-3.5 text-[13.5px] text-text-dim">
+        <div className="mx-5 sm:mx-8 lg:mx-10 mt-6 rounded-xl border border-border bg-panel-2 px-4 py-3.5 text-[13.5px] text-text-dim">
           Complete onboarding first — the Orchestrator needs your business to talk about.
         </div>
       </div>
@@ -54,7 +54,7 @@ export default async function OrchestratorPage() {
   }
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden">
+    <div className="flex h-full flex-col overflow-hidden">
       <Topbar title="Talk to your Orchestrator" subtitle={`${real.businessName} — plan, discuss and decide together, on your real data`} />
       <div className="min-h-0 flex-1 px-6 py-5 lg:px-8">
         <OrchestratorWorkspace

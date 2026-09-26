@@ -13,6 +13,7 @@ import { DomainCard } from "@/components/settings/DomainCard";
 import { PaymentSettingsCard } from "@/components/store/PaymentSettingsCard";
 import { StoreOpsSettingsCard } from "@/components/store/StoreOpsSettingsCard";
 import { CourierCard } from "@/components/store/CourierCard";
+import { SettingsNav } from "@/components/dashboard/SettingsNav";
 import { WidgetCustomizationCard } from "@/components/store/WidgetCustomizationCard";
 import { parseWidgetCopy } from "@/lib/widget-copy";
 import { parseCheckoutCustomFields } from "@/lib/checkout-fields";
@@ -79,8 +80,9 @@ export default async function SettingsPage({
 
   return (
     <div>
-      <Topbar title="Settings & Billing" subtitle={real?.businessName ?? "No real business yet"} />
-      <div className="max-w-[1200px] space-y-8 p-10">
+      <Topbar title="Settings & Billing" subtitle={real?.businessName ?? "No business yet"} />
+      <div className="max-w-[1200px] space-y-8 p-5 sm:p-8 lg:p-10">
+        <SettingsNav />
         {billingStatus === "success" && (
           <div className="rounded-xl border border-good/30 bg-good-soft px-4 py-3 text-[13px] text-good">
             Payment received — your plan updates automatically within a few seconds of Stripe confirming it.
@@ -111,24 +113,15 @@ export default async function SettingsPage({
             Checkout was cancelled — your plan hasn&apos;t changed.
           </div>
         )}
+        <section id="plan" className="scroll-mt-24 space-y-8">
         <Card className="p-7">
-          <SectionLabel>Your plan & real usage</SectionLabel>
+          <SectionLabel>Your plan</SectionLabel>
           <p className="mt-2 max-w-2xl text-[13.5px] leading-relaxed text-text-dim">
-            {isPlatformStripeConfigured() ? (
-              <>
-                Billed via real Stripe — plan changes below charge or credit your card immediately.
-                {business?.subscriptionStatus && business.subscriptionStatus !== "active" && (
-                  <> Current subscription status: <b>{business.subscriptionStatus}</b>.</>
-                )}
-              </>
-            ) : (
-              "Stripe billing isn't connected yet, so there's no real charge or renewal date — your plan is set manually by the platform owner today."
-            )}{" "}
-            Usage is rate-limited the same way
-            Claude.ai itself works: a fast-resetting short window plus a weekly window, so you&apos;re
-            never blocked for weeks — worst case is a few hours. The monthly total is the outer bound,
-            and it&apos;s structurally kept below your plan&apos;s price — this business can never cost
-            more in real AI usage than it pays.
+            {isPlatformStripeConfigured()
+              ? "Billed monthly through Stripe. Changing plan below charges or credits the difference right away."
+              : "Online billing isn't switched on yet — your plan is set by the Orbit team."}{" "}
+            Your AI allowance refills on its own: a short window every few hours, a weekly window, and a monthly total. If you reach it, the AI pauses
+            until it refills — your store keeps selling.
           </p>
           {usage ? (
             <div className="mt-5">
@@ -143,26 +136,19 @@ export default async function SettingsPage({
 
               <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
                 {usage.session && (
-                  <UsageWindowCard label="Last 5 hours" status={usage.session} resetLabel="resets in a few hours" />
+                  <UsageWindowCard label="Next few hours" status={usage.session} resetLabel="Refills every few hours" />
                 )}
                 {usage.weekly && (
-                  <UsageWindowCard label="Last 7 days" status={usage.weekly} resetLabel="rolling weekly reset" />
+                  <UsageWindowCard label="This week" status={usage.weekly} resetLabel="Refills day by day" />
                 )}
-                <div className="rounded-xl border border-border p-4">
-                  <div className="text-[12.5px] font-medium text-text-dim">This calendar month</div>
-                  <div className="mt-1.5 text-lg font-semibold">
-                    ${usage.usedUsd.toFixed(4)}
-                    <span className="text-[13px] font-normal text-text-faint">
-                      {" "}/ {usage.capUsd === null ? "no cap" : `$${usage.capUsd.toFixed(0)}`}
-                    </span>
+                {usage.capUsd !== null ? (
+                  <UsageWindowCard label="This month" status={{ usedUsd: usage.usedUsd, capUsd: usage.capUsd, atCap: usage.blockedWindow === "monthly" }} resetLabel="Refills on the 1st" />
+                ) : (
+                  <div className="rounded-xl border border-border p-4">
+                    <div className="text-[12.5px] font-medium text-text-dim">This month</div>
+                    <div className="mt-1.5 text-lg font-semibold">No limit</div>
                   </div>
-                  {usage.capUsd !== null && (
-                    <div className="mt-2.5">
-                      <ProgressBar value={(usage.usedUsd / usage.capUsd) * 100} />
-                    </div>
-                  )}
-                  <div className="mt-1.5 text-[11px] text-text-faint">outer bound — resets next calendar month</div>
-                </div>
+                )}
               </div>
 
               {usage.blockedWindow && (
@@ -170,11 +156,11 @@ export default async function SettingsPage({
                   <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-bad" />
                   <p className="text-[12.5px] text-bad">
                     {usage.blockedWindow === "session" &&
-                      "New AI cycles are paused for a few hours — your 5-hour window will reset on its own."}
+                      "Your AI is taking a short break — it refills within a few hours, no action needed."}
                     {usage.blockedWindow === "weekly" &&
-                      "New AI cycles are paused for now — your weekly window resets on a rolling basis, so you'll have room again within the week."}
+                      "Your AI has used this week's allowance — it refills day by day. A bigger plan gives it more room."}
                     {usage.blockedWindow === "monthly" &&
-                      "New AI cycles are paused for the rest of this month. This is already visible to the platform owner — they can raise your cap without you waiting."}
+                      "Your AI has used this month's allowance and is paused until the 1st. Move to a bigger plan below to keep going now."}
                   </p>
                 </div>
               )}
@@ -219,12 +205,14 @@ export default async function SettingsPage({
           </div>
           <p className="mt-4 text-[12.5px] text-text-faint">
             {isPlatformStripeConfigured()
-              ? "Switching plans above charges or credits your card immediately via Stripe. You can also contact the platform owner for a manual change."
-              : "Plan switching isn't self-serve yet — the platform owner hasn't connected real Stripe billing. Contact them to change your plan or usage cap."}
+              ? "Switching plans charges or credits your card right away."
+              : "Online plan changes aren't switched on yet — contact the Orbit team to change your plan."}
           </p>
           {isPlatformStripeConfigured() && business?.stripeCustomerId && <ManageBillingButton />}
         </div>
+        </section>
 
+        <section id="social" className="scroll-mt-24">
         {businessId && (
           <MetaConnectCard
             appConfigured={isMetaAppConfigured()}
@@ -236,9 +224,11 @@ export default async function SettingsPage({
             metaStatus={metaStatus}
           />
         )}
+        </section>
 
-        {businessId && <DomainCard />}
+        <section id="domain" className="scroll-mt-24">{businessId && <DomainCard />}</section>
 
+        <section id="payments" className="scroll-mt-24">
         {businessId && (
           <PaymentSettingsCard
             initialProvider={business?.paymentProvider ?? "cod"}
@@ -246,7 +236,9 @@ export default async function SettingsPage({
             initialCurrency={business?.storeCurrency ?? "usd"}
           />
         )}
+        </section>
 
+        <section id="store" className="scroll-mt-24">
         {businessId && (
           <StoreOpsSettingsCard
             initial={{
@@ -267,7 +259,9 @@ export default async function SettingsPage({
             }}
           />
         )}
+        </section>
 
+        <section id="look" className="scroll-mt-24">
         {businessId && (
           <WidgetCustomizationCard
             initial={{
@@ -284,12 +278,14 @@ export default async function SettingsPage({
             }}
           />
         )}
+        </section>
 
-        {businessId && <CourierCard />}
-        {businessId && <ShippingZonesManager businessId={businessId} currency={business?.storeCurrency ?? "usd"} />}
+        <section id="courier" className="scroll-mt-24">{businessId && <CourierCard />}</section>
+        <section id="delivery" className="scroll-mt-24">{businessId && <ShippingZonesManager businessId={businessId} currency={business?.storeCurrency ?? "usd"} />}</section>
 
-        {businessId && <TeamManager />}
+        <section id="team" className="scroll-mt-24">{businessId && <TeamManager />}</section>
 
+        <section id="whatsapp" className="scroll-mt-24">
         <Card
           className="p-7 transition-colors"
           style={
@@ -322,6 +318,7 @@ export default async function SettingsPage({
             )}
           </p>
         </Card>
+        </section>
       </div>
     </div>
   );
@@ -336,17 +333,17 @@ function UsageWindowCard({
   status: { usedUsd: number; capUsd: number; atCap: boolean };
   resetLabel: string;
 }) {
+  const pct = status.capUsd > 0 ? Math.min(100, Math.round((status.usedUsd / status.capUsd) * 100)) : 0;
   return (
     <div className={cn("rounded-xl border p-4", status.atCap ? "border-bad/40 bg-bad-soft" : "border-border")}>
       <div className="text-[12.5px] font-medium text-text-dim">{label}</div>
       <div className="mt-1.5 text-lg font-semibold">
-        ${status.usedUsd.toFixed(4)}
-        <span className="text-[13px] font-normal text-text-faint"> / ${status.capUsd.toFixed(2)}</span>
+        {pct}%<span className="text-[13px] font-normal text-text-faint"> of your AI allowance used</span>
       </div>
       <div className="mt-2.5">
-        <ProgressBar value={(status.usedUsd / status.capUsd) * 100} />
+        <ProgressBar value={pct} />
       </div>
-      <div className="mt-1.5 text-[11px] text-text-faint">{resetLabel}</div>
+      <div className="mt-1.5 text-[11px] text-text-faint">{status.atCap ? "Paused until it refills" : resetLabel}</div>
     </div>
   );
 }

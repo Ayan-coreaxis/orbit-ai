@@ -12,8 +12,8 @@ export default async function FinancePage() {
 
   return (
     <div>
-      <Topbar title="How Your Store Is Doing" subtitle="Real order revenue and real margin — never estimated" />
-      <div className="max-w-[1200px] space-y-6 p-10">
+      <Topbar title="How Your Store Is Doing" subtitle="Revenue and margin from your own orders — never estimated" />
+      <div className="max-w-[1200px] space-y-6 p-5 sm:p-8 lg:p-10">
         {!real || !finance ? (
           <Card className="p-6">
             <p className="text-[13.5px] text-text-faint">
@@ -24,15 +24,15 @@ export default async function FinancePage() {
           <>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <Card className="p-5">
-                <div className="text-[12.5px] font-medium text-text-faint">Real revenue, last 7 days</div>
+                <div className="text-[12.5px] font-medium text-text-faint">Revenue, last 7 days</div>
                 <div className="mt-2.5 text-2xl font-semibold">Rs {finance.revenueLast7Days.toLocaleString()}</div>
               </Card>
               <Card className="p-5">
-                <div className="text-[12.5px] font-medium text-text-faint">Real orders, last 7 days</div>
+                <div className="text-[12.5px] font-medium text-text-faint">Orders, last 7 days</div>
                 <div className="mt-2.5 text-2xl font-semibold">{finance.ordersLast7Days}</div>
               </Card>
               <Card className="p-5">
-                <div className="text-[12.5px] font-medium text-text-faint">Real gross profit, last 7 days</div>
+                <div className="text-[12.5px] font-medium text-text-faint">Gross profit, last 7 days</div>
                 {finance.realGrossProfitLast7Days !== null ? (
                   <>
                     <div className="mt-2.5 flex items-center gap-2 text-2xl font-semibold">

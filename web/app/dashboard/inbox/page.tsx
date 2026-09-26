@@ -56,10 +56,10 @@ export default async function InboxPage() {
         subtitle={
           conversations.length > 0
             ? `${conversations.length} real conversation${conversations.length === 1 ? "" : "s"}`
-            : "No real conversations yet"
+            : "No conversations yet"
         }
       />
-      <div className="max-w-[1200px] space-y-4 p-10">
+      <div className="max-w-[1200px] space-y-4 p-5 sm:p-8 lg:p-10">
         {conversations.length === 0 ? (
           <Card className="flex flex-col items-center gap-3 p-12 text-center">
             <MessageCircle className="h-6 w-6 text-text-faint" />

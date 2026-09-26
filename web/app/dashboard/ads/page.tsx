@@ -8,7 +8,7 @@ export default async function AdsPage() {
   return (
     <div>
       <Topbar title="Ads" subtitle="Real Meta ads on Facebook & Instagram — built paused, you start the spend" />
-      <div className="max-w-[1100px] p-10">
+      <div className="max-w-[1100px] p-5 sm:p-8 lg:p-10">
         {businessId ? (
           <AdsManager />
         ) : (

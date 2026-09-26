@@ -9,7 +9,7 @@ export default async function BillingPage() {
   return (
     <div>
       <Topbar title="Billing & MRR" subtitle="Real AI cost tracked — subscription billing not connected yet" />
-      <div className="max-w-[1300px] space-y-6 p-10">
+      <div className="max-w-[1300px] space-y-6 p-5 sm:p-8 lg:p-10">
         <Card className="p-7">
           <div className="flex items-start gap-3">
             <CircleDollarSign className="mt-0.5 h-5 w-5 shrink-0 text-text-faint" />

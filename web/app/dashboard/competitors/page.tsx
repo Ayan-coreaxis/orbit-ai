@@ -17,10 +17,10 @@ export default async function CompetitorsPage() {
         subtitle={
           list
             ? `${list.length} competitor${list.length === 1 ? "" : "s"} analyzed for ${real!.businessName}`
-            : "No real competitor analysis yet"
+            : "No competitor notes yet"
         }
       />
-      <div className="max-w-[1200px] space-y-6 p-10">
+      <div className="max-w-[1200px] space-y-6 p-5 sm:p-8 lg:p-10">
         {!real && (
           <div className="flex items-start gap-3 rounded-xl border border-accent/25 bg-accent-soft px-4 py-3.5">
             <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-accent-strong" />

@@ -490,7 +490,7 @@ export function OrchestratorChat({
           <div className="flex h-full flex-col items-center justify-center gap-3 text-center text-text-faint">
             <p className="max-w-xs text-[13.5px]">
               Ask about your plan, your numbers, or brainstorm what to do next — grounded in your real data, no
-              guessing. Say &ldquo;naya plan banao&rdquo; and your growth plan appears on the right.
+              guessing. Say &ldquo;naya plan banao&rdquo; and your growth plan appears next to the chat.
             </p>
           </div>
         )}
@@ -632,7 +632,7 @@ export function OrchestratorChat({
             </button>
           </div>
         ) : (
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
           <button
             onClick={() => fileInputRef.current?.click()}
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border-strong text-text-dim hover:text-text"
@@ -660,7 +660,7 @@ export function OrchestratorChat({
             </button>
           )}
           <input
-            className="input flex-1"
+            className="input order-first min-w-0 basis-full sm:order-none sm:flex-1 sm:basis-auto"
             placeholder={listening ? "Listening…" : pending.files.length ? "Add a message (optional)…" : "Ask your Orchestrator anything…"}
             value={input}
             disabled={listening}
@@ -678,7 +678,7 @@ export function OrchestratorChat({
           />
           <button
             onClick={() => setTtsEnabled((v) => !v)}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border-strong text-text-dim hover:text-text"
+            className="ml-auto flex h-10 w-10 shrink-0 sm:ml-0 items-center justify-center rounded-full border border-border-strong text-text-dim hover:text-text"
             title={ttsEnabled ? "Mute voice replies" : "Unmute voice replies"}
           >
             {ttsEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}

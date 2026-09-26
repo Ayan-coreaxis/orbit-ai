@@ -57,7 +57,7 @@ export default function ApiKeysPage() {
         title="API Keys & Integrations"
         subtitle="Saved directly to this server's .env.local — real, not a demo"
       />
-      <div className="max-w-[900px] space-y-5 p-10">
+      <div className="max-w-[900px] space-y-5 p-5 sm:p-8 lg:p-10">
         {!loaded && <p className="text-[13.5px] text-text-faint">Loading current status…</p>}
 
         {apiKeyConfigs.map((cfg) => (

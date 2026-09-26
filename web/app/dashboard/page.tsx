@@ -1,6 +1,26 @@
 import Link from "next/link";
+import {
+  AlertTriangle,
+  ArrowRight,
+  ArrowUpRight,
+  CheckCircle2,
+  Clapperboard,
+  Eye,
+  Globe,
+  Megaphone,
+  MessageSquare,
+  Package,
+  PackageX,
+  ShoppingBag,
+  Sparkles,
+  Store,
+  Truck,
+  TrendingDown,
+  TrendingUp,
+  Wallet,
+} from "lucide-react";
 import { Topbar } from "@/components/Topbar";
-import { Card, SectionLabel, StatusBadge } from "@/components/ui";
+import { Card, SectionLabel } from "@/components/ui";
 import { AgentNetwork, type AgentActivitySummary } from "@/components/AgentNetwork";
 import { LiveFeed, type RealFeedItem } from "@/components/LiveFeed";
 import { agents } from "@/lib/mock-data";
@@ -11,51 +31,96 @@ import { formatRelativeTime } from "@/lib/format-time";
 import { prisma } from "@/lib/prisma";
 import { loadStrategyLab } from "@/lib/strategy-lab";
 import { GrowthPlanOverview } from "@/components/strategy/GrowthPlanOverview";
-import { Sparkles, TrendingUp, TrendingDown, Store } from "lucide-react";
+import { CountUp } from "@/components/dashboard/CountUp";
 import { money } from "@/lib/money";
 
-const layers = Array.from(new Set(agents.map((a) => a.layer)));
+export const dynamic = "force-dynamic";
+
 const ACTIVE_WINDOW_MS = 60 * 60 * 1000;
 
 function agentLabel(agentId: string): string {
-  if (agentId === "orchestrator-chat") return "Orchestrator Chat";
-  if (agentId === "orchestrator-meeting-router") return "Orchestrator (deciding who to consult)";
+  if (agentId === "orchestrator-chat") return "Orchestrator chat";
+  if (agentId === "orchestrator-meeting-router") return "Orchestrator (choosing who to consult)";
   if (agentId.startsWith("orchestrator-meeting-")) {
-    const specialistId = agentId.replace("orchestrator-meeting-", "");
-    const name = agents.find((a) => a.id === specialistId)?.name;
+    const name = agents.find((a) => a.id === agentId.replace("orchestrator-meeting-", ""))?.name;
     return name ? `${name} (in meeting)` : agentId;
   }
   return agents.find((a) => a.id === agentId)?.name ?? agentId;
 }
 
+function greeting(d: Date) {
+  const h = d.getHours();
+  return h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
+}
+
+const STATUS_PILL: Record<string, string> = {
+  pending: "bg-warn-soft text-warn",
+  confirmed: "bg-accent-soft text-accent-strong",
+  shipped: "bg-panel-2 text-text-dim",
+  fulfilled: "bg-good-soft text-good",
+  cancelled: "bg-bad-soft text-bad",
+};
+
+type Todo = { href: string; icon: React.ComponentType<{ className?: string }>; title: string; body: string; tone: "accent" | "warn" | "bad" | "neutral" };
+
 export default async function DashboardPage() {
   const real = await getBusinessSummary();
   const now = new Date();
 
-  const activityMap = real ? await getRealAgentActivity(real.businessId) : {};
-  const recent = real ? await getRecentAgentActivity(real.businessId, 8) : [];
-  const orderGrowth = real ? await getOrderGrowth(real.businessId) : null;
+  if (!real) {
+    return (
+      <div>
+        <Topbar title="Overview" subtitle="Let's set up your store" />
+        <div className="p-5 sm:p-8 lg:p-10">
+          <Card className="orbit-scale-in mx-auto max-w-xl p-8 text-center">
+            <Sparkles className="mx-auto h-8 w-8 text-accent-strong" />
+            <h2 className="mt-4 text-xl font-semibold">Welcome to Orbit</h2>
+            <p className="mt-2 text-[14px] text-text-dim">Tell Orbit about your business and your AI team gets to work — it takes a few minutes.</p>
+            <Link href="/onboarding" className="press mt-6 inline-flex items-center gap-2 rounded-xl bg-accent px-5 py-2.5 text-[14px] font-semibold text-white">
+              Start setup <ArrowRight className="h-4 w-4" />
+            </Link>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
-  const lab = real ? await loadStrategyLab(real.businessId) : null;
-  const currency = real ? (await prisma.business.findUnique({ where: { id: real.businessId }, select: { storeCurrency: true } }))?.storeCurrency ?? "usd" : "usd";
+  const businessId = real.businessId;
+  const since7 = new Date(now.getTime() - 7 * 86400000);
+  const [business, orderGrowth, lab, recentOrders, unconfirmed, flagged, lowStock, storeDesign, productCount, visitors, activityMap, recent] = await Promise.all([
+    prisma.business.findUnique({
+      where: { id: businessId },
+      select: { storeCurrency: true, metaPageId: true, courierProvider: true, metaPixelId: true, customDomainStatus: true, whatsappInboundNumber: true },
+    }),
+    getOrderGrowth(businessId),
+    loadStrategyLab(businessId),
+    prisma.order.findMany({ where: { businessId }, orderBy: { createdAt: "desc" }, take: 6, select: { id: true, customerName: true, total: true, status: true, verified: true, createdAt: true, paymentProvider: true } }),
+    prisma.order.count({ where: { businessId, verified: false, status: "pending" } }),
+    prisma.order.count({ where: { businessId, flagged: true, status: { in: ["pending", "confirmed"] } } }),
+    prisma.product.findMany({ where: { businessId, stock: { lte: 5 } }, select: { name: true, stock: true }, take: 5, orderBy: { stock: "asc" } }),
+    prisma.storeDesign.findUnique({ where: { businessId }, select: { published: true } }),
+    prisma.product.count({ where: { businessId } }),
+    prisma.$queryRaw<{ c: bigint }[]>`SELECT COUNT(DISTINCT "sessionId") AS c FROM "StoreEvent" WHERE "businessId" = ${businessId} AND "type" = 'view_store' AND "createdAt" >= ${since7}`.catch(() => [{ c: BigInt(0) }]),
+    getRealAgentActivity(businessId),
+    getRecentAgentActivity(businessId, 8),
+  ]);
+  const currency = business?.storeCurrency ?? "pkr";
+  const visitors7 = Number(visitors[0]?.c ?? 0);
+  const needsAttention = unconfirmed + flagged;
 
-  const planDraft = real
-    ? await prisma.growthPlan.findFirst({
-        where: { businessId: real.businessId, status: "draft" },
-        select: { title: true, _count: { select: { strategies: true } } },
-      })
-    : null;
+  // What to do next — only real, checkable facts, most urgent first.
+  const todos: Todo[] = [];
+  if (real.planWaiting) todos.push({ href: "/dashboard/orchestrator", icon: Sparkles, title: "Your growth plan is ready", body: "Talk it through with your Orchestrator and approve it.", tone: "accent" });
+  if (flagged) todos.push({ href: "/dashboard/store", icon: AlertTriangle, title: `${flagged} order${flagged === 1 ? "" : "s"} look suspicious`, body: "Check them before you ship.", tone: "bad" });
+  if (unconfirmed) todos.push({ href: "/dashboard/store", icon: MessageSquare, title: `${unconfirmed} COD order${unconfirmed === 1 ? "" : "s"} waiting for the customer`, body: "They were asked to confirm on WhatsApp.", tone: "warn" });
+  if (lowStock.length) todos.push({ href: "/dashboard/store", icon: PackageX, title: `${lowStock.length} product${lowStock.length === 1 ? "" : "s"} running low`, body: lowStock.map((p) => `${p.name} (${p.stock})`).join(", "), tone: "warn" });
+  if (!storeDesign?.published) todos.push({ href: "/dashboard/orbit-design", icon: Store, title: "Publish your storefront", body: productCount ? `${productCount} products are ready — design the store and publish it.` : "Tell Orbit Design what you want and it builds it live.", tone: "accent" });
+  if (!business?.courierProvider || business.courierProvider === "manual") todos.push({ href: "/dashboard/settings", icon: Truck, title: "Connect your courier", body: "Book PostEx, Leopards or TCS from an order and track deliveries automatically.", tone: "neutral" });
+  if (!business?.metaPageId) todos.push({ href: "/dashboard/settings", icon: Megaphone, title: "Connect Facebook & Instagram", body: "Post reels and run ads straight from Orbit.", tone: "neutral" });
+  if (!business?.metaPixelId) todos.push({ href: "/dashboard/settings", icon: Eye, title: "Add your Meta Pixel", body: "So ads can optimise for real sales.", tone: "neutral" });
+  if (business?.customDomainStatus !== "verified") todos.push({ href: "/dashboard/settings", icon: Globe, title: "Use your own domain", body: "Put the store on yourbrand.com.", tone: "neutral" });
 
-  const store = real
-    ? {
-        published: (await prisma.storeDesign.findUnique({ where: { businessId: real.businessId }, select: { published: true } }))?.published ?? false,
-        productCount: await prisma.product.count({ where: { businessId: real.businessId } }),
-      }
-    : null;
-
-  // A specialist speaking in an Orchestrator meeting is real activity for that specialist too —
-  // fold "orchestrator-meeting-<id>" calls into the base agent's own activity for the network
-  // diagram, so its node lights up, without losing the distinct id in the raw feed below.
+  // agent activity (meeting calls count for the specialist too)
   for (const [agentId, a] of Object.entries(activityMap)) {
     if (!agentId.startsWith("orchestrator-meeting-") || agentId === "orchestrator-meeting-router") continue;
     const baseId = agentId.replace("orchestrator-meeting-", "");
@@ -66,199 +131,184 @@ export default async function DashboardPage() {
       callsAllTime: existing.callsAllTime + a.callsAllTime,
     };
   }
-
   const activity: Record<string, AgentActivitySummary> = {};
   for (const [agentId, a] of Object.entries(activityMap)) {
-    const status = !a.lastRunAt
-      ? "never"
-      : now.getTime() - a.lastRunAt.getTime() < ACTIVE_WINDOW_MS
-        ? "active"
-        : "idle";
     activity[agentId] = {
-      status,
-      lastRunLabel: a.lastRunAt
-        ? `Last real call ${formatRelativeTime(a.lastRunAt, now)} · ${a.callsAllTime} call${a.callsAllTime === 1 ? "" : "s"} all time`
-        : "Not run yet",
+      status: !a.lastRunAt ? "never" : now.getTime() - a.lastRunAt.getTime() < ACTIVE_WINDOW_MS ? "active" : "idle",
+      lastRunLabel: a.lastRunAt ? `Last call ${formatRelativeTime(a.lastRunAt, now)} · ${a.callsAllTime} all time` : "Not run yet",
     };
   }
+  const feedItems: RealFeedItem[] = recent.map((r, i) => ({ id: `${r.agentId}-${i}`, agentLabel: agentLabel(r.agentId), when: formatRelativeTime(r.createdAt, now) }));
+  const hasActivity = recent.length > 0;
 
-  const feedItems: RealFeedItem[] = recent.map((r, i) => ({
-    id: `${r.agentId}-${i}`,
-    agentLabel: agentLabel(r.agentId),
-    when: formatRelativeTime(r.createdAt, now),
-  }));
+  const growth = orderGrowth.orderGrowthPct;
+  const kpis = [
+    {
+      label: "Orders · 7 days",
+      value: <CountUp value={orderGrowth.thisWeekOrders} />,
+      icon: ShoppingBag,
+      sub:
+        growth !== null ? (
+          <span className={`inline-flex items-center gap-1 font-medium ${growth >= 0 ? "text-good" : "text-bad"}`}>
+            {growth >= 0 ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
+            {growth >= 0 ? "+" : ""}
+            {growth.toFixed(0)}% vs last week
+          </span>
+        ) : (
+          `${orderGrowth.lastWeekOrders} the week before`
+        ),
+    },
+    { label: "Revenue · 7 days", value: <CountUp value={orderGrowth.thisWeekRevenue} format="money" currency={currency} />, icon: Wallet, sub: `${money(orderGrowth.lastWeekRevenue, currency)} the week before` },
+    { label: "Store visitors · 7 days", value: <CountUp value={visitors7} />, icon: Eye, sub: visitors7 && orderGrowth.thisWeekOrders ? `${((orderGrowth.thisWeekOrders / visitors7) * 100).toFixed(1)}% bought` : "Tracked on your storefront" },
+    { label: "Needs your attention", value: <CountUp value={needsAttention} />, icon: AlertTriangle, sub: needsAttention ? `${unconfirmed} unconfirmed · ${flagged} flagged` : "All clear", alert: needsAttention > 0 },
+  ];
+
+  const toneCls: Record<Todo["tone"], string> = {
+    accent: "bg-accent-soft text-accent-strong",
+    warn: "bg-warn-soft text-warn",
+    bad: "bg-bad-soft text-bad",
+    neutral: "bg-panel-2 text-text-dim",
+  };
 
   return (
     <div>
-      <Topbar title="Overview" subtitle={real ? real.businessName : "No business yet"} />
-      <div className="max-w-[1400px] space-y-10 p-10">
-        {!real && (
-          <div className="flex items-start gap-3 rounded-xl border border-accent/25 bg-accent-soft px-4 py-3.5">
-            <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-accent-strong" />
-            <p className="text-[13.5px] leading-relaxed text-accent-strong">
-              No business yet. <a href="/onboarding" className="underline">Complete onboarding</a> to set up your store and growth plan — nothing fake is shown here in the meantime.
-            </p>
-          </div>
-        )}
-
-        {real && lab?.active && <GrowthPlanOverview plan={lab.active} currency={currency} />}
-
-        {real && planDraft && (
-          <Card className="flex flex-wrap items-center justify-between gap-4 border-accent/25 bg-accent-soft p-5">
-            <div className="flex items-start gap-3">
-              <Sparkles className="mt-0.5 h-4.5 w-4.5 shrink-0 text-accent-strong" />
-              <div>
-                <div className="text-[14px] font-semibold text-accent-strong">Your growth plan is ready to discuss</div>
-                <p className="mt-0.5 text-[13px] leading-relaxed text-accent-strong/80">
-                  &ldquo;{planDraft.title}&rdquo; — {planDraft._count.strategies} strategies built from your own numbers. Talk it through with your
-                  Orchestrator, change anything, and approve it when it&apos;s right. Nothing runs before that.
-                </p>
+      <Topbar title={`${greeting(now)} 👋`} subtitle={`${real.businessName} · ${now.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" })}`} />
+      <div className="max-w-[1400px] space-y-6 p-5 sm:p-8 lg:p-10">
+        {/* KPIs */}
+        <div className="orbit-stagger grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
+          {kpis.map((k) => (
+            <Card key={k.label} className={`hover-lift p-4 sm:p-5 ${k.alert ? "border-warn/40" : ""}`}>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[12px] font-medium text-text-faint sm:text-[12.5px]">{k.label}</span>
+                <k.icon className={`h-4 w-4 ${k.alert ? "text-warn" : "text-text-faint"}`} />
               </div>
-            </div>
-            <Link
-              href="/dashboard/orchestrator"
-              className="shrink-0 rounded-lg bg-accent px-4 py-2 text-[13.5px] font-semibold text-white hover:opacity-90"
-            >
-              Talk to your Orchestrator
-            </Link>
-          </Card>
-        )}
-
-        {real && store && !store.published && (
-          <Card className="flex flex-wrap items-center justify-between gap-4 border-accent/25 bg-accent-soft p-5">
-            <div className="flex items-start gap-3">
-              <Store className="mt-0.5 h-4.5 w-4.5 shrink-0 text-accent-strong" />
-              <div>
-                <div className="text-[14px] font-semibold text-accent-strong">Design your storefront</div>
-                <p className="mt-0.5 text-[13px] leading-relaxed text-accent-strong/80">
-                  {store.productCount > 0
-                    ? `${store.productCount} product${store.productCount === 1 ? "" : "s"} imported from your website. Tell Orbit Design what you want and it builds your store live — publish it when ready.`
-                    : "Tell Orbit Design what kind of store you want and it builds it live — home, shop, about, and more. Publish it when ready."}
-                </p>
-              </div>
-            </div>
-            <Link
-              href="/dashboard/orbit-design"
-              className="shrink-0 rounded-lg bg-accent px-4 py-2 text-[13.5px] font-semibold text-white hover:opacity-90"
-            >
-              Open Orbit Design
-            </Link>
-          </Card>
-        )}
-
-        {/* Real orders + growth — the actual thing this whole platform exists to move */}
-        {orderGrowth && (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Card className="p-6">
-              <SectionLabel>Real orders — last 7 days</SectionLabel>
-              <div className="mt-2 flex items-baseline gap-3">
-                <span className="text-3xl font-semibold">{orderGrowth.thisWeekOrders}</span>
-                {orderGrowth.orderGrowthPct !== null ? (
-                  <span
-                    className={`flex items-center gap-1 text-[13px] font-medium ${orderGrowth.orderGrowthPct >= 0 ? "text-good" : "text-bad"}`}
-                  >
-                    {orderGrowth.orderGrowthPct >= 0 ? (
-                      <TrendingUp className="h-3.5 w-3.5" />
-                    ) : (
-                      <TrendingDown className="h-3.5 w-3.5" />
-                    )}
-                    {orderGrowth.orderGrowthPct >= 0 ? "+" : ""}
-                    {orderGrowth.orderGrowthPct.toFixed(0)}% vs prior week
-                  </span>
-                ) : (
-                  <span className="text-[12.5px] text-text-faint">
-                    {orderGrowth.lastWeekOrders === 0 && orderGrowth.thisWeekOrders === 0
-                      ? "no real orders yet this period or last"
-                      : "no orders last week to compare against"}
-                  </span>
-                )}
-              </div>
-              <p className="mt-1.5 text-[12px] text-text-faint">
-                {orderGrowth.lastWeekOrders} order{orderGrowth.lastWeekOrders === 1 ? "" : "s"} the week before — real orders, computed directly, never estimated.
-              </p>
+              <div className="mt-2 text-[22px] font-semibold tracking-tight sm:text-[26px]">{k.value}</div>
+              <div className="mt-1 truncate text-[11.5px] text-text-faint sm:text-[12px]">{k.sub}</div>
             </Card>
-            <Card className="p-6">
-              <SectionLabel>Real revenue — last 7 days</SectionLabel>
-              <div className="mt-2 text-3xl font-semibold">{money(orderGrowth.thisWeekRevenue, currency)}</div>
-              <p className="mt-1.5 text-[12px] text-text-faint">
-                {money(orderGrowth.lastWeekRevenue, currency)} the week before.
-              </p>
-            </Card>
-          </div>
-        )}
+          ))}
+        </div>
 
-        {/* Agent network + real activity */}
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_300px]">
-          <Card className="p-7">
+        {lab?.active && <GrowthPlanOverview plan={lab.active} currency={currency} />}
+
+        <div className="grid gap-6 lg:grid-cols-[1.25fr_1fr]">
+          {/* Do next */}
+          <Card className="p-5 sm:p-6">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <span className="relative flex h-2 w-2">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-good opacity-60" />
-                  <span className="relative inline-flex h-2 w-2 rounded-full bg-good" />
+              <SectionLabel>Do next</SectionLabel>
+              {todos.length === 0 && (
+                <span className="inline-flex items-center gap-1.5 text-[12.5px] text-good">
+                  <CheckCircle2 className="h-4 w-4" /> You&apos;re all set
                 </span>
-                <SectionLabel>Real agent activity</SectionLabel>
-              </div>
-              <span className="text-[12.5px] text-text-faint">Hover to preview, click to pin</span>
+              )}
             </div>
-            <div className="mt-6">
-              <AgentNetwork activity={activity} />
-            </div>
-            <div className="mt-2 flex items-center justify-center gap-5 text-[12px] text-text-faint">
-              <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-good" /> Ran recently</span>
-              <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={{ background: "#8a8578" }} /> Ran before</span>
-              <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={{ background: "#c7c4bb" }} /> Not run yet</span>
-            </div>
+            {todos.length === 0 ? (
+              <p className="mt-4 text-[13.5px] text-text-dim">Nothing needs you right now. Ask your Orchestrator what to push this week.</p>
+            ) : (
+              <ul className="orbit-stagger mt-4 space-y-2">
+                {todos.slice(0, 6).map((t) => (
+                  <li key={t.title}>
+                    <Link href={t.href} className="group flex items-center gap-3 rounded-xl border border-transparent p-2.5 transition-all hover:border-border hover:bg-panel-2">
+                      <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${toneCls[t.tone]}`}>
+                        <t.icon className="h-4 w-4" />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-[14px] font-medium">{t.title}</span>
+                        <span className="block truncate text-[12.5px] text-text-faint">{t.body}</span>
+                      </span>
+                      <ArrowRight className="h-4 w-4 shrink-0 text-text-faint transition-transform group-hover:translate-x-0.5 group-hover:text-text" />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
           </Card>
-          <Card className="max-h-[560px] overflow-y-auto p-6">
-            <LiveFeed items={feedItems} />
+
+          {/* Recent orders */}
+          <Card className="p-5 sm:p-6">
+            <div className="flex items-center justify-between">
+              <SectionLabel>Latest orders</SectionLabel>
+              <Link href="/dashboard/store" className="inline-flex items-center gap-1 text-[12.5px] text-text-faint hover:text-text">
+                All orders <ArrowUpRight className="h-3.5 w-3.5" />
+              </Link>
+            </div>
+            {recentOrders.length === 0 ? (
+              <div className="mt-6 flex flex-col items-center py-6 text-center">
+                <Package className="h-7 w-7 text-text-faint" />
+                <p className="mt-3 text-[13.5px] text-text-dim">No orders yet — they show up here the moment one comes in.</p>
+              </div>
+            ) : (
+              <ul className="orbit-stagger mt-3 divide-y divide-border">
+                {recentOrders.map((o) => (
+                  <li key={o.id} className="flex items-center gap-3 py-2.5">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-panel-2 text-[12px] font-semibold text-text-dim">
+                      {o.customerName.slice(0, 1).toUpperCase()}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-[13.5px] font-medium">{o.customerName}</div>
+                      <div className="text-[11.5px] text-text-faint">
+                        #{o.id.slice(-6).toUpperCase()} · {formatRelativeTime(o.createdAt, now)} · {o.paymentProvider === "cod" ? "COD" : "Card"}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-[13.5px] font-semibold">{money(o.total, currency)}</div>
+                      <span className={`mt-0.5 inline-block rounded-full px-2 py-0.5 text-[10.5px] font-medium ${STATUS_PILL[o.status] ?? "bg-panel-2 text-text-dim"}`}>
+                        {!o.verified && o.status === "pending" ? "awaiting customer" : o.status}
+                      </span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
           </Card>
         </div>
 
-        {/* Agent grid */}
-        <div>
-          <SectionLabel>Your AI team — 19 people you never have to hire</SectionLabel>
-          <p className="mt-1.5 text-[13px] text-text-faint">
-            <span className="text-good">● Live</span> agents run real AI today. <span className="text-text-faint">○ Preview</span> agents show the plan — not built yet.
-          </p>
-          <div className="mt-5 space-y-8">
-            {layers.map((layer) => (
-              <div key={layer}>
-                <div className="mb-3 text-[14px] font-semibold text-accent-strong">{layer}</div>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {agents
-                    .filter((a) => a.layer === layer)
-                    .map((a) => {
-                      const summary = activity[a.id];
-                      return (
-                        <Link key={a.id} href={`/dashboard/agents/${a.id}`}>
-                          <Card
-                            className={
-                              "p-5 transition-colors hover:border-border-strong" +
-                              (a.live ? "" : " opacity-60")
-                            }
-                          >
-                            <div className="flex items-start justify-between gap-2">
-                              <span className="text-[14.5px] font-medium">{a.name}</span>
-                              {a.live ? (
-                                <StatusBadge status={summary?.status ?? "never"} />
-                              ) : (
-                                <span className="rounded-full bg-panel-2 px-2.5 py-1 text-[11px] font-medium text-text-faint">
-                                  Preview
-                                </span>
-                              )}
-                            </div>
-                            <p className="mt-2.5 text-[13.5px] leading-relaxed text-text-dim">
-                              {a.live ? (summary?.lastRunLabel ?? "Not run yet") : "Not built yet"}
-                            </p>
-                          </Card>
-                        </Link>
-                      );
-                    })}
-                </div>
-              </div>
-            ))}
-          </div>
+        {/* Quick actions */}
+        <div className="orbit-stagger grid grid-cols-2 gap-3 md:grid-cols-4">
+          {[
+            { href: "/dashboard/orchestrator", icon: Sparkles, label: "Ask the Orchestrator" },
+            { href: "/dashboard/content", icon: Clapperboard, label: "Make a photo or reel" },
+            { href: "/dashboard/ads", icon: Megaphone, label: "Create an ad" },
+            { href: "/dashboard/orbit-design", icon: Store, label: "Edit your store" },
+          ].map((a) => (
+            <Link key={a.href} href={a.href} className="hover-lift press group flex items-center gap-3 rounded-2xl border border-border bg-panel p-4">
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl gradient-fill text-white transition-transform duration-300 group-hover:rotate-6">
+                <a.icon className="h-4 w-4" />
+              </span>
+              <span className="text-[13.5px] font-medium">{a.label}</span>
+            </Link>
+          ))}
         </div>
+
+        {/* Agent activity — only once something has happened */}
+        {hasActivity ? (
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_300px]">
+            <Card className="p-5 sm:p-7">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <span className="relative flex h-2 w-2">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-good opacity-60" />
+                    <span className="relative inline-flex h-2 w-2 rounded-full bg-good" />
+                  </span>
+                  <SectionLabel>Your AI team at work</SectionLabel>
+                </div>
+                <span className="hidden text-[12.5px] text-text-faint sm:block">Hover to preview, click to pin</span>
+              </div>
+              <div className="mt-6">
+                <AgentNetwork activity={activity} />
+              </div>
+            </Card>
+            <Card className="max-h-[560px] overflow-y-auto p-6">
+              <LiveFeed items={feedItems} />
+            </Card>
+          </div>
+        ) : (
+          <Card className="flex items-center gap-4 p-5">
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-panel-2">
+              <Sparkles className="h-5 w-5 text-text-faint" />
+            </span>
+            <p className="text-[13.5px] text-text-dim">Your AI team&apos;s work will show up here — every call it makes, as it happens.</p>
+          </Card>
+        )}
       </div>
     </div>
   );

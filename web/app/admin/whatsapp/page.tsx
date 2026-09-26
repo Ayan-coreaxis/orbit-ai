@@ -115,7 +115,7 @@ export default function WhatsAppAdminPage() {
   return (
     <div>
       <Topbar title="WhatsApp" subtitle="Twilio WhatsApp — the seller's store chatbot, order confirmations, delivery & cart messages" />
-      <div className="max-w-[1000px] space-y-5 p-10">
+      <div className="max-w-[1000px] space-y-5 p-5 sm:p-8 lg:p-10">
         <Card className="p-6">
           <div className="flex items-center justify-between">
             <SectionLabel>Setup</SectionLabel>

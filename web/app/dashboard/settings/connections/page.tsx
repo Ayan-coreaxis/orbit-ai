@@ -13,7 +13,7 @@ export default async function ConnectionsPage() {
   return (
     <div>
       <Topbar title="Connections & Skills" subtitle="Tools and guidance your agents pull in when a task needs them" />
-      <div className="max-w-[940px] space-y-5 p-10">
+      <div className="max-w-[940px] space-y-5 p-5 sm:p-8 lg:p-10">
         <Link
           href="/dashboard/settings"
           className="inline-flex items-center gap-1.5 text-[13.5px] text-text-faint hover:text-text-dim"
@@ -30,7 +30,7 @@ export default async function ConnectionsPage() {
 
         {!businessId ? (
           <Card className="p-6">
-            <p className="text-[13.5px] text-text-faint">No real business yet — complete onboarding first.</p>
+            <p className="text-[13.5px] text-text-faint">No business yet — finish setup first.</p>
           </Card>
         ) : (
           <>

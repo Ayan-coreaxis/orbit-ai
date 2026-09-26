@@ -13,7 +13,7 @@ export default async function SellersPage() {
         title="Businesses"
         subtitle={`${businesses.length} real business${businesses.length === 1 ? "" : "es"} on the platform — plan/cap set manually here, Stripe billing isn't connected yet`}
       />
-      <div className="max-w-[1400px] space-y-6 p-10">
+      <div className="max-w-[1400px] space-y-6 p-5 sm:p-8 lg:p-10">
         <Card className="overflow-hidden">
           {businesses.length === 0 ? (
             <p className="p-6 text-[13.5px] text-text-faint">

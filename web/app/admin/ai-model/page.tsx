@@ -148,7 +148,7 @@ export default function AiModelPage() {
   return (
     <div>
       <Topbar title="AI Model" subtitle="Which real Claude model every agent calls, platform-wide" />
-      <div className="max-w-[900px] space-y-5 p-10">
+      <div className="max-w-[900px] space-y-5 p-5 sm:p-8 lg:p-10">
         {!loaded && <p className="text-[13.5px] text-text-faint">Loading current selection…</p>}
         {error && <p className="text-[13.5px] text-bad">{error}</p>}
 

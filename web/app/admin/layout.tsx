@@ -11,9 +11,9 @@ export default async function AdminLayout({
   if (!authed) redirect("/admin-login");
 
   return (
-    <div className="flex h-screen bg-bg">
+    <div className="flex h-dvh flex-col bg-bg lg:flex-row">
       <AdminSidebar />
-      <main className="scrollbar-thin h-screen flex-1 overflow-y-auto">
+      <main className="scrollbar-thin min-h-0 flex-1 overflow-y-auto">
         {children}
       </main>
     </div>

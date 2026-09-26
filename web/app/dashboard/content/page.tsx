@@ -16,7 +16,7 @@ export default async function ContentPage() {
         title="Content"
         subtitle={`Images, reels and posts · ${business?.metaPageId ? `Connected: ${business.metaPageName ?? "your Page"}` : "Facebook Page not connected yet"}`}
       />
-      <div className="grid max-w-[1200px] gap-8 p-10">
+      <div className="grid max-w-[1200px] gap-8 p-5 sm:p-8 lg:p-10">
         <Studio />
         <RecentPosts />
       </div>

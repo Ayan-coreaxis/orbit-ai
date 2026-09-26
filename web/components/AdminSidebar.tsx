@@ -45,7 +45,19 @@ export function AdminSidebar() {
   }
 
   return (
-    <aside className="flex h-screen w-64 shrink-0 flex-col border-r border-border bg-panel">
+    <>
+    {/* phones: a scrollable strip of sections */}
+    <nav className="scrollbar-thin flex shrink-0 gap-1 overflow-x-auto border-b border-border bg-panel px-3 py-2 lg:hidden">
+      {nav.map((item) => {
+        const active = item.href === "/admin" ? pathname === "/admin" : pathname.startsWith(item.href);
+        return (
+          <Link key={item.href} href={item.href} className={`shrink-0 whitespace-nowrap rounded-full px-3 py-1.5 text-[12.5px] font-medium ${active ? "bg-accent text-white" : "bg-panel-2 text-text-dim"}`}>
+            {item.label}
+          </Link>
+        );
+      })}
+    </nav>
+    <aside className="hidden h-screen w-64 shrink-0 flex-col border-r border-border bg-panel lg:flex">
       <div className="flex items-center gap-2.5 px-6 py-6">
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-900">
           <ShieldCheck className="h-4.5 w-4.5 text-white" strokeWidth={2.5} />
@@ -104,5 +116,6 @@ export function AdminSidebar() {
         </div>
       </div>
     </aside>
+    </>
   );
 }

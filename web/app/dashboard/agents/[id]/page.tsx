@@ -128,7 +128,7 @@ export default async function AgentDetailPage({
   return (
     <div>
       <Topbar title={agent.name} subtitle={agent.layer} />
-      <div className="max-w-[900px] space-y-6 p-10">
+      <div className="max-w-[900px] space-y-6 p-5 sm:p-8 lg:p-10">
         <Link
           href="/dashboard"
           className="inline-flex items-center gap-1.5 text-[13.5px] text-text-faint hover:text-text-dim"
@@ -158,7 +158,7 @@ export default async function AgentDetailPage({
         <Card className="p-7">
           <div className="flex items-center gap-2">
             <Activity className="h-4 w-4 text-text-faint" />
-            <SectionLabel>Real-time work</SectionLabel>
+            <SectionLabel>What it&apos;s doing</SectionLabel>
           </div>
           {!agent.live ? (
             <p className="mt-4 text-[14px] text-text-faint">
@@ -260,7 +260,7 @@ export default async function AgentDetailPage({
           <SectionLabel>How this agent works</SectionLabel>
           <div className="mt-4 flex flex-wrap items-center gap-2">
             <Pill tone={agent.live ? "good" : "neutral"}>
-              {!agent.live ? "Not built yet" : NO_AI_AGENTS.has(id) ? "Live — real code, no AI" : "Live — real Claude API calls"}
+              {!agent.live ? "Not built yet" : NO_AI_AGENTS.has(id) ? "Live — runs automatically" : "Live — AI powered"}
             </Pill>
             {agent.live && !NO_AI_AGENTS.has(id) && (
               <Pill tone="neutral">Model: {AGENT_MODEL[id] ?? "claude-sonnet-4-5"}</Pill>

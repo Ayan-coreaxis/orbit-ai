@@ -13,7 +13,7 @@ export default async function AgentsPage() {
         title="Agent Activity"
         subtitle={`${totalCalls.toLocaleString()} real agent calls, all time, across every business · $${totalCost.toFixed(4)} real spend`}
       />
-      <div className="max-w-[1300px] space-y-6 p-10">
+      <div className="max-w-[1300px] space-y-6 p-5 sm:p-8 lg:p-10">
         <Card className="overflow-hidden">
           {rows.length === 0 ? (
             <p className="p-6 text-[13.5px] text-text-faint">

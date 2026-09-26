@@ -39,7 +39,7 @@ export function UpgradeButton({ plan, currentPlan, billingConfigured }: { plan: 
         onClick={upgrade}
         disabled={loading || !billingConfigured}
         className="w-full rounded-lg bg-accent py-2 text-[12.5px] font-semibold text-white disabled:opacity-40"
-        title={billingConfigured ? undefined : "Billing isn't connected yet — the platform owner needs to set up real Stripe Prices."}
+        title={billingConfigured ? undefined : "Online billing isn't switched on yet."}
       >
         {loading ? "Redirecting…" : billingConfigured ? "Switch to this plan" : "Not available yet"}
       </button>

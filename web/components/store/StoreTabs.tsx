@@ -64,7 +64,7 @@ export function StoreTabs({
 
   return (
     <div>
-      <div role="tablist" aria-label="Store sections" className="flex gap-0.5 border-b border-border">
+      <div role="tablist" aria-label="Store sections" className="scrollbar-thin -mx-1 flex gap-0.5 overflow-x-auto border-b border-border px-1">
         {TABS.map((t) => {
           const active = tab === t.key;
           const Icon = t.icon;
@@ -74,7 +74,7 @@ export function StoreTabs({
               role="tab"
               aria-selected={active}
               onClick={() => select(t.key)}
-              className={`group -mb-px flex items-center gap-2 border-b-2 px-3.5 py-2.5 text-[13.5px] font-medium outline-none transition-colors focus-visible:bg-panel-2 ${
+              className={`group -mb-px flex shrink-0 items-center whitespace-nowrap gap-2 border-b-2 px-3.5 py-2.5 text-[13.5px] font-medium outline-none transition-colors focus-visible:bg-panel-2 ${
                 active
                   ? "border-accent-strong text-text"
                   : "border-transparent text-text-faint hover:text-text-dim"

@@ -45,7 +45,7 @@ export function LiveFeed({ items }: { items: RealFeedItem[] }) {
           <div key={item.id} className="rounded-lg px-2.5 py-2.5">
             <p className="text-[13px] leading-snug text-text">
               <span className="font-medium">{item.agentLabel}</span>
-              <span className="text-text-dim"> made a real AI call</span>
+              <span className="text-text-dim"> did some work</span>
             </p>
             <p className="mt-0.5 text-[11px] text-text-faint">{item.when}</p>
           </div>

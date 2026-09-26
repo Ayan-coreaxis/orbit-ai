@@ -24,22 +24,22 @@ export default async function ReviewsPage() {
             : "No business yet"
         }
       />
-      <div className="max-w-[1000px] space-y-6 p-10">
+      <div className="max-w-[1000px] space-y-6 p-5 sm:p-8 lg:p-10">
         {!businessId ? (
           <Card className="p-6">
-            <p className="text-[13.5px] text-text-faint">No real business yet — complete onboarding first.</p>
+            <p className="text-[13.5px] text-text-faint">No business yet — finish setup first.</p>
           </Card>
         ) : (
           <>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <Card className="p-5">
-                <div className="text-[12.5px] font-medium text-text-faint">Real average rating</div>
+                <div className="text-[12.5px] font-medium text-text-faint">Average rating</div>
                 <div className="mt-2.5 text-2xl font-semibold">
                   {avgRating !== null ? `${avgRating.toFixed(1)} / 5` : "No ratings yet"}
                 </div>
               </Card>
               <Card className="p-5">
-                <div className="text-[12.5px] font-medium text-text-faint">Real reviews requested</div>
+                <div className="text-[12.5px] font-medium text-text-faint">Reviews requested</div>
                 <div className="mt-2.5 text-2xl font-semibold">{reviews.length}</div>
               </Card>
               <Card className="p-5">

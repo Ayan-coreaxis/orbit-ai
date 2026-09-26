@@ -34,7 +34,7 @@ export default async function AdminOverview() {
   return (
     <div>
       <Topbar title="Platform Overview" subtitle="Real numbers only — nothing here is seeded or estimated" />
-      <div className="max-w-[1300px] space-y-8 p-10">
+      <div className="max-w-[1300px] space-y-8 p-5 sm:p-8 lg:p-10">
         <SetupChecklist items={setup} />
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           {tiles.map((t) => (
