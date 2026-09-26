@@ -6,7 +6,8 @@ import { getUsageStatus, PLAN_LABELS, PLAN_PRICE_USD } from "@/lib/usage-limit";
 import { getActiveBusinessId } from "@/lib/get-active-business-id";
 import { prisma } from "@/lib/prisma";
 import { isMetaAppConfigured } from "@/lib/meta-oauth";
-import { isPlatformStripeConfigured, PLAN_PRICE_IDS } from "@/lib/platform-stripe";
+import { isPlatformStripeConfigured, planPriceId, subscriptionIsLive } from "@/lib/platform-stripe";
+import { ManageBillingButton } from "@/components/dashboard/ManageBillingButton";
 import { MetaConnectCard } from "@/components/store/MetaConnectCard";
 import { DomainCard } from "@/components/settings/DomainCard";
 import { PaymentSettingsCard } from "@/components/store/PaymentSettingsCard";
@@ -67,9 +68,13 @@ export default async function SettingsPage({
           accountTabs: true,
           checkoutCustomFields: true,
           subscriptionStatus: true,
+          stripeCustomerId: true,
         },
       })
     : null;
+
+  // A subscription that ended leaves the plan at Starter with AI paused — every plan can be picked again.
+  const subEnded = !!business?.subscriptionStatus && !subscriptionIsLive(business.subscriptionStatus);
 
   return (
     <div>
@@ -78,6 +83,21 @@ export default async function SettingsPage({
         {billingStatus === "success" && (
           <div className="rounded-xl border border-good/30 bg-good-soft px-4 py-3 text-[13px] text-good">
             Payment received — your plan updates automatically within a few seconds of Stripe confirming it.
+          </div>
+        )}
+        {billingStatus === "changed" && (
+          <div className="rounded-xl border border-good/30 bg-good-soft px-4 py-3 text-[13px] text-good">
+            Plan changed. Stripe charged or credited the difference for the rest of this month.
+          </div>
+        )}
+        {subEnded && (
+          <div className="rounded-xl border border-bad/30 bg-bad-soft px-4 py-3 text-[13px] text-bad">
+            Your subscription has ended ({business?.subscriptionStatus}). Your store stays online, but the AI agents are paused — pick a plan below to turn them back on.
+          </div>
+        )}
+        {business?.subscriptionStatus === "past_due" && (
+          <div className="rounded-xl border border-warn/30 bg-warn-soft px-4 py-3 text-[13px] text-warn">
+            Your last payment didn&apos;t go through. Stripe will retry — update your card with Manage billing below so nothing pauses.
           </div>
         )}
         {billingStatus === "cancelled" && (
@@ -184,8 +204,8 @@ export default async function SettingsPage({
                 {businessId && usage && (
                   <UpgradeButton
                     plan={TIER_PLAN_ID[tier.name]}
-                    currentPlan={usage.plan}
-                    billingConfigured={isPlatformStripeConfigured() && !!PLAN_PRICE_IDS[TIER_PLAN_ID[tier.name]]}
+                    currentPlan={subEnded ? "" : usage.plan}
+                    billingConfigured={isPlatformStripeConfigured() && !!planPriceId(TIER_PLAN_ID[tier.name])}
                   />
                 )}
               </Card>
@@ -196,6 +216,7 @@ export default async function SettingsPage({
               ? "Switching plans above charges or credits your card immediately via Stripe. You can also contact the platform owner for a manual change."
               : "Plan switching isn't self-serve yet — the platform owner hasn't connected real Stripe billing. Contact them to change your plan or usage cap."}
           </p>
+          {isPlatformStripeConfigured() && business?.stripeCustomerId && <ManageBillingButton />}
         </div>
 
         {businessId && (
