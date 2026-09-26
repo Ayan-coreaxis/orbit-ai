@@ -330,6 +330,8 @@ export default function Home() {
             <Link href="/pricing" className="hover:text-zinc-300">Pricing</Link>
             <Link href="/login" className="hover:text-zinc-300">Log in</Link>
             <Link href="/dashboard" className="hover:text-zinc-300">Dashboard</Link>
+            <Link href="/privacy" className="hover:text-zinc-300">Privacy</Link>
+            <Link href="/terms" className="hover:text-zinc-300">Terms</Link>
           </div>
         </div>
       </footer>

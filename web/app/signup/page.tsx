@@ -98,6 +98,18 @@ export default function SignupPage() {
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <>Create account <ArrowRight className="h-4 w-4" /></>}
           </button>
 
+          <p className="mt-4 text-center text-[12px] leading-relaxed text-zinc-500">
+            By creating an account you agree to the{" "}
+            <Link href="/terms" className="text-zinc-300 underline underline-offset-2 hover:text-white">
+              Terms
+            </Link>{" "}
+            and{" "}
+            <Link href="/privacy" className="text-zinc-300 underline underline-offset-2 hover:text-white">
+              Privacy Policy
+            </Link>
+            .
+          </p>
+
           <p className="mt-6 text-center text-[13.5px] text-zinc-500">
             Already have an account?{" "}
             <Link href="/login" className="font-medium text-zinc-200 hover:text-white">

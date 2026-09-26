@@ -147,6 +147,10 @@ export default function PricingPage() {
       <footer className="border-t border-zinc-900">
         <div className="mx-auto max-w-7xl px-8 py-10 text-center text-[13.5px] text-zinc-600">
           orbit.ai — one plan, every part of your store, working together.
+          <div className="mt-3 flex justify-center gap-6">
+            <Link href="/privacy" className="hover:text-zinc-300">Privacy</Link>
+            <Link href="/terms" className="hover:text-zinc-300">Terms</Link>
+          </div>
         </div>
       </footer>
     </div>
