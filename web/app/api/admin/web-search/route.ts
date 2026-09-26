@@ -36,13 +36,13 @@ export async function POST(req: NextRequest) {
     const x = Math.floor(Number(v));
     return Number.isFinite(x) && x >= 0 && x <= max ? String(x) : null;
   };
-  if (typeof body.enabled === "boolean") setKey("web_search_enabled", body.enabled ? "true" : "false");
-  if (typeof body.country === "string" && /^([a-z]{2}|all)$/i.test(body.country.trim())) setKey("web_search_country", body.country.trim().toLowerCase());
+  if (typeof body.enabled === "boolean") await setKey("web_search_enabled", body.enabled ? "true" : "false");
+  if (typeof body.country === "string" && /^([a-z]{2}|all)$/i.test(body.country.trim())) await setKey("web_search_country", body.country.trim().toLowerCase());
   const perTurn = n(body.perTurn, 10);
-  if (perTurn) setKey("web_search_per_turn", perTurn);
+  if (perTurn) await setKey("web_search_per_turn", perTurn);
   for (const plan of ["starter", "growth", "scale"] as const) {
     const v = n(body.limits?.[plan], 100000);
-    if (v !== null) setKey(`web_search_limit_${plan}`, v);
+    if (v !== null) await setKey(`web_search_limit_${plan}`, v);
   }
   return NextResponse.json({ ok: true });
 }

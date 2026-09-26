@@ -19,6 +19,6 @@ export async function POST(req: NextRequest) {
   if (!value || typeof value !== "string" || value.trim().length === 0) {
     return NextResponse.json({ error: "Value cannot be empty" }, { status: 400 });
   }
-  setKey(id, value.trim());
+  await setKey(id, value.trim());
   return NextResponse.json({ ok: true });
 }

@@ -59,35 +59,61 @@ export const KEY_ENV_MAP: Record<string, string> = {
   ...Object.fromEntries(WA_TEMPLATES.map((t) => [`wa_template_${t.kind}`, t.env])),
 };
 
-function readLines(): string[] {
-  if (!fs.existsSync(ENV_PATH)) return [];
-  return fs.readFileSync(ENV_PATH, "utf-8").split("\n");
+/**
+ * Keys saved in Super Admin are stored ENCRYPTED in the database (PlatformSetting "env:<NAME>")
+ * and copied into process.env — so they work on hosts with a read-only disk (Vercel) and on every
+ * server instance. Each instance loads them at boot and refreshes every minute (instrumentation.ts).
+ * .env.local is still written when the disk allows it (local development).
+ */
+
+const PREFIX = "env:";
+let lastLoad = 0;
+
+export async function loadStoredKeys(force = false): Promise<void> {
+  if (!force && Date.now() - lastLoad < 60_000) return;
+  lastLoad = Date.now();
+  try {
+    const { prisma } = await import("@/lib/prisma");
+    const { open } = await import("@/lib/secret-box");
+    const rows = await prisma.platformSetting.findMany({ where: { key: { startsWith: PREFIX } } });
+    for (const r of rows) {
+      const name = r.key.slice(PREFIX.length);
+      const v = open(r.value);
+      if (v !== null) process.env[name] = v;
+    }
+  } catch {
+    /* DB not ready yet — the host's own env vars still apply */
+  }
 }
 
 export function getKeyStatus(): Record<string, boolean> {
-  const lines = readLines();
   const status: Record<string, boolean> = {};
   for (const [id, envName] of Object.entries(KEY_ENV_MAP)) {
-    const line = lines.find((l) => l.startsWith(`${envName}=`));
-    const value = line?.split("=")[1]?.trim();
-    status[id] = !!value && value !== "paste_your_key_here" && value.length > 0;
+    const value = process.env[envName]?.trim();
+    status[id] = !!value && value !== "paste_your_key_here";
   }
   return status;
 }
 
-export function setKey(id: string, value: string): void {
+export async function setKey(id: string, value: string): Promise<void> {
   const envName = KEY_ENV_MAP[id];
   if (!envName) throw new Error(`Unknown key id: ${id}`);
-
-  const lines = readLines().filter((l) => l.trim().length > 0);
-  const idx = lines.findIndex((l) => l.startsWith(`${envName}=`));
-  const newLine = `${envName}=${value}`;
-  if (idx >= 0) {
-    lines[idx] = newLine;
-  } else {
-    lines.push(newLine);
-  }
-  fs.writeFileSync(ENV_PATH, lines.join("\n") + "\n", "utf-8");
-  // Take effect in this running server too — code reads process.env at call time.
+  const { prisma } = await import("@/lib/prisma");
+  const { seal } = await import("@/lib/secret-box");
+  await prisma.platformSetting.upsert({
+    where: { key: PREFIX + envName },
+    create: { key: PREFIX + envName, value: seal(value) },
+    update: { value: seal(value) },
+  });
+  // Take effect in this running server right away — code reads process.env at call time.
   process.env[envName] = value;
+  try {
+    const lines = fs.existsSync(ENV_PATH) ? fs.readFileSync(ENV_PATH, "utf-8").split("\n").filter((l) => l.trim().length > 0) : [];
+    const idx = lines.findIndex((l) => l.startsWith(`${envName}=`));
+    if (idx >= 0) lines[idx] = `${envName}=${value}`;
+    else lines.push(`${envName}=${value}`);
+    fs.writeFileSync(ENV_PATH, lines.join("\n") + "\n", "utf-8");
+  } catch {
+    /* read-only disk (serverless) — the database copy is the source of truth */
+  }
 }

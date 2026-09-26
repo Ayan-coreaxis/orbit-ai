@@ -1,10 +1,23 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { appBaseUrl } from "@/lib/public-url";
+
+const description = "Your online store, content, ads, WhatsApp and growth plan — run by one AI Orchestrator and its team, on your real numbers.";
 
 export const metadata: Metadata = {
-  title: "Orbit — The AI team that runs your store",
-  description:
-    "One platform, one strategy, a coordinated team of AI agents for online sellers.",
+  metadataBase: new URL(appBaseUrl()),
+  title: { default: "Orbit — The AI team that runs your store", template: "%s · Orbit" },
+  description,
+  applicationName: "Orbit",
+  openGraph: { type: "website", siteName: "Orbit", title: "Orbit — The AI team that runs your store", description },
+  twitter: { card: "summary_large_image", title: "Orbit — The AI team that runs your store", description },
+};
+
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: dark)", color: "#0b0b0d" },
+    { media: "(prefers-color-scheme: light)", color: "#faf8f5" },
+  ],
 };
 
 const themeInitScript = `

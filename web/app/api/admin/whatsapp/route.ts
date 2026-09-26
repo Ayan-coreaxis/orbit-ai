@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
     if (!def) return NextResponse.json({ ok: false, message: "Unknown template." }, { status: 400 });
     const sid = (body.sid ?? "").trim();
     if (sid && !/^HX[0-9a-f]{32}$/i.test(sid)) return NextResponse.json({ ok: false, message: "A Content SID starts with HX followed by 32 letters/numbers — copy it from Twilio > Content Template Builder." });
-    setKey(`wa_template_${def.kind}`, sid);
+    await setKey(`wa_template_${def.kind}`, sid);
     return NextResponse.json({ ok: true, message: sid ? "Saved — this message now goes out as the approved template." : "Removed — this message goes out as plain text." });
   }
   const { to, from } = body;

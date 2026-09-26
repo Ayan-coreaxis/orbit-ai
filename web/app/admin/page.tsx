@@ -3,7 +3,9 @@ import { Topbar } from "@/components/Topbar";
 import { Card, SectionLabel, Pill } from "@/components/ui";
 import { getRealPlatformStats, getRealBusinessRows } from "@/lib/admin-stats";
 import { getUsageStatus, type UsageWindowId } from "@/lib/usage-limit";
-import { MessageCircle, AlertTriangle, CircleDollarSign } from "lucide-react";
+import { MessageCircle, CircleDollarSign } from "lucide-react";
+import { setupChecklist } from "@/lib/setup-check";
+import { SetupChecklist } from "@/components/admin/SetupChecklist";
 
 const BLOCKED_LABEL: Record<UsageWindowId, string> = {
   session: "At 5-hour cap — blocked",
@@ -12,7 +14,7 @@ const BLOCKED_LABEL: Record<UsageWindowId, string> = {
 };
 
 export default async function AdminOverview() {
-  const [stats, businesses] = await Promise.all([getRealPlatformStats(), getRealBusinessRows()]);
+  const [stats, businesses, setup] = await Promise.all([getRealPlatformStats(), getRealBusinessRows(), setupChecklist()]);
 
   // Real blocking status per business — checks the same rolling session/weekly/monthly windows
   // that actually gate a new AI cycle, not just the monthly headline number.
@@ -33,6 +35,7 @@ export default async function AdminOverview() {
     <div>
       <Topbar title="Platform Overview" subtitle="Real numbers only — nothing here is seeded or estimated" />
       <div className="max-w-[1300px] space-y-8 p-10">
+        <SetupChecklist items={setup} />
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           {tiles.map((t) => (
             <Card key={t.label} className="p-5">
@@ -42,22 +45,6 @@ export default async function AdminOverview() {
           ))}
         </div>
 
-        <Card className="p-6">
-          <div className="flex items-start gap-3">
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-text-faint" />
-            <div>
-              <div className="text-[13.5px] font-medium text-text-dim">
-                No MRR, plan, or agent-uptime numbers shown here
-              </div>
-              <p className="mt-1 text-[13px] leading-relaxed text-text-faint">
-                Stripe billing isn&apos;t connected yet, so there is no real subscription revenue to
-                report — showing a made-up MRR number would be exactly the kind of fake data this
-                page used to have. Same for agent uptime/error-rate: no monitoring system exists yet,
-                so that section has been removed rather than filled with invented numbers.
-              </p>
-            </div>
-          </div>
-        </Card>
 
         <Card className="p-6">
           <div className="flex items-center gap-2">

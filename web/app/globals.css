@@ -155,3 +155,67 @@ body {
 .animate-fade-in {
   animation: fade-in-up 0.35s ease-out;
 }
+
+/* ---------- Orbit motion system ----------
+   One set of small, fast animations used across the app. Everything respects
+   prefers-reduced-motion (see the end of this block). */
+@keyframes orbit-fade-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes orbit-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes orbit-scale-in {
+  from { opacity: 0; transform: scale(0.97); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes orbit-shimmer {
+  from { background-position: -200% 0; }
+  to { background-position: 200% 0; }
+}
+@keyframes orbit-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+@keyframes orbit-spin-slow { to { transform: rotate(360deg); } }
+
+.orbit-fade-up { animation: orbit-fade-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.orbit-fade { animation: orbit-fade 0.4s ease-out both; }
+.orbit-scale-in { animation: orbit-scale-in 0.35s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.orbit-float { animation: orbit-float 5s ease-in-out infinite; }
+.orbit-spin-slow { animation: orbit-spin-slow 24s linear infinite; }
+
+/* Children appear one after another: add .orbit-stagger to a list/grid. */
+.orbit-stagger > * { animation: orbit-fade-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.orbit-stagger > *:nth-child(1) { animation-delay: 0.02s; }
+.orbit-stagger > *:nth-child(2) { animation-delay: 0.06s; }
+.orbit-stagger > *:nth-child(3) { animation-delay: 0.1s; }
+.orbit-stagger > *:nth-child(4) { animation-delay: 0.14s; }
+.orbit-stagger > *:nth-child(5) { animation-delay: 0.18s; }
+.orbit-stagger > *:nth-child(6) { animation-delay: 0.22s; }
+.orbit-stagger > *:nth-child(7) { animation-delay: 0.26s; }
+.orbit-stagger > *:nth-child(n + 8) { animation-delay: 0.3s; }
+
+/* Loading placeholders */
+.skeleton {
+  border-radius: 0.6rem;
+  background: linear-gradient(90deg, var(--panel-2) 0%, var(--border) 50%, var(--panel-2) 100%);
+  background-size: 200% 100%;
+  animation: orbit-shimmer 1.4s ease-in-out infinite;
+}
+
+/* Cards that lift a little on hover */
+.hover-lift { transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.2s ease, border-color 0.2s ease; }
+.hover-lift:hover { transform: translateY(-2px); box-shadow: 0 10px 30px -12px rgb(0 0 0 / 0.35); }
+
+/* Buttons press in slightly */
+.press { transition: transform 0.12s ease; }
+.press:active { transform: scale(0.97); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
