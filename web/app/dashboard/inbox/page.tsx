@@ -3,7 +3,21 @@ import { Card, Pill } from "@/components/ui";
 import { getActiveBusinessId } from "@/lib/get-active-business-id";
 import { prisma } from "@/lib/prisma";
 import { MessageCircle } from "lucide-react";
-import { WhatsAppIcon } from "@/components/icons/BrandIcons";
+import { FacebookIcon, InstagramIcon, WhatsAppIcon } from "@/components/icons/BrandIcons";
+
+function ChannelIcon({ channel }: { channel: string }) {
+  if (channel === "whatsapp") return <WhatsAppIcon size={18} />;
+  if (channel === "instagram") return <InstagramIcon size={18} />;
+  if (channel === "messenger") return <FacebookIcon size={18} />;
+  return <MessageCircle className="h-[18px] w-[18px] text-text-faint" />;
+}
+
+function who(channel: string, ref: string): string {
+  if (channel === "whatsapp") return ref;
+  if (channel === "instagram") return `Instagram user …${ref.slice(-6)}`;
+  if (channel === "messenger") return `Messenger user …${ref.slice(-6)}`;
+  return `Website visitor ${ref.slice(0, 8)}`;
+}
 
 interface ConversationGroup {
   channel: string;
@@ -50,9 +64,9 @@ export default async function InboxPage() {
           <Card className="flex flex-col items-center gap-3 p-12 text-center">
             <MessageCircle className="h-6 w-6 text-text-faint" />
             <p className="max-w-md text-[13.5px] leading-relaxed text-text-faint">
-              No real customer conversations yet. Your website chat widget and (once a real number
-              is assigned) WhatsApp chatbot both write here — this fills in the moment a real
-              customer asks something.
+              No real customer conversations yet. Your website chat widget, WhatsApp (once a number
+              is assigned) and your Facebook Page&apos;s Messenger and Instagram DMs (once Meta is
+              connected) all write here — this fills in the moment a real customer asks something.
             </p>
           </Card>
         ) : (
@@ -62,13 +76,13 @@ export default async function InboxPage() {
               <details key={`${c.channel}:${c.customerRef}`} className="group">
                 <Card className="p-0">
                   <summary className="flex cursor-pointer list-none items-center gap-3 p-5">
-                    {c.channel === "whatsapp" ? <WhatsAppIcon size={18} /> : <MessageCircle className="h-[18px] w-[18px] text-text-faint" />}
+                    <ChannelIcon channel={c.channel} />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <span className="text-[13.5px] font-medium">
-                          {c.channel === "whatsapp" ? c.customerRef : `Website visitor ${c.customerRef.slice(0, 8)}`}
+                          {who(c.channel, c.customerRef)}
                         </span>
-                        <Pill tone={c.channel === "whatsapp" ? "good" : "neutral"}>{c.channel}</Pill>
+                        <Pill tone={c.channel === "website" ? "neutral" : "good"}>{c.channel}</Pill>
                       </div>
                       <p className="mt-0.5 truncate text-[12.5px] text-text-faint">
                         {lastMessage.role === "user" ? "" : "You: "}

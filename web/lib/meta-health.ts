@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { GRAPH_BASE, NEEDED_PERMISSIONS, getAdAccounts, getManagedPages, isMetaAppConfigured, type AdAccountInfo, type ConnectedPage } from "@/lib/meta-oauth";
 import { appIsPublic, publicFileUrl, publicStoreUrl } from "@/lib/public-url";
+import { pageSubscribed, subscribePage } from "@/lib/meta-messaging";
 
 /**
  * One honest answer to "is Meta ready?": the connection, the permissions actually granted, the
@@ -59,6 +60,16 @@ export async function metaHealth(businessId: string) {
       ok: !!b?.metaInstagramUserId,
       fix: "In the Instagram app: Settings > Account type > switch to Professional, link it to your Facebook Page, then reconnect here.",
     });
+    if (b?.metaPageId && b.metaAccessToken && process.env.META_WEBHOOK_VERIFY_TOKEN) {
+      let subscribed = await pageSubscribed(b.metaPageId, b.metaAccessToken);
+      if (subscribed === false) subscribed = (await subscribePage(b.metaPageId, b.metaAccessToken)).ok; // fix it on the spot
+      checks.push({
+        id: "dms",
+        label: subscribed ? "Messenger & Instagram DMs reach your store chatbot" : "DMs aren't reaching Orbit yet",
+        ok: !!subscribed,
+        fix: "Reconnect and allow messaging permissions. Until Meta approves Orbit's app, only app testers' messages arrive.",
+      });
+    }
     const acct = accounts.find((a) => a.id === b?.metaAdAccountId);
     checks.push({
       id: "adaccount",
@@ -92,6 +103,7 @@ export async function chooseMetaAssets(businessId: string, opts: { pageId?: stri
     const page = (await getManagedPages(b.metaUserToken)).find((p) => p.id === opts.pageId);
     if (!page) throw new Error("That Page isn't one you manage.");
     Object.assign(data, { metaPageId: page.id, metaPageName: page.name, metaAccessToken: page.access_token, metaInstagramUserId: page.instagram_business_account?.id ?? null });
+    await subscribePage(page.id, page.access_token).catch(() => {});
   }
   if (opts.adAccountId) {
     const acct = (await getAdAccounts(b.metaUserToken)).find((a) => a.id === opts.adAccountId);

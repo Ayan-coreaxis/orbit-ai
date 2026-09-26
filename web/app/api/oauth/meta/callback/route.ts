@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { subscribePage } from "@/lib/meta-messaging";
 import { prisma } from "@/lib/prisma";
 import { verifyState, exchangeCodeForToken, exchangeForLongLived, getManagedPages, getAdAccounts } from "@/lib/meta-oauth";
 
@@ -46,6 +47,9 @@ export async function GET(req: NextRequest) {
         metaConnectedAt: new Date(),
       },
     });
+
+    // Let the store chatbot answer this Page's Messenger / Instagram DMs.
+    await subscribePage(page.id, page.access_token).catch(() => {});
 
     return redirect("connected");
   } catch (e) {

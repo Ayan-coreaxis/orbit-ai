@@ -35,7 +35,7 @@ export async function getChatbotReply(
   businessId: string,
   message: string,
   history: ChatHistoryItem[] = [],
-  conversation?: { channel: "website" | "whatsapp"; customerRef: string },
+  conversation?: { channel: "website" | "whatsapp" | "messenger" | "instagram"; customerRef: string },
 ): Promise<ChatbotReplyResult> {
   if (!process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY === "paste_your_key_here") {
     return { reply: "Sorry, chat isn't available right now.", error: "Anthropic key not configured" };

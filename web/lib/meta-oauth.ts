@@ -22,6 +22,9 @@ const SCOPES = [
   "ads_management",
   "ads_read",
   "business_management", // Pages / ad accounts owned by a Business portfolio need this
+  "pages_messaging", // the store chatbot answers Messenger DMs
+  "pages_manage_metadata", // subscribe the Page so its DMs reach Orbit
+  "instagram_manage_messages", // …and Instagram DMs
 ].join(",");
 
 /** The permissions each Orbit feature needs — the connection check reports what's missing. */
@@ -30,6 +33,8 @@ export const NEEDED_PERMISSIONS: Record<string, string[]> = {
   "Post to Instagram": ["instagram_basic", "instagram_content_publish"],
   "Run Meta ads": ["ads_management"],
   "Read ad results": ["ads_read"],
+  "Answer Messenger DMs": ["pages_messaging", "pages_manage_metadata"],
+  "Answer Instagram DMs": ["instagram_manage_messages"],
 };
 
 function getAppCredentials(): { appId: string; appSecret: string } | null {

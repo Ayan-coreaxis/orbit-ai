@@ -10,6 +10,7 @@ export const KEY_ENV_MAP: Record<string, string> = {
   meta_app_id: "META_APP_ID",
   meta_app_secret: "META_APP_SECRET",
   meta_login_config_id: "META_LOGIN_CONFIG_ID",
+  meta_webhook_verify_token: "META_WEBHOOK_VERIFY_TOKEN",
   twilio: "TWILIO_AUTH_TOKEN",
   twilio_sid: "TWILIO_ACCOUNT_SID",
   twilio_whatsapp: "TWILIO_WHATSAPP_FROM",
