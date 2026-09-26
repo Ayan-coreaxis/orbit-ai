@@ -19,7 +19,19 @@ export async function sendTrackingNotification(orderId: string): Promise<void> {
 
   const message = `Hi ${order.customerName}! Your order from ${order.business.name} is on its way. ${courierLine}. Order details: ${trackLink}`;
 
-  const result = await sendWhatsAppMessage(order.customerPhone, message, { from: order.business.whatsappInboundNumber ?? undefined });
+  const result = await sendWhatsAppMessage(order.customerPhone, message, {
+    from: order.business.whatsappInboundNumber ?? undefined,
+    template: {
+      kind: "order_shipped",
+      vars: [
+        order.customerName,
+        order.business.name,
+        order.id.slice(-6).toUpperCase(),
+        `Courier: ${order.courierName ?? "your courier"}, tracking #${order.trackingNumber}`,
+        order.trackingUrl || trackLink,
+      ],
+    },
+  });
   await prisma.order.update({
     where: { id: order.id },
     data: result.sent

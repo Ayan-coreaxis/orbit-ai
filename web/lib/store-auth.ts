@@ -103,7 +103,9 @@ export async function issueOtp(
   });
 
   if (channel === "phone") {
-    const r = await sendWhatsAppMessage(target, `Your verification code is ${code}. It expires in 10 minutes.`);
+    const r = await sendWhatsAppMessage(target, `Your verification code is ${code}. It expires in 10 minutes.`, {
+      template: { kind: "otp", vars: [code] },
+    });
     if (r.sent) return { sent: true };
     if (process.env.NODE_ENV === "production") return { sent: false, error: r.error };
     console.info(`[store-auth] OTP for ${target} (${businessId}): ${code}`);

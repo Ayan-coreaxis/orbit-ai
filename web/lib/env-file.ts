@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { WA_TEMPLATES } from "@/lib/whatsapp-templates";
 
 const ENV_PATH = path.join(process.cwd(), ".env.local");
 
@@ -50,6 +51,8 @@ export const KEY_ENV_MAP: Record<string, string> = {
   studio_limit_videos_growth: "STUDIO_LIMIT_VIDEOS_GROWTH",
   studio_limit_images_scale: "STUDIO_LIMIT_IMAGES_SCALE",
   studio_limit_videos_scale: "STUDIO_LIMIT_VIDEOS_SCALE",
+  // Approved WhatsApp template Content SIDs (Super Admin > WhatsApp)
+  ...Object.fromEntries(WA_TEMPLATES.map((t) => [`wa_template_${t.kind}`, t.env])),
 };
 
 function readLines(): string[] {

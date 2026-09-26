@@ -12,7 +12,72 @@ type Data = {
   publicApp: boolean;
   sellers: { id: string; name: string; whatsappInboundNumber: string | null }[];
   inboundLast7Days: number;
+  templates: Template[];
 };
+
+type Template = { kind: string; label: string; category: string; vars: string[]; sample: string; sid: string | null };
+
+function TemplateRow({ t, onSaved }: { t: Template; onSaved: (sid: string | null) => void }) {
+  const [sid, setSid] = useState(t.sid ?? "");
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ ok: boolean; message: string } | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  async function save() {
+    setBusy(true);
+    setMsg(null);
+    const r = (await (await fetch("/api/admin/whatsapp", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ template: t.kind, sid }) })).json()) as { ok: boolean; message: string };
+    setMsg(r);
+    if (r.ok) onSaved(sid.trim() || null);
+    setBusy(false);
+  }
+
+  return (
+    <li className="py-3">
+      <div className="flex items-center justify-between gap-3">
+        <button onClick={() => setOpen(!open)} className="text-left text-[13.5px] font-medium hover:underline">
+          {t.label}
+        </button>
+        <div className="flex items-center gap-2">
+          <Pill tone="neutral">{t.category.toLowerCase()}</Pill>
+          <Pill tone={t.sid ? "good" : "neutral"}>{t.sid ? "Template" : "Plain text"}</Pill>
+        </div>
+      </div>
+      {open && (
+        <div className="mt-3 space-y-3 rounded-xl border border-border bg-panel p-4">
+          <div>
+            <div className="text-[12px] font-medium text-text-dim">Suggested body to submit for approval</div>
+            <div className="mt-1 flex items-start gap-2 rounded-lg border border-border-strong bg-bg px-3 py-2 text-[12.5px]">
+              <span className="flex-1 whitespace-pre-wrap">{t.sample}</span>
+              <button
+                onClick={() => navigator.clipboard?.writeText(t.sample).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); })}
+                className="text-text-faint hover:text-text"
+                aria-label="Copy template body"
+              >
+                {copied ? <Check className="h-4 w-4 text-good" /> : <Copy className="h-4 w-4" />}
+              </button>
+            </div>
+            <ol className="mt-2 grid gap-0.5 text-[12px] text-text-faint">
+              {t.vars.map((v, i) => (
+                <li key={v}>
+                  <span className="font-mono">{`{{${i + 1}}}`}</span> = {v}
+                </li>
+              ))}
+            </ol>
+          </div>
+          <div className="flex gap-2">
+            <input className="input flex-1 font-mono" placeholder="Content SID, e.g. HX1234…" value={sid} onChange={(e) => setSid(e.target.value)} />
+            <Button onClick={save} disabled={busy}>
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null} {sid.trim() ? "Save" : "Use plain text"}
+            </Button>
+          </div>
+          {msg && <p className={`rounded-lg px-3 py-2 text-[12.5px] ${msg.ok ? "bg-good-soft text-good" : "bg-bad-soft text-bad"}`}>{msg.message}</p>}
+        </div>
+      )}
+    </li>
+  );
+}
 
 export default function WhatsAppAdminPage() {
   const [d, setD] = useState<Data | null>(null);
@@ -78,7 +143,7 @@ export default function WhatsAppAdminPage() {
             </div>
             <p className="mt-2 text-[11.5px] leading-relaxed text-text-faint">
               Every incoming message is checked against Twilio&apos;s signature, so only Twilio can reach the chatbot. If Orbit sits behind a proxy that changes the address, set
-              TWILIO_WEBHOOK_URL to exactly the URL above. Messages to a customer who hasn&apos;t written in the last 24 hours need a Meta-approved template in Twilio.
+              TWILIO_WEBHOOK_URL to exactly the URL above. Messages to a customer who hasn&apos;t written in the last 24 hours need an approved template (below).
             </p>
           </div>
         </Card>
@@ -93,6 +158,25 @@ export default function WhatsAppAdminPage() {
             </Button>
           </div>
           {res && <p className={`mt-3 rounded-lg px-3 py-2 text-[13px] ${res.ok ? "bg-good-soft text-good" : "bg-bad-soft text-bad"}`}>{res.message}</p>}
+        </Card>
+
+        <Card className="p-6">
+          <div className="flex items-center justify-between">
+            <SectionLabel>Approved message templates</SectionLabel>
+            <Pill tone={d?.templates.every((t) => t.sid) ? "good" : "neutral"}>
+              {d ? `${d.templates.filter((t) => t.sid).length} of ${d.templates.length} set` : "…"}
+            </Pill>
+          </div>
+          <p className="mt-2 text-[12.5px] leading-relaxed text-text-dim">
+            WhatsApp only delivers messages Orbit sends first (order updates, cart reminders, login codes) when they use a Meta-approved template. For each one: in Twilio open Messaging &gt;
+            Content Template Builder, create a WhatsApp template with the body below (same {"{{1}}"}, {"{{2}}"} … order), submit it for approval, then paste its Content SID here. Until a SID is
+            saved, that message goes out as plain text — which works in the sandbox and within 24 hours of the customer&apos;s last message.
+          </p>
+          <ul className="mt-3 divide-y divide-border">
+            {d?.templates.map((t) => (
+              <TemplateRow key={t.kind} t={t} onSaved={(sid) => setD((cur) => cur && { ...cur, templates: cur.templates.map((x) => (x.kind === t.kind ? { ...x, sid } : x)) })} />
+            ))}
+          </ul>
         </Card>
 
         <Card className="p-6">

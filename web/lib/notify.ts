@@ -35,6 +35,26 @@ interface Built {
   text: string;
 }
 
+/** Variables for the matching approved WhatsApp template (order must match lib/whatsapp-templates.ts). */
+function templateVars(template: NotifyTemplate, v: NotifyVars): string[] {
+  const name = v.firstName || "there";
+  switch (template) {
+    case "order_placed":
+    case "order_confirmed":
+      return [name, v.storeName, v.orderNumber, v.statusUrl ?? ""];
+    case "order_shipped": {
+      const courier = [v.courierName && `Courier: ${v.courierName}`, v.trackingNumber && `tracking #${v.trackingNumber}`].filter(Boolean).join(", ");
+      return [name, v.storeName, v.orderNumber, courier || "Shipped", v.trackingUrl || v.statusUrl || ""];
+    }
+    case "verify_order":
+      return [name, v.storeName, v.orderNumber, v.total ?? "", v.verifyUrl ?? ""];
+    case "review_request":
+      return [name, v.storeName, `order #${v.orderNumber}`, v.reviewUrl ?? ""];
+    case "back_in_stock":
+      return [name, v.storeName, v.productName ?? "your item", v.productUrl ?? ""];
+  }
+}
+
 function build(template: NotifyTemplate, v: NotifyVars): Built {
   const hi = v.firstName ? `Hi ${v.firstName}, ` : "Hi, ";
   switch (template) {
@@ -106,7 +126,11 @@ export async function notifyCustomer(
   const { subject, text } = build(template, vars);
   const out: NotifyResult = { anySent: false };
 
-  if (contact.phone) out.whatsapp = await sendWhatsAppMessage(contact.phone, text, { from: contact.whatsappFrom ?? undefined });
+  if (contact.phone)
+    out.whatsapp = await sendWhatsAppMessage(contact.phone, text, {
+      from: contact.whatsappFrom ?? undefined,
+      template: { kind: template, vars: templateVars(template, vars) },
+    });
   if (contact.email) out.email = await sendEmail(contact.email, subject, text);
 
   out.anySent = !!(out.whatsapp?.sent || out.email?.sent);
@@ -126,7 +150,7 @@ export async function notifySeller(
   text: string,
 ): Promise<NotifyResult> {
   const out: NotifyResult = { anySent: false };
-  if (contact.phone) out.whatsapp = await sendWhatsAppMessage(contact.phone, `${subject}\n${text}`);
+  if (contact.phone) out.whatsapp = await sendWhatsAppMessage(contact.phone, `${subject}\n${text}`, { template: { kind: "owner_alert", vars: [subject, text] } });
   if (contact.email) out.email = await sendEmail(contact.email, subject, text);
   out.anySent = !!(out.whatsapp?.sent || out.email?.sent);
   return out;

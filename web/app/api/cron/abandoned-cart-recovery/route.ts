@@ -40,7 +40,10 @@ export async function GET(req: NextRequest) {
     const cartLink = await storeUrl(cart.business.id, "/cart");
     const message = `Hi! You left ${summary} in your cart at ${cart.business.name} (${money(cart.total, cart.business.storeCurrency)}). Complete your order here: ${cartLink} — or just reply to this message.`;
 
-    const result = await sendWhatsAppMessage(cart.customerPhone, message, { from: cart.business.whatsappInboundNumber ?? undefined });
+    const result = await sendWhatsAppMessage(cart.customerPhone, message, {
+      from: cart.business.whatsappInboundNumber ?? undefined,
+      template: { kind: "cart_recovery", vars: [cart.business.name, summary, money(cart.total, cart.business.storeCurrency), cartLink] },
+    });
     await prisma.abandonedCart.update({
       where: { id: cart.id },
       data: { notifiedAt: new Date(), notifyError: result.error },

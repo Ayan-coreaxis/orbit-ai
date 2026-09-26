@@ -868,7 +868,9 @@ If you find a contradiction, rewrite ONLY the affected task(s) to resolve it —
   let whatsappError: string | undefined;
   if (business.whatsapp && settings.notifyWhatsApp) {
     const message = `📊 Orbit.ai — your weekly plan is ready.\n\nFocus: ${strategy.focusProduct}\n${strategy.theme}\n\nOpen your dashboard for the full task list.`;
-    const result = await sendWhatsAppMessage(business.whatsapp, message);
+    const result = await sendWhatsAppMessage(business.whatsapp, message, {
+      template: { kind: "owner_alert", vars: ["Your weekly plan is ready", `Focus: ${strategy.focusProduct}. ${strategy.theme}. Open your dashboard for the full task list.`] },
+    });
     whatsappNotified = result.sent;
     whatsappError = result.error;
   }
