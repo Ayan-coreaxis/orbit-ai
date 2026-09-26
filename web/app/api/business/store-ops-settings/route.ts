@@ -26,6 +26,7 @@ export async function PATCH(req: NextRequest) {
     metaCapiToken?: string | null;
     relatedProductsEnabled?: boolean;
     recentlyViewedEnabled?: boolean;
+    chatWidgetEnabled?: boolean;
     widgetMotion?: string;
     widgetCopy?: Record<string, string> | null;
     accountTabs?: string[] | null;
@@ -56,6 +57,7 @@ export async function PATCH(req: NextRequest) {
   }
   if (b.relatedProductsEnabled !== undefined) data.relatedProductsEnabled = !!b.relatedProductsEnabled;
   if (b.recentlyViewedEnabled !== undefined) data.recentlyViewedEnabled = !!b.recentlyViewedEnabled;
+  if (b.chatWidgetEnabled !== undefined) data.chatWidgetEnabled = !!b.chatWidgetEnabled;
   if (b.widgetMotion !== undefined && WIDGET_MOTIONS.includes(b.widgetMotion)) data.widgetMotion = b.widgetMotion;
   if (b.widgetCopy !== undefined) {
     if (b.widgetCopy && typeof b.widgetCopy === "object") {

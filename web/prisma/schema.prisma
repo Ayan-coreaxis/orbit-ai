@@ -86,6 +86,7 @@ model Business {
   // the way they can everything else. These are the one on/off switch they get for each.
   relatedProductsEnabled Boolean @default(true) // "You may also like" — real co-view recommendations
   recentlyViewedEnabled  Boolean @default(true) // "Recently viewed" — per-browser history
+  chatWidgetEnabled      Boolean @default(true) // floating "Ask us" chat on the storefront — answered by the store chatbot, logged to the inbox
 
   // Real end-user customization for the generic "widget" components (checkout, cart, auth, account,
   // track) that live OUTSIDE the Orbit Design doc — a seller couldn't touch their copy or motion at

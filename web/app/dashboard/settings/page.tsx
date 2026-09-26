@@ -65,6 +65,7 @@ export default async function SettingsPage({
           metaCapiNote: true,
           relatedProductsEnabled: true,
           recentlyViewedEnabled: true,
+          chatWidgetEnabled: true,
           widgetMotion: true,
           widgetCopy: true,
           accountTabs: true,
@@ -255,6 +256,7 @@ export default async function SettingsPage({
               metaCapiNote: business?.metaCapiNote ?? null,
               relatedProductsEnabled: business?.relatedProductsEnabled ?? true,
               recentlyViewedEnabled: business?.recentlyViewedEnabled ?? true,
+              chatWidgetEnabled: business?.chatWidgetEnabled ?? true,
               currency: business?.storeCurrency ?? "usd",
             }}
           />

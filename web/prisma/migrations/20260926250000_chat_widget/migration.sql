@@ -1,0 +1,1 @@
+ALTER TABLE "Business" ADD COLUMN "chatWidgetEnabled" BOOLEAN NOT NULL DEFAULT true;

@@ -113,7 +113,7 @@ export default async function AgentDetailPage({
 }) {
   const { id } = await params;
   const agent = agents.find((a) => a.id === id);
-  if (!agent) notFound();
+  if (!agent || !agent.live) notFound(); // planned agents (voice, handoff) have no page until they exist
 
   const real = await getBusinessSummary();
   const usage = await getAgentUsage(id);

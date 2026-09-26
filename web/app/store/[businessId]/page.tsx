@@ -87,7 +87,7 @@ export default async function StorefrontPage({ params }: { params: Promise<{ bus
       />
       <script dangerouslySetInnerHTML={{ __html: storefrontRuntimeJs(businessId, sfProducts) }} />
       <CartSync businessId={businessId} />
-      <StoreCartBar businessId={businessId} accent={doc.tokens.accent} accentText={doc.tokens.accentText} currency={business.storeCurrency} tokens={doc.tokens} />
+      <StoreCartBar businessId={businessId} storeName={doc.storeName} accent={doc.tokens.accent} accentText={doc.tokens.accentText} currency={business.storeCurrency} tokens={doc.tokens} />
     </>
   );
 }

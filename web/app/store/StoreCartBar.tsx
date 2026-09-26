@@ -4,6 +4,7 @@ import { useState } from "react";
 import { usePathname } from "next/navigation";
 import { lineKey, setQty, useCart } from "./cart-store";
 import { money } from "@/lib/money";
+import { StoreChat } from "./StoreChat";
 
 /** Floating cart pill that opens a slide-out drawer (line items + checkout). */
 export function StoreCartBar({
@@ -12,8 +13,10 @@ export function StoreCartBar({
   accentText,
   currency,
   tokens,
+  storeName,
 }: {
   businessId: string;
+  storeName?: string;
   accent: string;
   accentText: string;
   currency?: string;
@@ -41,10 +44,12 @@ export function StoreCartBar({
 
   // Nothing to show with an empty cart — and never on the cart / checkout page itself, where the
   // pill would sit on top of the checkout button.
-  if (count === 0 || /\/cart\/?$/.test(pathname)) return null;
+  const chat = <StoreChat businessId={businessId} storeName={storeName} vars={vars} />;
+  if (count === 0 || /\/cart\/?$/.test(pathname)) return chat;
 
   return (
     <>
+      {chat}
       <button
         onClick={() => setOpen(true)}
         style={{

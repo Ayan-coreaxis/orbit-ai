@@ -65,7 +65,7 @@ export default async function LoginPage({ params }: { params: Promise<{ business
       />
       <script dangerouslySetInnerHTML={{ __html: storefrontRuntimeJs(businessId, []) }} />
       <CartSync businessId={businessId} />
-      <StoreCartBar businessId={businessId} accent={doc.tokens.accent} accentText={doc.tokens.accentText} currency={business.storeCurrency} tokens={doc.tokens} />
+      <StoreCartBar businessId={businessId} storeName={doc.storeName} accent={doc.tokens.accent} accentText={doc.tokens.accentText} currency={business.storeCurrency} tokens={doc.tokens} />
     </>
   );
 }

@@ -17,6 +17,7 @@ interface Ops {
   metaCapiNote: string | null;
   relatedProductsEnabled: boolean;
   recentlyViewedEnabled: boolean;
+  chatWidgetEnabled: boolean;
   currency: string;
 }
 
@@ -35,6 +36,7 @@ export function StoreOpsSettingsCard({ initial }: { initial: Ops }) {
     metaCapiToken: "",
     relatedProductsEnabled: initial.relatedProductsEnabled,
     recentlyViewedEnabled: initial.recentlyViewedEnabled,
+    chatWidgetEnabled: initial.chatWidgetEnabled,
   });
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -56,6 +58,7 @@ export function StoreOpsSettingsCard({ initial }: { initial: Ops }) {
       metaPixelId: f.metaPixelId,
       relatedProductsEnabled: f.relatedProductsEnabled,
       recentlyViewedEnabled: f.recentlyViewedEnabled,
+      chatWidgetEnabled: f.chatWidgetEnabled,
     };
     if (f.metaCapiToken.trim()) body.metaCapiToken = f.metaCapiToken.trim();
     const r = await fetch("/api/business/store-ops-settings", {
@@ -116,6 +119,11 @@ export function StoreOpsSettingsCard({ initial }: { initial: Ops }) {
           checked={f.recentlyViewedEnabled}
           onChange={(v) => setF({ ...f, recentlyViewedEnabled: v })}
           label={'Show "Recently viewed" on product pages'}
+        />
+        <Toggle
+          checked={f.chatWidgetEnabled}
+          onChange={(v) => setF({ ...f, chatWidgetEnabled: v })}
+          label="Show the chat bubble on your store — your Chatbot answers from your products and delivery settings; every chat lands in Inbox"
         />
       </div>
 
