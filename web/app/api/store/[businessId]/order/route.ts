@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
+import { pauseAdsForSoldOut } from "@/lib/inventory-ads";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { getStoreCustomer } from "@/lib/store-auth";
@@ -63,6 +64,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ bus
   const sess = (await cookies()).get("sc_sess")?.value;
   if (sess) await recordEvent(businessId, sess, "order_complete");
   await notifyOrder(order.id, "order_placed", originFromRequest(req)).catch(() => {});
+  after(() => pauseAdsForSoldOut(businessId).catch(() => {}));
 
   return NextResponse.json({ orderId: order.id, total: order.total });
 }

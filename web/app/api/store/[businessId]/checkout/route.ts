@@ -18,6 +18,7 @@ import { earnPointsForOrder, redeemPoints, LoyaltyError } from "@/lib/loyalty";
 import { qualifyReferralForOrder } from "@/lib/referral";
 import { redeemGiftCard, GiftCardError } from "@/lib/gift-cards";
 import { money } from "@/lib/money";
+import { pauseAdsForSoldOut } from "@/lib/inventory-ads";
 import { parseCheckoutCustomFields, validateCustomFieldAnswers } from "@/lib/checkout-fields";
 
 interface AddressInput {
@@ -287,6 +288,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ bus
   }
 
   const orderNumber = order.id.slice(-6).toUpperCase();
+  after(() => pauseAdsForSoldOut(businessId).catch(() => {}));
   after(async () => {
     await bestEffort("checkout.notifyCustomer", async () => {
       if (needsVerify) {

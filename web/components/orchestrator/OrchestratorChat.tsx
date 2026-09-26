@@ -34,6 +34,7 @@ const SPECIALIST_LABELS: Record<string, { name: string; color: string }> = {
   experimentation: { name: "Experimentation Agent", color: "#2b7bb3" },
   retention: { name: "Retention Agent", color: "#c2185b" },
   reviews: { name: "Reviews Agent", color: "#6b7c1f" },
+  inventory: { name: "Inventory Agent", color: "#0f766e" },
 };
 
 // Stages shown while the real API call is in flight — the reply isn't streamed yet, so these

@@ -319,6 +319,7 @@ model AdCampaign {
   purchaseValue  Float? // revenue Meta attributes to this ad, in `currency`
   syncedAt       DateTime?
   source         String    @default("ads-agent") // ads-agent | owner | orchestrator
+  pausedReason   String? // "sold_out" when Orbit paused it because the advertised product ran out — cleared when the owner turns it back on
   activatedAt    DateTime?
   createdAt      DateTime  @default(now())
 

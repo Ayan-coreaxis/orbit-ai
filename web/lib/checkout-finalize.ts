@@ -7,6 +7,7 @@ import { applyStockDelta, OutOfStockError } from "@/lib/checkout";
 import { earnPointsForOrder, redeemPoints, LoyaltyError } from "@/lib/loyalty";
 import { qualifyReferralForOrder } from "@/lib/referral";
 import { redeemGiftCard, GiftCardError } from "@/lib/gift-cards";
+import { pauseAdsForSoldOut } from "@/lib/inventory-ads";
 
 interface Item {
   productId?: string;
@@ -115,6 +116,7 @@ export async function finalizeStripeOrder(
   await sendPurchaseEvent(order.id).catch(() => {});
   await earnPointsForOrder(order.id).catch(() => {});
   await qualifyReferralForOrder(order.id).catch(() => {});
+  await pauseAdsForSoldOut(businessId).catch(() => {});
 
   return { ok: true, orderId: order.id };
 }

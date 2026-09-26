@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { saveProductVariants } from "@/lib/product-variants-save";
 import { fireBackInStock } from "@/lib/stock-notify";
 import { originFromRequest } from "@/lib/order-notify";
+import { noteRestockedAds, pauseAdsForSoldOut } from "@/lib/inventory-ads";
 
 async function ownedProduct(id: string, businessId: string) {
   const p = await prisma.product.findUnique({ where: { id }, select: { businessId: true } });
@@ -49,6 +50,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     for (const v of product.variants) {
       if ((beforeVar.get(v.id) ?? 0) <= 0 && v.stock > 0) await fireBackInStock(businessId, id, origin, v.id).catch(() => {});
     }
+    // stock went to zero → stop ads for it; came back → tell the owner their paused ads can run again
+    await pauseAdsForSoldOut(businessId).catch(() => {});
+    await noteRestockedAds(businessId, id).catch(() => {});
   });
 
   return NextResponse.json({ product });

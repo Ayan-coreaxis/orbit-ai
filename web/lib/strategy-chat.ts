@@ -4,6 +4,7 @@ import { getBusinessSnapshot, parseMetric, parseSteps, measureStrategy } from "@
 import { STRATEGY_ITEM_SCHEMA, coerceArray, plannerPrinciples, strategyData, type RawStrategy } from "@/lib/strategy-planner";
 import { STORE_CHANGES_SCHEMA, applyStoreChanges, splitPendingOps } from "@/lib/store-settings-ops";
 import { after } from "next/server";
+import { noteRestockedAds, pauseAdsForSoldOut } from "@/lib/inventory-ads";
 import { STORE_DESIGN_SCHEMA, describeDesignJobs, runDesignJobs, sanitizeStoredDesignJobs } from "@/lib/design-ops";
 import { DELETE_PRODUCTS_SCHEMA, NEW_PRODUCTS_SCHEMA, PRODUCT_CHANGES_SCHEMA, applyProductChanges } from "@/lib/product-ops";
 import { CREATE_CONTENT_SCHEMA, describeStudioRequests, runStudioRequests, sanitizeStoredStudioRequests } from "@/lib/studio/ops";
@@ -310,6 +311,11 @@ async function applyClaimedProposal(businessId: string, m: { id: string; pending
   if (designJobs.length) after(() => runDesignJobs(businessId, designJobs, m.planId));
   if (studioJobs.length) after(() => runStudioRequests(businessId, studioJobs));
   if (metaOps.length) after(() => runMetaOps(businessId, metaOps));
+  if (productChanges.length)
+    after(async () => {
+      await pauseAdsForSoldOut(businessId).catch(() => {});
+      for (const c of productChanges) if (c.op === "product_update") await noteRestockedAds(businessId, c.productId).catch(() => {});
+    });
   await prisma.orchestratorMessage.update({ where: { id: m.id }, data: { opsState: "applied", opsSummary: JSON.stringify(applied) } });
   return applied;
 }
