@@ -237,9 +237,20 @@ User feedback: a separate Strategy Lab page + separate plan chat was wrong — t
 - [x] WhatsApp: Twilio signature verification, replies from the seller's own number, admin test page
 - [x] Sellers can connect their own domain (DNS check, automatic routing, Vercel / Caddy SSL)
 - [ ] Deploy Orbit on a public https domain, then test Meta, Twilio and a real custom domain live
-- [ ] WhatsApp message templates for messages outside the 24-hour window (order updates, cart recovery)
-- [ ] Meta Pixel / Conversions API so ads can optimise for purchases, not just clicks
-- [ ] Instagram / Messenger DMs into the Inbox (Meta webhooks)
+- [x] ~~WhatsApp message templates for messages outside the 24-hour window~~ — done 2026-09-26
+- [x] ~~Meta Pixel / Conversions API so ads can optimise for purchases~~ — done 2026-09-26
+- [x] ~~Instagram / Messenger DMs into the Inbox (Meta webhooks)~~ — done 2026-09-26
+
+## ✅ Done (added 2026-09-26, everything left that Claude could do before launch)
+- [x] Database moved to PostgreSQL (baseline migration, SQLite → Postgres copy script, SQLite history archived)
+- [x] Uploaded files served by a route (work after a production build); uploads refuse clearly on serverless hosts without R2
+- [x] WhatsApp approved templates (9 message kinds) — admin pastes Content SIDs in Super Admin > WhatsApp
+- [x] Meta Pixel on every store page + ViewContent / AddToCart / InitiateCheckout / Purchase; Conversions API purchases (deduped); sales-optimised ads with click fallback; Ads page shows sales / value / return
+- [x] Messenger + Instagram DMs answered by the store chatbot and shown in the Inbox
+- [x] Privacy Policy + Terms pages (linked from landing, pricing, signup)
+- [x] Platform billing fixed: no second subscription on plan change, Stripe billing portal, ended subscription pauses AI, past-due banner
+- [x] AI-written onboarding questions, answers fed to every planning agent
+- [ ] Owner: Postgres host, deploy, R2, Meta App Review (+ messaging permissions) & webhook, Twilio templates, Stripe portal + prices, LEGAL_CONTACT_EMAIL, lawyer review of /privacy and /terms
 
 ## ✅ Done (added 2026-09-26, Orbit Studio — AI images, reels, UGC, try-on & ads, Growth/Scale plans)
 - [x] 21 content formats (11 image, 10 video) defined as data in `lib/studio/formats.ts` — each shows the seller "what you'll get" and asks only for the material it needs
@@ -255,7 +266,7 @@ User feedback: a separate Strategy Lab page + separate plan chat was wrong — t
 ## 🔲 Not done yet — next up
 
 - [ ] **Twilio credentials not yet added** — the WhatsApp send code is real and wired in, but nobody has added a Twilio Account SID / Auth Token / WhatsApp sender in Admin yet, so it's never actually fired. Get a Twilio account (they offer a free WhatsApp sandbox number for testing — no paid plan needed to try it) and add the 3 keys to test end-to-end.
-- [ ] **AI-dynamic onboarding questions** — user asked for onboarding to have AI generate its own setup questions instead of a fixed form; deferred because it needs live Claude API calls to design/test and the account has no credits right now
+- [x] ~~**AI-dynamic onboarding questions**~~ — done 2026-09-26 (`lib/onboarding-questions.ts`; fixed fallback set when AI is unavailable)
 
 ## ✅ Done (added 2026-08-17, "complete the ecommerce vertical" — Phase 1: real analytics)
 

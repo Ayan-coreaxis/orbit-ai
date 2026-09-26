@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import { ContactLine, LegalPage } from "@/components/legal/LegalPage";
 
+// Rendered per request so a contact email saved in Super Admin shows up without a rebuild.
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Privacy Policy — orbit.ai",
   description: "What orbit.ai collects, why, who it is shared with, and how to delete it.",

@@ -2,6 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ContactLine, LegalPage } from "@/components/legal/LegalPage";
 
+// Rendered per request so a contact email saved in Super Admin shows up without a rebuild.
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Terms of Service — orbit.ai",
   description: "The rules for using orbit.ai.",
