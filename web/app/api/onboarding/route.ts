@@ -6,6 +6,7 @@ import { draftGrowthPlan } from "@/lib/strategy-planner";
 import { getCurrentUser } from "@/lib/auth";
 import { UsageCapExceededError, PLAN_DEFAULT_CAP_USD } from "@/lib/usage-limit";
 import { VALID_BUSINESS_MODELS } from "@/lib/business-model";
+import { cleanAnswers } from "@/lib/onboarding-questions";
 
 export const maxDuration = 120;
 
@@ -17,6 +18,7 @@ interface OnboardingBody {
   instagram?: string;
   whatsapp?: string;
   competitors: string[];
+  answers?: { question: string; answer: string }[];
 }
 
 export async function POST(req: NextRequest) {
@@ -58,6 +60,10 @@ export async function POST(req: NextRequest) {
       website: body.website || null,
       instagram: body.instagram || null,
       whatsapp: body.whatsapp || null,
+      onboardingAnswers: (() => {
+        const a = cleanAnswers(body.answers);
+        return a.length ? JSON.stringify(a) : null;
+      })(),
       plan: "starter",
       monthlyUsageCapUsd: PLAN_DEFAULT_CAP_USD.starter,
       competitors: { create: competitorUrls.map((url) => ({ url })) },

@@ -130,6 +130,7 @@ export interface BusinessSnapshot {
   name: string;
   niche: string;
   businessModel: string | null;
+  onboardingAnswers: string | null;
   plan: string;
   currency: string;
   last30: { orders: number; revenue: number; aov: number; cancelled: number; newCustomers: number; repeatCustomers: number };
@@ -196,6 +197,7 @@ export async function getBusinessSnapshot(businessId: string): Promise<BusinessS
     name: business.name,
     niche: business.niche,
     businessModel: business.businessModel,
+    onboardingAnswers: business.onboardingAnswers,
     plan: business.plan,
     currency: business.storeCurrency,
     last30: {

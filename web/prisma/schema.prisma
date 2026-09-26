@@ -77,6 +77,7 @@ model Business {
   courierApiKey        String? // seller's own courier API token
   ga4MeasurementId     String? // seller's Google Analytics 4 id (G-XXXX), injected into their storefront
   metaPixelId          String? // seller's Meta Pixel id
+  onboardingAnswers    String? // JSON [{question, answer}] — the seller's answers to the AI-written onboarding questions; every agent reads them
   metaCapiToken        String? // Conversions API token from Meta Events Manager (server-side purchase events)
   metaCapiNote         String? // last Conversions API result: "ok:<iso time>" or the error to show the seller
 

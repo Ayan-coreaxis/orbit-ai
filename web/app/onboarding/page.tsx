@@ -6,7 +6,8 @@ import { gsap } from "gsap";
 import { Compass, ArrowRight, ArrowLeft, Plus, X, Loader2, Sparkles, Check, Package, TrendingUp, Truck, Layers } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const steps = ["Website", "Model", "Presence", "Competitors", "Generating"];
+const steps = ["Website", "Model", "About you", "Presence", "Competitors", "Generating"];
+const LAST_INPUT_STEP = 4; // Competitors — the step before Generating
 
 interface BusinessModelOption {
   id: string;
@@ -42,6 +43,15 @@ const BUSINESS_MODELS: BusinessModelOption[] = [
   },
 ];
 
+interface Question {
+  id: string;
+  question: string;
+  why: string;
+  type: "choice" | "text";
+  options?: string[];
+  placeholder?: string;
+}
+
 interface DiscoverResult {
   businessName: string;
   niche: string;
@@ -63,6 +73,11 @@ export default function Onboarding() {
   // What the website scan actually found — shown on the channels step so the seller sees why fields are prefilled.
   const [foundOnSite, setFoundOnSite] = useState<{ label: string; value: string; searched: boolean }[]>([]);
   const [competitors, setCompetitors] = useState<string[]>([""]);
+  // AI-written questions for this seller (step 3), and which business they were written for.
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [questionsFor, setQuestionsFor] = useState("");
+  const [loadingQuestions, setLoadingQuestions] = useState(false);
+  const [answers, setAnswers] = useState<Record<string, string>>({});
   const [generating, setGenerating] = useState(false);
   const [progressText, setProgressText] = useState("Reading your business profile…");
   const [error, setError] = useState<string | null>(null);
@@ -97,11 +112,34 @@ export default function Onboarding() {
     );
   }, [step]);
 
+  async function loadQuestions() {
+    const key = `${business.name}|${business.niche}|${businessModel}`;
+    if (key === questionsFor && questions.length) return;
+    setLoadingQuestions(true);
+    try {
+      const res = await fetch("/api/onboarding/questions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: business.name, niche: business.niche, businessModel, website }),
+      });
+      const data = (await res.json()) as { questions?: Question[] };
+      if (data.questions?.length) {
+        setQuestions(data.questions);
+        setQuestionsFor(key);
+      }
+    } catch {
+      /* the step still works — it just shows nothing to answer */
+    } finally {
+      setLoadingQuestions(false);
+    }
+  }
+
   function next() {
-    if (step === 3) {
+    if (step === LAST_INPUT_STEP) {
       startGeneration();
       return;
     }
+    if (step === 1) void loadQuestions();
     setStep((s) => Math.min(s + 1, steps.length - 1));
   }
 
@@ -152,7 +190,7 @@ export default function Onboarding() {
   }
 
   async function startGeneration() {
-    setStep(4);
+    setStep(LAST_INPUT_STEP + 1);
     setGenerating(true);
     setError(null);
     const messages = [
@@ -180,6 +218,7 @@ export default function Onboarding() {
           instagram: socials.instagram,
           whatsapp: socials.whatsapp,
           competitors: competitors.filter(Boolean),
+          answers: questions.map((q) => ({ question: q.question, answer: (answers[q.id] ?? "").trim() })).filter((a) => a.answer),
         }),
       });
       clearInterval(interval);
@@ -192,7 +231,7 @@ export default function Onboarding() {
     } catch (e) {
       clearInterval(interval);
       setGenerating(false);
-      setStep(3);
+      setStep(LAST_INPUT_STEP);
       setError(e instanceof Error ? e.message : "Something went wrong.");
     }
   }
@@ -220,7 +259,7 @@ export default function Onboarding() {
 
           {!generating && (
             <div data-entrance className="mb-8 flex items-center justify-center gap-2">
-              {steps.slice(0, 4).map((s, i) => (
+              {steps.slice(0, LAST_INPUT_STEP + 1).map((s, i) => (
                 <div key={s} className="flex items-center gap-2">
                   <div
                     className={cn(
@@ -232,7 +271,7 @@ export default function Onboarding() {
                   >
                     {i + 1}
                   </div>
-                  {i < 3 && (
+                  {i < LAST_INPUT_STEP && (
                     <div
                       className={cn(
                         "h-px w-8 transition-colors duration-300",
@@ -369,6 +408,56 @@ export default function Onboarding() {
 
               {step === 2 && (
                 <div>
+                  <h2 className="text-xl font-semibold text-white">A few questions about {business.name || "your business"}</h2>
+                  <p className="mt-1.5 text-[14.5px] text-zinc-400">
+                    Written by AI for what you sell. Answer what you can — skip anything you&apos;re not sure about. Your AI team reads these before every plan.
+                  </p>
+                  {loadingQuestions ? (
+                    <div className="mt-8 flex items-center gap-2.5 text-[13.5px] text-zinc-400">
+                      <Loader2 className="h-4 w-4 animate-spin text-fuchsia-400" /> Writing questions for your business…
+                    </div>
+                  ) : (
+                    <div className="mt-6 space-y-5">
+                      {questions.map((q) => (
+                        <div key={q.id}>
+                          <div className="text-[14px] font-medium text-zinc-200">{q.question}</div>
+                          {q.why && <div className="mt-0.5 text-[12px] text-zinc-500">{q.why}</div>}
+                          {q.type === "choice" && q.options?.length ? (
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {q.options.map((o) => {
+                                const on = answers[q.id] === o;
+                                return (
+                                  <button
+                                    key={o}
+                                    type="button"
+                                    onClick={() => setAnswers({ ...answers, [q.id]: on ? "" : o })}
+                                    className={cn(
+                                      "rounded-lg border px-3 py-1.5 text-[13px] transition-colors",
+                                      on ? "border-fuchsia-500 bg-fuchsia-500/10 text-white" : "border-zinc-800 bg-zinc-900/60 text-zinc-400 hover:border-zinc-700",
+                                    )}
+                                  >
+                                    {o}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <input
+                              className="dark-input mt-2"
+                              placeholder={q.placeholder ?? "Your answer"}
+                              value={answers[q.id] ?? ""}
+                              onChange={(e) => setAnswers({ ...answers, [q.id]: e.target.value })}
+                            />
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {step === 3 && (
+                <div>
                   <h2 className="text-xl font-semibold text-white">Where do you sell &amp; talk to customers?</h2>
                   <p className="mt-1.5 text-[14.5px] text-zinc-400">
                     Your AI team will post and reply across whatever you connect here.
@@ -415,7 +504,7 @@ export default function Onboarding() {
                 </div>
               )}
 
-              {step === 3 && (
+              {step === 4 && (
                 <div>
                   <h2 className="text-xl font-semibold text-white">Who are your competitors?</h2>
                   <p className="mt-1.5 text-[14.5px] text-zinc-400">
@@ -463,7 +552,7 @@ export default function Onboarding() {
                 </div>
               )}
 
-              {step === 4 && (
+              {step === 5 && (
                 <div className="flex flex-col items-center py-10 text-center">
                   <div className="relative flex h-14 w-14 items-center justify-center">
                     <div className="absolute inset-0 animate-spin rounded-full bg-[conic-gradient(from_0deg,#a855f7,#ec4899,#f97316,#a855f7)] [mask:radial-gradient(farthest-side,transparent_calc(100%-3px),#000_calc(100%-3px))]" />
@@ -481,7 +570,7 @@ export default function Onboarding() {
               )}
             </div>
 
-            {step < 4 && (
+            {step <= LAST_INPUT_STEP && (
               <div className="mt-8 flex items-center justify-between">
                 {step > 0 ? (
                   <button
@@ -495,10 +584,10 @@ export default function Onboarding() {
                 )}
                 <button
                   onClick={next}
-                  disabled={(step === 0 && !canContinueStep0) || (step === 1 && !businessModel)}
+                  disabled={(step === 0 && !canContinueStep0) || (step === 1 && !businessModel) || (step === 2 && loadingQuestions)}
                   className="group inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-violet-500 via-fuchsia-500 to-orange-500 px-5 py-2.5 text-[14.5px] font-semibold text-white shadow-[0_0_20px_rgba(217,70,239,0.22)] transition-transform hover:scale-[1.02] disabled:opacity-40 disabled:hover:scale-100"
                 >
-                  {step === 3 ? "Generate my growth report" : "Continue"}
+                  {step === LAST_INPUT_STEP ? "Generate my growth report" : step === 2 && !Object.values(answers).some((a) => a.trim()) ? "Skip for now" : "Continue"}
                   <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
                 </button>
               </div>

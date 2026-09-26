@@ -1,4 +1,5 @@
 import type Anthropic from "@anthropic-ai/sdk";
+import { sellerAnswersBlock } from "@/lib/onboarding-questions";
 import { anthropic, MODEL } from "@/lib/anthropic";
 import { prisma } from "@/lib/prisma";
 import { estimateCostUsd } from "@/lib/pricing";
@@ -92,7 +93,7 @@ export function snapshotText(s: BusinessSnapshot): string {
   const connected = Object.entries(s.connected)
     .map(([k, v]) => `${k}: ${v ? "connected" : "NOT connected"}`)
     .join(", ");
-  return `BUSINESS: ${s.name} — sells ${s.niche}. Business model: ${s.businessModel ?? "not stated"}. Orbit plan: ${s.plan}.
+  return `BUSINESS: ${s.name} — sells ${s.niche}. Business model: ${s.businessModel ?? "not stated"}. Orbit plan: ${s.plan}.${sellerAnswersBlock(s.onboardingAnswers)}
 LAST 30 DAYS (real): ${s.last30.orders} valid orders, revenue ${money(s.last30.revenue)}, avg order ${money(s.last30.aov)}, ${s.last30.cancelled} cancelled, ${s.last30.newCustomers} new customers, ${s.last30.repeatCustomers} returning customers.
 PREVIOUS 30 DAYS: ${s.prev30.orders} orders, revenue ${money(s.prev30.revenue)}.
 ALL TIME: ${s.allTimeOrders} orders from ${s.allTimeCustomers} customers.

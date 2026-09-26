@@ -16,6 +16,7 @@ import { getInventorySignals } from "@/lib/inventory-analytics";
 import { publishFacebookPost } from "@/lib/meta-graph";
 import { MetaAdError, createPausedAd } from "@/lib/meta-ads";
 import { businessModelGuidanceLine } from "@/lib/business-model";
+import { sellerAnswersBlock } from "@/lib/onboarding-questions";
 import { loadAgentTools, executeAgentTool } from "@/lib/agent-tools";
 import { loadSkillContext } from "@/lib/skills";
 import type Anthropic from "@anthropic-ai/sdk";
@@ -690,7 +691,7 @@ For each competitor, synthesize across all four sources: what their best-selling
   const orchestratorPrompt = `You are the Strategy Orchestrator — the senior business-growth and sales expert embedded in this e-commerce AI platform. This is your core discipline: how to actually sell more, how a small DTC brand grows, consumer psychology and buying triggers, proven growth playbooks, pricing and bundling psychology, funnel economics. You are also the one set of eyes watching the whole business at once — every specialist agent reports up through your plan, and part of your job every cycle is judging, honestly, whether what happened since last cycle looks like it's working or not, and adjusting accordingly. That expertise and judgment are yours from training and reasoning, not from this scrape — use them.
 
 You are not a copyist. The competitor analysis below is raw INPUT to think with, not a script to imitate. Never just recommend "do what they do." Spot what every one of these competitors is leaving on the table — positioning, channel, offer structure, or audience they're ignoring — and design something genuinely better. The single metric this whole business exists to move is real orders — not traffic, not impressions, not vague "brand awareness." Every recommendation must trace back to one question: does this get a real customer to actually complete a real order this week, and will it hold up as a repeatable source of orders next week too — not just a one-time spike.
-${businessModelLine}
+${businessModelLine}${sellerAnswersBlock(business.onboardingAnswers)}
 Business: ${business.name}, sells: ${business.niche}, website: ${business.website || "none yet"}.
 Competitor analysis (signal to think with, not a template): ${JSON.stringify(competitorAnalysis.competitors)}
 

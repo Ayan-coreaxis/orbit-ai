@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { getOrderGrowth } from "@/lib/get-order-growth";
 import { businessModelGuidanceLine } from "@/lib/business-model";
+import { sellerAnswersBlock } from "@/lib/onboarding-questions";
 
 /**
  * Builds the real, checkable context the Orchestrator chat is grounded in — same
@@ -45,7 +46,7 @@ export async function buildOrchestratorContext(businessId: string): Promise<stri
 
   return `Business: ${business.name} — sells ${business.niche}. The single metric this business exists to move is real orders, not traffic or vague brand awareness — ground every answer in that.${
     businessModelGuidance ? `\nHow this seller actually operates (shapes HOW you advise, not the goal itself): ${businessModelGuidance}` : ""
-  }
+  }${sellerAnswersBlock(business.onboardingAnswers)}
 
 CURRENT PLAN (this cycle's real focus, set by you last cycle):
 Focus: ${plan.focusProduct ?? "no plan generated yet"}
