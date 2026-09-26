@@ -46,6 +46,25 @@ function htmlToText(html: string): string {
     .trim();
 }
 
+/** Real links to individual product pages in raw HTML (same site only), absolute. */
+function extractProductLinks(html: string, pageUrl: string): string[] {
+  let origin = "";
+  try {
+    origin = new URL(pageUrl).origin;
+  } catch {
+    return [];
+  }
+  const out = new Set<string>();
+  for (const m of html.matchAll(/href=["']([^"'#]+\/products?\/[^"'#?]+)[^"']*["']/gi)) {
+    try {
+      const u = new URL(m[1], pageUrl);
+      if (u.origin === origin && !/\.(json|js|xml)$/i.test(u.pathname)) out.add(`${u.origin}${u.pathname}`);
+    } catch {}
+    if (out.size >= 12) break;
+  }
+  return [...out];
+}
+
 function looksBlocked(text: string): boolean {
   if (text.length < 200) return true;
   const lower = text.toLowerCase();
@@ -77,6 +96,7 @@ async function fetchWithHttp(url: string): Promise<RawFetch> {
       // request that could hit a different result (e.g. a bot-check page with no real links).
       instagram: extractInstagramHandle(html),
       contacts: extractContacts(html, htmlToText(html)),
+      productLinks: extractProductLinks(html, url),
     };
   } finally {
     clearTimeout(timeout);
@@ -159,7 +179,7 @@ export async function scrapePage(rawUrl: string, waitMs = 3000): Promise<ScrapeR
   try {
     const http = await fetchWithHttp(url);
     if (!looksBlocked(http.text)) {
-      return { url, text: safeSlice(http.text, 1500), structuredData: http.structuredData, rawProducts: http.rawProducts, method: "http", instagram: http.instagram, contacts: http.contacts };
+      return { url, text: safeSlice(http.text, 1500), structuredData: http.structuredData, rawProducts: http.rawProducts, method: "http", instagram: http.instagram, contacts: http.contacts, productLinks: http.productLinks };
     }
   } catch {
     // fall through to browser fallback
@@ -176,6 +196,7 @@ export async function scrapePage(rawUrl: string, waitMs = 3000): Promise<ScrapeR
         method: "browser",
         instagram: browserFetch.instagram,
         contacts: browserFetch.contacts,
+        productLinks: browserFetch.productLinks,
       };
     }
     return {
@@ -376,12 +397,99 @@ async function fetchExtraPath(url: string): Promise<ScrapeResult> {
   return { url, text: "", structuredData: "(unavailable)", rawProducts: [], method: "failed" };
 }
 
-async function scrapeSiteDeep(rawUrl: string): Promise<{ combinedText: string; rawProducts: ProductSummary[]; pagesFound: number; primaryMethod: ScrapeResult["method"] }> {
+type CatalogItem = { name: string; price: number; compareAt: number | null; available: boolean | null; added: string | null; currency: string | null };
+
+async function getJson(url: string): Promise<unknown | null> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+  try {
+    const res = await safeFetch(url, { signal: controller.signal, headers: { ...REALISTIC_HEADERS, Accept: "application/json" } });
+    if (!res.ok || !(res.headers.get("content-type") ?? "").includes("json")) return null;
+    return await res.json();
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+/**
+ * The competitor's real catalog, when their platform publishes it: Shopify's public /products.json
+ * or WooCommerce's public Store API. Real current prices, sale ("compare at") prices, stock and
+ * launch dates — far better than reading prose. Null when neither exists.
+ */
+export async function readCatalogApi(base: string): Promise<{ platform: string; items: CatalogItem[] } | null> {
+  const shop = (await getJson(`${base}/products.json?limit=60`)) as { products?: Record<string, unknown>[] } | null;
+  if (shop && Array.isArray(shop.products) && shop.products.length) {
+    const items = shop.products.map((p): CatalogItem => {
+      const vs = Array.isArray(p.variants) ? (p.variants as Record<string, unknown>[]) : [];
+      const prices = vs.map((v) => Number(v.price)).filter((n) => Number.isFinite(n) && n > 0);
+      const compares = vs.map((v) => Number(v.compare_at_price)).filter((n) => Number.isFinite(n) && n > 0);
+      const price = prices.length ? Math.min(...prices) : 0;
+      const compareAt = compares.length ? Math.max(...compares) : null;
+      return {
+        name: String(p.title ?? "").slice(0, 90),
+        price,
+        compareAt: compareAt && compareAt > price ? compareAt : null,
+        available: vs.length ? vs.some((v) => v.available !== false) : null,
+        added: typeof p.published_at === "string" ? p.published_at.slice(0, 10) : typeof p.created_at === "string" ? p.created_at.slice(0, 10) : null,
+        currency: null,
+      };
+    });
+    return { platform: "Shopify", items: items.filter((i) => i.name && i.price > 0) };
+  }
+  const woo = (await getJson(`${base}/wp-json/wc/store/v1/products?per_page=60&orderby=date`)) as Record<string, unknown>[] | null;
+  if (Array.isArray(woo) && woo.length) {
+    const items = woo.map((p): CatalogItem => {
+      const pr = (p.prices ?? {}) as Record<string, unknown>;
+      const minor = Number(pr.currency_minor_unit ?? 2);
+      const conv = (v: unknown) => (Number.isFinite(Number(v)) ? Number(v) / 10 ** minor : 0);
+      const price = conv(pr.price);
+      const regular = conv(pr.regular_price);
+      return {
+        name: String(p.name ?? "").replace(/<[^>]+>/g, "").slice(0, 90),
+        price,
+        compareAt: regular > price ? regular : null,
+        available: typeof p.is_in_stock === "boolean" ? p.is_in_stock : null,
+        added: null,
+        currency: typeof pr.currency_code === "string" ? pr.currency_code : null,
+      };
+    });
+    return { platform: "WooCommerce", items: items.filter((i) => i.name && i.price > 0) };
+  }
+  return null;
+}
+
+export function formatCatalog(c: { platform: string; items: CatalogItem[] }): string {
+  const items = c.items;
+  if (!items.length) return "";
+  const fmt = (n: number) => Math.round(n).toLocaleString("en-US");
+  const onSale = items.filter((i) => i.compareAt);
+  const soldOut = items.filter((i) => i.available === false);
+  const prices = items.map((i) => i.price).sort((a, b) => a - b);
+  const median = prices[Math.floor(prices.length / 2)];
+  const newest = [...items].filter((i) => i.added).sort((a, b) => (b.added! > a.added! ? 1 : -1));
+  const line = (i: CatalogItem) =>
+    `- ${i.name}: ${i.currency ?? ""}${fmt(i.price)}${i.compareAt ? ` (was ${fmt(i.compareAt)}, −${Math.round((1 - i.price / i.compareAt) * 100)}%)` : ""}${i.available === false ? " · SOLD OUT" : ""}${i.added ? ` · added ${i.added}` : ""}`;
+  return [
+    `REAL CATALOG from their ${c.platform} store (public product feed — exact numbers): ${items.length} products seen, prices ${fmt(prices[0])}–${fmt(prices[prices.length - 1])} (median ${fmt(median)}), ${onSale.length} on sale, ${soldOut.length} sold out.`,
+    ...(newest.length ? ["Newest launches:", ...newest.slice(0, 8).map(line)] : []),
+    ...(onSale.length ? ["Biggest discounts:", ...[...onSale].sort((a, b) => b.compareAt! / b.price - a.compareAt! / a.price).slice(0, 6).map(line)] : []),
+    ...(soldOut.length ? ["Sold out (demand signal):", ...soldOut.slice(0, 6).map(line)] : []),
+    ...(!newest.length ? ["Products:", ...items.slice(0, 12).map(line)] : []),
+  ].join("\n");
+}
+
+async function scrapeSiteDeep(rawUrl: string): Promise<{ combinedText: string; rawProducts: ProductSummary[]; pagesFound: number; primaryMethod: ScrapeResult["method"]; catalog: string }> {
   const base = rawUrl.startsWith("http") ? rawUrl.replace(/\/$/, "") : `https://${rawUrl.replace(/\/$/, "")}`;
   const targets = DEEP_SCAN_PATHS.map((p) => `${base}${p}`);
 
-  const [home, ...extra] = await Promise.all([scrapePage(base, 2000), ...targets.map(fetchExtraPath)]);
-  const results = [home, ...extra];
+  const [home, catalogApi, ...extra] = await Promise.all([scrapePage(base, 2000), readCatalogApi(base), ...targets.map(fetchExtraPath)]);
+  // No public catalog feed → open a few real product pages the homepage links to; product pages
+  // carry the real price / stock markup that listing pages often leave out.
+  const productPages =
+    catalogApi || !home.productLinks?.length ? [] : await Promise.all(home.productLinks.slice(0, 5).map(fetchExtraPath));
+  const results = [home, ...extra, ...productPages];
 
   const seenProducts = new Set<string>();
   const rawProducts: ProductSummary[] = [];
@@ -402,8 +510,9 @@ async function scrapeSiteDeep(rawUrl: string): Promise<{ combinedText: string; r
 
   const combinedText = extraText ? `${home.text}\n\n--- additional real pages checked ---\n\n${extraText}` : home.text;
   const pagesFound = results.filter((r) => r.method !== "failed").length;
+  const catalog = catalogApi ? formatCatalog(catalogApi) : "";
 
-  return { combinedText, rawProducts, pagesFound, primaryMethod: home.method };
+  return { combinedText, rawProducts, pagesFound, primaryMethod: home.method, catalog };
 }
 
 function toScrapeResult(url: string, r: { text: string; method: "api" | "failed" }): ScrapeResult {
@@ -446,7 +555,7 @@ export async function scrapeCompetitorFull(rawUrl: string): Promise<CompetitorIn
       `(${deepSite.pagesFound} real page${deepSite.pagesFound === 1 ? "" : "s"} checked: homepage + shop/about/pricing paths that actually resolved) ${deepSite.combinedText}`,
       3000,
     ),
-    structuredData: formatProductSummaries(deepSite.rawProducts),
+    structuredData: [deepSite.catalog, formatProductSummaries(deepSite.rawProducts)].filter(Boolean).join("\n\n"),
     rawProducts: deepSite.rawProducts,
     method: deepSite.primaryMethod,
   };
