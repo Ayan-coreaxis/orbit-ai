@@ -190,7 +190,7 @@ export default async function DashboardPage() {
 
         {lab?.active && <GrowthPlanOverview plan={lab.active} currency={currency} />}
 
-        <div className="grid gap-6 lg:grid-cols-[1.25fr_1fr]">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
           {/* Do next */}
           <Card className="p-5 sm:p-6">
             <div className="flex items-center justify-between">

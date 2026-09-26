@@ -15,7 +15,7 @@ export const metadata: Metadata = {
 
 export default function PricingPage() {
   return (
-    <div className="min-h-screen overflow-x-clip bg-[#09090b] text-zinc-100">
+    <div className="relative min-h-screen overflow-x-clip bg-[#09090b] text-zinc-100">
       <SiteHeader />
       <div className="pointer-events-none absolute left-1/2 top-0 h-[520px] w-[1000px] -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(168,85,247,0.18),transparent)]" />
 

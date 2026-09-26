@@ -114,7 +114,7 @@ export default async function UsagePage() {
               No AI usage recorded yet — this fills in as real businesses use the Orchestrator chat and their growth plan.
             </p>
           ) : (
-            <table className="w-full text-[14px]">
+            <div className="overflow-x-auto"><table className="w-full min-w-[640px] text-[14px]">
               <thead>
                 <tr className="border-b border-border bg-panel-2/60 text-left text-[12.5px] font-medium text-text-faint">
                   <th className="px-6 py-3.5 font-medium">Business</th>
@@ -142,7 +142,7 @@ export default async function UsagePage() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
           )}
         </Card>
 
@@ -151,7 +151,7 @@ export default async function UsagePage() {
           {agentRows.length === 0 ? (
             <p className="p-6 text-[13.5px] text-text-faint">No agent calls logged yet.</p>
           ) : (
-            <table className="w-full text-[14px]">
+            <div className="overflow-x-auto"><table className="w-full min-w-[640px] text-[14px]">
               <thead>
                 <tr className="border-b border-border bg-panel-2/60 text-left text-[12.5px] font-medium text-text-faint">
                   <th className="px-6 py-3.5 font-medium">Agent</th>
@@ -174,7 +174,7 @@ export default async function UsagePage() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
           )}
         </Card>
 

@@ -1,5 +1,14 @@
 @import "tailwindcss";
 
+/* Grid items never grow past their track because of long unbreakable content (truncate, long URLs) —
+   otherwise a single-column mobile grid widens to the text and pushes cards off-screen. In the base
+   layer so any explicit min-w-* utility still wins. */
+@layer base {
+  .grid > * {
+    min-width: 0;
+  }
+}
+
 /* Dark is the default brand identity — matches the landing page. Light is an explicit opt-in. */
 :root {
   --bg: #0a0a0c;

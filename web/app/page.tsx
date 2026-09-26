@@ -71,7 +71,7 @@ const CONTROL = [
 
 export default function Home() {
   return (
-    <div className="min-h-screen overflow-x-clip bg-[#09090b] text-zinc-100">
+    <div className="relative min-h-screen overflow-x-clip bg-[#09090b] text-zinc-100">
       <SiteHeader />
 
       {/* ---------- Hero ---------- */}

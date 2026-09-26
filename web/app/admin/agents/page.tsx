@@ -21,7 +21,7 @@ export default async function AgentsPage() {
               Orchestrator chat.
             </p>
           ) : (
-            <table className="w-full text-[14px]">
+            <div className="overflow-x-auto"><table className="w-full min-w-[640px] text-[14px]">
               <thead>
                 <tr className="border-b border-border bg-panel-2/60 text-left text-[12.5px] font-medium text-text-faint">
                   <th className="px-6 py-3.5 font-medium">Agent</th>
@@ -48,7 +48,7 @@ export default async function AgentsPage() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
           )}
         </Card>
 

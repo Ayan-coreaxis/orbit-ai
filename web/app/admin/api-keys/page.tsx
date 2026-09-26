@@ -62,8 +62,8 @@ export default function ApiKeysPage() {
 
         {apiKeyConfigs.map((cfg) => (
           <Card key={cfg.id} className="p-6">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex items-start gap-3">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="flex min-w-0 flex-1 items-start gap-3">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-panel-2">
                   <KeyRound className="h-[18px] w-[18px] text-text-dim" />
                 </div>

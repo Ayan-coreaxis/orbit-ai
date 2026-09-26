@@ -1,11 +1,27 @@
 # Orbit.ai — Task Tracker
 
-Last updated: 2026-08-25
+Last updated: 2026-09-26
 Full plan: `ecommerce-ai-os-plan-v1.md` · Short summary: `ecommerce-ai-os-plan-SHORT.md`
 
 This file is the running checklist — what's actually built and working vs. what's still left. Reviewed against the whole build so far.
 
 ---
+
+## ✅ Done (added 2026-09-26, production-ready pass)
+- [x] Security audit of every API route (signed expiring sessions, SSRF guard, rate limits, cron secret, security headers)
+- [x] Bug review fixes (billing states, OTP race, proposal double-apply, IPv6 SSRF)
+- [x] Production readiness: health check, error pages, go-live checklist, encrypted admin keys, `DEPLOY.md`
+- [x] Landing / pricing / login / signup redesign + password reset
+- [x] Dashboard UI: grouped sidebar, mobile drawer, ⌘K search, new overview, animations
+- [x] Storefront UX: guest checkout first, honest banner, order totals breakdown, mobile fixes
+- [x] Store chat bubble (Chatbot on every store page, logged to Inbox, on/off in Settings)
+- [x] Orchestrator proposes city delivery zones (Apply)
+- [x] Inventory → ads: pause ads when the product sells out, tell the owner on restock
+- [x] Hero slider / carousel: swipe, dots, keyboard, smart autoplay
+- [x] Competitor intel reads real catalogs (Shopify / WooCommerce) + product pages
+- [x] Full production-build test: all seller / admin / store pages at desktop + mobile, signup → onboarding → dashboard, shopper order with zone fee, chat
+- [ ] Voice limit per plan — waiting on owner (recommended: Starter browser voice, Growth/Scale limited premium Google TTS)
+- [ ] Owner: set live keys + deploy (see `DEPLOY.md`); test PostEx/Leopards/TCS, Meta, Resend against real accounts
 
 ## ✅ Done
 

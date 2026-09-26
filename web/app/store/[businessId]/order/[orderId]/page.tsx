@@ -6,6 +6,7 @@ import { money } from "@/lib/money";
 import { finalizeStripeOrder } from "@/lib/checkout-finalize";
 import { copyText, parseWidgetCopy, statusLabel } from "@/lib/widget-copy";
 import { PixelPurchase } from "@/components/store/PixelPurchase";
+import { StoreCartBar } from "../../../StoreCartBar";
 
 export const dynamic = "force-dynamic";
 
@@ -170,6 +171,7 @@ export default async function OrderConfirmationPage({
           ← Back to {storeName}
         </a>
       </div>
+      <StoreCartBar businessId={businessId} storeName={storeName} accent={tokens.accent} accentText={tokens.accentText} currency={business?.storeCurrency} tokens={tokens} />
     </>
   );
 }
