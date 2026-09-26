@@ -35,6 +35,8 @@ export async function POST(req: NextRequest) {
       const businessId = await businessForStripe(session.metadata?.businessId, session.customer);
       const plan = session.metadata?.plan;
       if (!businessId || !plan) break;
+      // Only a paid checkout grants the plan (async payment methods finish later via subscription events).
+      if (session.payment_status !== "paid" && session.payment_status !== "no_payment_required") break;
       await prisma.business.update({
         where: { id: businessId },
         data: {

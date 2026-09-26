@@ -1,3 +1,4 @@
+import { clientIp } from "@/lib/guard";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getStoreCustomer } from "@/lib/store-auth";
@@ -85,7 +86,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ bus
   const col = findCollection(spec, collection);
   if (!col) return NextResponse.json({ error: "Unknown collection." }, { status: 400 });
 
-  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
+  const ip = clientIp(req);
   if (rateLimited(`${businessId}:${collection}:${ip}`))
     return NextResponse.json({ error: "Too many submissions — try again in a minute." }, { status: 429 });
 

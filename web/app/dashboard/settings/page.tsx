@@ -91,6 +91,11 @@ export default async function SettingsPage({
             Plan changed. Stripe charged or credited the difference for the rest of this month.
           </div>
         )}
+        {billingStatus === "pending" && (
+          <div className="rounded-xl border border-warn/30 bg-warn-soft px-4 py-3 text-[13px] text-warn">
+            Your plan change is waiting for payment — it switches as soon as Stripe confirms it. Check your card in Manage billing if it doesn&apos;t.
+          </div>
+        )}
         {subEnded && (
           <div className="rounded-xl border border-bad/30 bg-bad-soft px-4 py-3 text-[13px] text-bad">
             Your subscription has ended ({business?.subscriptionStatus}). Your store stays online, but the AI agents are paused — pick a plan below to turn them back on.

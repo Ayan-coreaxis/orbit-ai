@@ -13,7 +13,7 @@ import { recordReferralSignup } from "@/lib/referral";
  * (verified via /auth/otp-verify). Which paths are allowed comes from `getAuthMethods`.
  */
 export async function POST(req: NextRequest, { params }: { params: Promise<{ businessId: string }> }) {
-  const limited = await throttle(req, "shop-signup", 10, 3600000);
+  const limited = await throttle(req, "shop-signup", 20, 3600000);
   if (limited) return limited;
   const { businessId } = await params;
   if (!(await storeExists(businessId))) return NextResponse.json({ error: "Store not found." }, { status: 404 });

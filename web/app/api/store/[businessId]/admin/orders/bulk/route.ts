@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getActiveBusinessId } from "@/lib/get-active-business-id";
 import { prisma } from "@/lib/prisma";
 import { applyStockDelta } from "@/lib/checkout";
+import { sendPurchaseEvent } from "@/lib/meta-capi";
 
 const STATUSES = ["confirmed", "shipped", "fulfilled", "cancelled"] as const;
 
@@ -27,7 +28,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ bus
 
   for (const o of orders) {
     if (o.status === status || o.status === "cancelled") continue;
-    const data: Record<string, unknown> = { status, verified: true };
+    const data: Record<string, unknown> = { status, ...(status !== "cancelled" ? { verified: true } : {}) };
     if (status === "confirmed") data.confirmedAt = o.confirmedAt ?? now;
     if (status === "shipped") {
       data.shippedAt = o.shippedAt ?? now;
@@ -53,6 +54,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ bus
       }
       await tx.order.update({ where: { id: o.id }, data });
     });
+    if (status !== "cancelled") await sendPurchaseEvent(o.id).catch(() => {});
     updated += 1;
   }
 

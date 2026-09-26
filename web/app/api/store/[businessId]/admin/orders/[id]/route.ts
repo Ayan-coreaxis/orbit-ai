@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { notifyOrder, originFromRequest } from "@/lib/order-notify";
 import { applyStockDelta } from "@/lib/checkout";
 import { bookShipment, syncOrderCourier } from "@/lib/courier";
+import { sendPurchaseEvent } from "@/lib/meta-capi";
 
 const STATUSES = ["pending", "confirmed", "shipped", "fulfilled", "cancelled"] as const;
 type Status = (typeof STATUSES)[number];
@@ -142,6 +143,9 @@ export async function PATCH(
   if (notifyTemplate && (body.notify ?? true)) {
     notified = await notifyOrder(id, notifyTemplate, originFromRequest(req)).catch(() => null);
   }
+
+  // A confirmed / verified order becomes a real sale for Meta (no-op if already sent or not eligible).
+  if (data.status === "confirmed" || data.status === "shipped" || data.verified === true) await sendPurchaseEvent(id).catch(() => {});
 
   const updated = await prisma.order.findUnique({ where: { id } });
   return NextResponse.json({ ok: true, order: updated, notified });

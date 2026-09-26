@@ -5,7 +5,7 @@ import { getStoreCustomer } from "@/lib/store-auth";
 
 /** Live coupon + totals preview for the cart — same authoritative math the checkout uses. */
 export async function POST(req: NextRequest, { params }: { params: Promise<{ businessId: string }> }) {
-  const limited = await throttle(req, "shop-coupon", 60, 600000);
+  const limited = await throttle(req, "shop-coupon", 120, 600000);
   if (limited) return limited;
   const { businessId } = await params;
   const b = (await req.json().catch(() => ({}))) as {

@@ -1,6 +1,7 @@
 import { createHash } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { GRAPH_BASE } from "@/lib/meta-oauth";
+import { clientIp } from "@/lib/guard";
 
 /**
  * Meta Conversions API — tells Meta about each real purchase from the server, so ads can optimise
@@ -20,11 +21,11 @@ const sha = (s: string) => createHash("sha256").update(s).digest("hex");
 /** Browser details worth keeping with an order so the server event matches the shopper. */
 export function adContextFrom(req: Request, cookie: (name: string) => string | undefined): AdContext {
   const h = req.headers;
-  const ip = (h.get("x-forwarded-for") ?? "").split(",")[0].trim() || h.get("x-real-ip") || undefined;
+  const ip = clientIp(req);
   const ctx: AdContext = {
     fbp: cookie("_fbp")?.slice(0, 200),
     fbc: cookie("_fbc")?.slice(0, 300),
-    ip: ip?.slice(0, 64),
+    ip: ip === "unknown" ? undefined : ip.slice(0, 64),
     ua: h.get("user-agent")?.slice(0, 400) ?? undefined,
     url: h.get("referer")?.slice(0, 500) ?? undefined,
   };
@@ -72,6 +73,12 @@ export async function sendPurchaseEvent(orderId: string, f: Fetch = fetch): Prom
   const pixel = b.metaPixelId?.trim();
   if (!pixel || !/^\d{6,20}$/.test(pixel)) return { sent: false, error: "No pixel." };
   if (order.capiSentAt) return { sent: true };
+  // Only real sales: not cancelled, card orders paid, COD orders confirmed by the shopper and not
+  // held as suspicious (a flagged order counts once the seller confirms or ships it).
+  if (order.status === "cancelled") return { sent: false, error: "Cancelled." };
+  if (order.paymentProvider === "stripe" && order.paymentStatus !== "paid") return { sent: false, error: "Not paid yet." };
+  if (!order.verified) return { sent: false, error: "Waiting for the shopper to confirm." };
+  if (order.flagged && !["confirmed", "shipped", "fulfilled"].includes(order.status)) return { sent: false, error: "Flagged — waiting for the seller." };
   const token = b.metaCapiToken?.trim() || b.metaUserToken;
   if (!token) return note(b.id, false, "Add a Conversions API token (Settings > Store) so purchases reach Meta from the server.");
 

@@ -73,8 +73,16 @@ export function requiredRecords(domain: string, token: string): DnsRecord[] {
 
 export async function setDomain(businessId: string, input: string) {
   const domain = normalizeDomain(input);
-  const taken = await prisma.business.findFirst({ where: { customDomain: domain, NOT: { id: businessId } }, select: { id: true } });
-  if (taken) throw new DomainError("That domain is already connected to another store.");
+  const taken = await prisma.business.findFirst({ where: { customDomain: domain, NOT: { id: businessId } }, select: { id: true, customDomainStatus: true } });
+  if (taken?.customDomainStatus === "verified") throw new DomainError("That domain is already connected to another store.");
+  // An unproven (pending) claim can't block the real owner: it is released, and whoever adds the
+  // DNS records first gets verified.
+  if (taken) {
+    await prisma.business.update({
+      where: { id: taken.id },
+      data: { customDomain: null, customDomainToken: null, customDomainStatus: null, customDomainCheckedAt: null, customDomainNote: `Another store claimed ${domain} before you proved it was yours — add it again if it really is.` },
+    });
+  }
   const current = await prisma.business.findUnique({ where: { id: businessId }, select: { customDomain: true } });
   if (current?.customDomain && current.customDomain !== domain) await removeFromHost(current.customDomain);
   return prisma.business.update({

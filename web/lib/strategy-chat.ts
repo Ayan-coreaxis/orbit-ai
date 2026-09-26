@@ -270,10 +270,22 @@ export async function applyPlanOps(businessId: string, planId: string, ops: Plan
 export async function resolveProposal(businessId: string, messageId: string, action: "apply" | "dismiss"): Promise<string[]> {
   const m = await prisma.orchestratorMessage.findFirst({ where: { id: messageId, businessId, opsState: "pending" } });
   if (!m) throw new Error("There's no pending change on that message.");
-  if (action === "dismiss") {
-    await prisma.orchestratorMessage.update({ where: { id: m.id }, data: { opsState: "dismissed" } });
-    return [];
+  // Claim the proposal atomically so a double-click / retry can't apply it (and post / build ads) twice.
+  const claimed = await prisma.orchestratorMessage.updateMany({
+    where: { id: m.id, opsState: "pending" },
+    data: { opsState: action === "dismiss" ? "dismissed" : "applying" },
+  });
+  if (claimed.count !== 1) throw new Error("That change is already being handled.");
+  if (action === "dismiss") return [];
+  try {
+    return await applyClaimedProposal(businessId, m);
+  } catch (e) {
+    await prisma.orchestratorMessage.update({ where: { id: m.id }, data: { opsState: "failed", opsSummary: JSON.stringify([e instanceof Error ? e.message : "Couldn't apply."]) } }).catch(() => {});
+    throw e;
   }
+}
+
+async function applyClaimedProposal(businessId: string, m: { id: string; pendingOps: string | null; planId: string | null }): Promise<string[]> {
   const { planOps, storeChanges, productChanges } = splitPendingOps(m.pendingOps);
   let rawAll: unknown[] = [];
   try {

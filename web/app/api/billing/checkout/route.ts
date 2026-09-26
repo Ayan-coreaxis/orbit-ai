@@ -51,11 +51,13 @@ export async function POST(req: NextRequest) {
         const updated = await stripe.subscriptions.update(sub.id, {
           items: [{ id: item.id, price: priceId }],
           proration_behavior: "always_invoice",
+          // The new price only takes effect once its invoice is paid.
+          payment_behavior: "pending_if_incomplete",
           cancel_at_period_end: false,
           metadata: { businessId, plan },
         });
         await applySubscription(businessId, updated);
-        return NextResponse.json({ url: `${returnTo}?billing=changed` });
+        return NextResponse.json({ url: `${returnTo}?billing=${updated.pending_update ? "pending" : "changed"}` });
       }
     }
 

@@ -44,7 +44,9 @@ const ALIASES: Record<string, string> = {
 /** "  Lahore City " → "lahore", "LHR" → "lahore", "D.G. Khan" → "dera ghazi khan". */
 export function canonicalCity(input: string | null | undefined): string {
   let c = (input ?? "").toLowerCase().replace(/[.,/#()'-]/g, " ").replace(/\s+/g, " ").trim();
-  c = c.replace(/\b(city|district|cantt?onment|cant)\b$/, (m) => (/cant/.test(m) && c.startsWith("wah") ? m : "")).trim();
   c = c.replace(/\b(pakistan|pk)\b/g, "").replace(/\s+/g, " ").trim();
+  if (ALIASES[c]) return ALIASES[c];
+  // "Lahore City" / "Lahore District" / "Lahore Cantt" → "lahore" (but Wah Cantt is its own city)
+  if (!/^wah\b/.test(c)) c = c.replace(/\s+(city|district|cantt|cant|cantonment)$/, "").trim();
   return ALIASES[c] ?? c;
 }

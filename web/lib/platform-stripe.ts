@@ -64,17 +64,21 @@ export async function applySubscription(businessId: string, sub: Pick<Stripe.Sub
   const priceId = sub.items.data[0]?.price?.id;
   const plan = priceId ? priceIdToPlan(priceId) : null;
   const ended = ENDED.has(sub.status);
+  const paid = sub.status === "active" || sub.status === "trialing";
   const current = await prisma.business.findUnique({ where: { id: businessId }, select: { stripeSubscriptionId: true } });
-  // An old subscription ending must not undo a newer one the seller already moved to.
-  if (ended && current?.stripeSubscriptionId && current.stripeSubscriptionId !== sub.id) return;
+  // Events about an old subscription must not touch the one the seller has now — only a newly
+  // paid (active) subscription replaces it.
+  if (current?.stripeSubscriptionId && current.stripeSubscriptionId !== sub.id && !paid) return;
   await prisma.business.update({
     where: { id: businessId },
     data: {
       subscriptionStatus: sub.status,
       stripeSubscriptionId: sub.id,
+      // The plan (and its AI allowance) only follows a PAID subscription. past_due keeps whatever
+      // the seller had while Stripe retries; incomplete / unpaid upgrades never grant anything.
       ...(ended
         ? { plan: "starter", monthlyUsageCapUsd: 0 } // store stays online; AI agents pause until a plan is chosen again
-        : plan
+        : paid && plan
           ? { plan, monthlyUsageCapUsd: PLAN_DEFAULT_CAP_USD[plan] ?? 15 }
           : {}),
     },

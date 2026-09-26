@@ -6,20 +6,20 @@ import { prisma } from "@/lib/prisma";
  * DB hiccups we let the request through rather than block real customers.
  */
 export async function rateLimit(key: string, limit: number, windowMs: number): Promise<boolean> {
-  const now = Date.now();
+  const now = new Date();
   try {
-    const row = await prisma.rateLimit.findUnique({ where: { key } });
-    if (!row || now - row.windowStart.getTime() > windowMs) {
-      await prisma.rateLimit.upsert({
-        where: { key },
-        create: { key, count: 1, windowStart: new Date(now) },
-        update: { count: 1, windowStart: new Date(now) },
-      });
+    // One atomic increment per request, so parallel requests can't all read "under the limit".
+    const row = await prisma.rateLimit.upsert({
+      where: { key },
+      create: { key, count: 1, windowStart: now },
+      update: { count: { increment: 1 } },
+    });
+    if (now.getTime() - row.windowStart.getTime() > windowMs) {
+      // Window over: start a new one (only one request wins the reset).
+      await prisma.rateLimit.updateMany({ where: { key, windowStart: row.windowStart }, data: { count: 1, windowStart: now } });
       return false;
     }
-    if (row.count >= limit) return true;
-    await prisma.rateLimit.update({ where: { key }, data: { count: { increment: 1 } } });
-    return false;
+    return row.count > limit;
   } catch {
     return false; // fail open
   }

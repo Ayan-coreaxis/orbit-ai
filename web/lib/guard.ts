@@ -1,10 +1,17 @@
 import { NextResponse } from "next/server";
 import { rateLimit } from "@/lib/rate-limit";
 
-/** The caller's IP (first hop of x-forwarded-for on Vercel / behind a proxy). */
+/**
+ * The caller's IP. Vercel sets x-real-ip / x-vercel-forwarded-for itself (they can't be forged);
+ * behind another proxy the LAST x-forwarded-for entry is the one our proxy added — earlier entries
+ * are whatever the client sent.
+ */
 export function clientIp(req: Request): string {
   const h = req.headers;
-  return (h.get("x-forwarded-for") ?? "").split(",")[0].trim() || h.get("x-real-ip") || "unknown";
+  const trusted = h.get("x-vercel-forwarded-for") || h.get("x-real-ip");
+  if (trusted) return trusted.split(",")[0].trim();
+  const xff = (h.get("x-forwarded-for") ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+  return xff[xff.length - 1] || "unknown";
 }
 
 /**

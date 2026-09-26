@@ -24,7 +24,7 @@ interface OnboardingBody {
 }
 
 export async function POST(req: NextRequest) {
-  const limited = await throttle(req, "onboarding", 5, 86400000);
+  const limited = await throttle(req, "onboarding", 20, 86400000);
   if (limited) return limited;
   if (!process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY === "paste_your_key_here") {
     return NextResponse.json(

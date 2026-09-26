@@ -46,3 +46,14 @@ describe("cron guard", () => {
     expect(cronAllowed(req("Bearer x"))).toBe(false);
   });
 });
+
+describe("SSRF guard — IPv6 tricks", () => {
+  it("catches mapped, compatible and translated private addresses", () => {
+    for (const ip of ["::ffff:7f00:1", "::ffff:a9fe:a9fe", "::7f00:1", "::ffff:10.0.0.1", "64:ff9b::a9fe:a9fe", "2002:7f00:1::", "fec0::1", "fe80::1%eth0", "::", "ff02::1"]) expect(isPrivateIp(ip)).toBe(true);
+    for (const ip of ["::ffff:8.8.8.8", "2001:4860:4860::8888"]) expect(isPrivateIp(ip)).toBe(false);
+  });
+  it("refuses bracketed IPv6 URLs to private hosts", async () => {
+    await expect(assertPublicUrl("http://[::ffff:127.0.0.1]/")).rejects.toThrow();
+    await expect(assertPublicUrl("http://[::ffff:169.254.169.254]/")).rejects.toThrow();
+  });
+});

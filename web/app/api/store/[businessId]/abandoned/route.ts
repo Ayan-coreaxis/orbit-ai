@@ -10,7 +10,7 @@ import { quoteCheckout } from "@/lib/checkout";
  * (`app/api/cron/abandoned-cart-recovery`) then nudges them.
  */
 export async function POST(req: NextRequest, { params }: { params: Promise<{ businessId: string }> }) {
-  const limited = await throttle(req, "shop-abandoned", 30, 600000);
+  const limited = await throttle(req, "shop-abandoned", 60, 600000);
   if (limited) return limited;
   const { businessId } = await params;
   const sess = (await cookies()).get("sc_sess")?.value;

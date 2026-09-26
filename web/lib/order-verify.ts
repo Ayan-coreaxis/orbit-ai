@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { notifyOrder } from "@/lib/order-notify";
 import { earnPointsForOrder } from "@/lib/loyalty";
 import { qualifyReferralForOrder } from "@/lib/referral";
+import { sendPurchaseEvent } from "@/lib/meta-capi";
 
 /**
  * COD order verification. When a seller turns on `codVerification`, a cash-on-delivery order is
@@ -29,6 +30,7 @@ export async function verifyOrderByToken(businessId: string, token: string, orig
     await notifyOrder(order.id, "order_placed", origin).catch(() => {});
     await earnPointsForOrder(order.id).catch(() => {});
     await qualifyReferralForOrder(order.id).catch(() => {});
+    await sendPurchaseEvent(order.id).catch(() => {}); // now a real sale for Meta
   }
   return order;
 }
@@ -56,6 +58,7 @@ export async function verifyLatestOrderForPhone(businessId: string, phone: strin
   await notifyOrder(order.id, "order_placed", origin).catch(() => {});
   await earnPointsForOrder(order.id).catch(() => {});
   await qualifyReferralForOrder(order.id).catch(() => {});
+  await sendPurchaseEvent(order.id).catch(() => {});
   return true;
 }
 

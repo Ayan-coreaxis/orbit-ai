@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { hashPassword, verifyPassword } from "@/lib/auth";
 import { sendWhatsAppMessage } from "@/lib/whatsapp";
 import { sendEmail } from "@/lib/email";
+import { escapeHtml } from "@/lib/orbit-design";
 
 export { hashPassword, verifyPassword };
 
@@ -117,9 +118,6 @@ export async function issueOtp(
   return { sent: false, devCode: code };
 }
 
-function escapeHtml(s: string): string {
-  return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
-}
 
 /**
  * True + consumes the code if it matches the newest live code for `target`. Each wrong guess counts;
@@ -130,13 +128,17 @@ export async function consumeOtp(businessId: string, target: string, code: strin
     where: { businessId, target: target.slice(0, 160), consumedAt: null, expiresAt: { gt: new Date() } },
     orderBy: { createdAt: "desc" },
   });
-  if (!row || row.attempts >= OTP_MAX_ATTEMPTS) return false;
+  if (!row) return false;
+  // Spend one try atomically BEFORE comparing, so a burst of parallel guesses can't all slip
+  // past the cap (each guess needs its own successful increment while attempts < 5).
+  const spent = await prisma.customerOtp.updateMany({
+    where: { id: row.id, consumedAt: null, attempts: { lt: OTP_MAX_ATTEMPTS } },
+    data: { attempts: { increment: 1 } },
+  });
+  if (spent.count !== 1) return false;
   const a = Buffer.from(row.code);
   const b = Buffer.from(code.trim());
-  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
-    await prisma.customerOtp.update({ where: { id: row.id }, data: { attempts: { increment: 1 } } });
-    return false;
-  }
-  await prisma.customerOtp.update({ where: { id: row.id }, data: { consumedAt: new Date() } });
-  return true;
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return false;
+  const used = await prisma.customerOtp.updateMany({ where: { id: row.id, consumedAt: null }, data: { consumedAt: new Date() } });
+  return used.count === 1;
 }

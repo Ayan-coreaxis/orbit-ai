@@ -1,3 +1,4 @@
+import { clientIp } from "@/lib/guard";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { rateLimit } from "@/lib/rate-limit";
@@ -11,7 +12,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ bus
   if (!b.productId || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))
     return NextResponse.json({ error: "A valid email and product are required." }, { status: 400 });
 
-  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
+  const ip = clientIp(req);
   if (await rateLimit(`stocknotify:${businessId}:${ip}`, 10, 60_000))
     return NextResponse.json({ error: "Too many requests — try again shortly." }, { status: 429 });
 

@@ -9,5 +9,8 @@ describe("canonicalCity", () => {
     expect(canonicalCity("Wah Cantt")).toBe("wah cantt");
     expect(canonicalCity("Isb")).toBe("islamabad");
     expect(canonicalCity("")).toBe("");
+    expect(canonicalCity("Lahore City, Pakistan")).toBe("lahore");
+    expect(canonicalCity("Lahore Cantt")).toBe("lahore");
+    expect(canonicalCity("Karachi District")).toBe("karachi");
   });
 });

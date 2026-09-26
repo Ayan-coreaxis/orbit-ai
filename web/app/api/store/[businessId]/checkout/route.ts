@@ -40,7 +40,7 @@ function formatAddress(a: AddressInput, fallback: string): string {
  * run after the response so a slow Twilio never slows checkout.
  */
 export async function POST(req: NextRequest, { params }: { params: Promise<{ businessId: string }> }) {
-  const limited = await throttle(req, "shop-checkout", 20, 600000);
+  const limited = await throttle(req, "shop-checkout", 60, 600000);
   if (limited) return limited;
   const { businessId } = await params;
 
