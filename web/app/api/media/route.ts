@@ -42,6 +42,7 @@ export async function POST(req: NextRequest) {
   } catch (e) {
     if (e instanceof MediaError) return NextResponse.json({ error: e.message }, { status: e.status });
     console.warn("[media] upload failed:", String(e).slice(0, 200));
-    return NextResponse.json({ error: "Couldn't save that file — try again." }, { status: 500 });
+    const setup = e instanceof Error && e.message.startsWith("File storage isn't set up") ? e.message : null;
+    return NextResponse.json({ error: setup ?? "Couldn't save that file — try again." }, { status: setup ? 503 : 500 });
   }
 }

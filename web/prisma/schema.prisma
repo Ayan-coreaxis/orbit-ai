@@ -3,8 +3,10 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  // Hosted Postgres (Neon / Supabase) hands out a pooled URL for the app and a direct one for migrations.
+  directUrl = env("DIRECT_URL")
 }
 
 model User {

@@ -33,7 +33,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ busi
     ...(q
       ? {
           OR: [
-            { customerName: { contains: q } },
+            { customerName: { contains: q, mode: "insensitive" as const } }, // Postgres matches case-sensitively by default
             { customerPhone: { contains: q } },
             { id: { contains: q } },
           ],

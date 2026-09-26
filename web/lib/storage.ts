@@ -49,10 +49,35 @@ export async function putFile(key: string, body: Buffer, contentType: string): P
     if (!res.ok) throw new Error(`R2 upload failed (${res.status}): ${(await res.text()).slice(0, 200)}`);
     return `${c.publicUrl}/${clean}`;
   }
+  if (serverlessHost()) {
+    // Vercel / Lambda disks are read-only and wiped between requests — a file saved here would vanish.
+    throw new Error("File storage isn't set up: this server can't keep files. Connect Cloudflare R2 in Super Admin > Storage.");
+  }
   const full = path.join(PUBLIC_DIR, clean);
   await mkdir(path.dirname(full), { recursive: true });
   await writeFile(full, body);
   return `/${clean}`;
+}
+
+/** Running where local disk doesn't persist (so R2 is required for uploads). */
+export function serverlessHost(): boolean {
+  return !!(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.NETLIFY);
+}
+
+/**
+ * A locally stored upload, for the /uploads/… route (Next only serves files that were in public/
+ * at build time in production). Null if it doesn't exist or the path tries to leave uploads/.
+ */
+export async function readLocalUpload(parts: string[]): Promise<Buffer | null> {
+  if (!parts.length || parts.some((p) => !p || p === "." || p === ".." || p.includes("\\") || p.includes("\0"))) return null;
+  const root = path.join(PUBLIC_DIR, "uploads");
+  const full = path.join(root, ...parts);
+  if (!full.startsWith(root + path.sep)) return null;
+  try {
+    return await readFile(full);
+  } catch {
+    return null;
+  }
 }
 
 /** Key of a stored file from its URL, whether local ("/uploads/…") or on R2 ("https://pub…/uploads/…"). */
