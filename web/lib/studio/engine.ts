@@ -289,7 +289,7 @@ export type JobView = {
   error: string | null;
   source: string;
   createdAt: string;
-  result: { url: string; kind: string; poster: string | null } | null;
+  result: { id: string; url: string; kind: string; poster: string | null } | null;
   keyframeUrl: string | null;
   estimateUsd: number;
 };
@@ -312,7 +312,7 @@ export async function jobViews(businessId: string, jobs: Job[]): Promise<JobView
       error: j.error,
       source: j.source,
       createdAt: j.createdAt.toISOString(),
-      result: r ? { url: r.url, kind: r.kind, poster: parseList(r.frames)[0] ?? null } : null,
+      result: r ? { id: r.id, url: r.url, kind: r.kind, poster: parseList(r.frames)[0] ?? null } : null,
       keyframeUrl: j.keyframeMediaId ? (byId.get(j.keyframeMediaId)?.url ?? null) : null,
       estimateUsd: format ? estimateCostUsd(format.kind, format.seconds, !!format.keyframe) : 0,
     };

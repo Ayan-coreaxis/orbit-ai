@@ -15,6 +15,8 @@ export async function POST() {
       metaInstagramUserId: null,
       metaAdAccountId: null,
       metaConnectedAt: null,
+      metaUserToken: null,
+      metaUserTokenExpiresAt: null,
     },
   });
   return NextResponse.json({ ok: true });

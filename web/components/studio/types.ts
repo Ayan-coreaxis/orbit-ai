@@ -14,7 +14,7 @@ export type StudioJobView = {
   error: string | null;
   source: string;
   createdAt: string;
-  result: { url: string; kind: string; poster: string | null } | null;
+  result: { id: string; url: string; kind: string; poster: string | null } | null;
   keyframeUrl: string | null;
   estimateUsd: number;
 };

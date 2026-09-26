@@ -99,14 +99,14 @@ export interface NotifyResult {
 }
 
 export async function notifyCustomer(
-  contact: { phone?: string | null; email?: string | null },
+  contact: { phone?: string | null; email?: string | null; whatsappFrom?: string | null }, // whatsappFrom: the seller's own WhatsApp number, if assigned
   template: NotifyTemplate,
   vars: NotifyVars,
 ): Promise<NotifyResult> {
   const { subject, text } = build(template, vars);
   const out: NotifyResult = { anySent: false };
 
-  if (contact.phone) out.whatsapp = await sendWhatsAppMessage(contact.phone, text);
+  if (contact.phone) out.whatsapp = await sendWhatsAppMessage(contact.phone, text, { from: contact.whatsappFrom ?? undefined });
   if (contact.email) out.email = await sendEmail(contact.email, subject, text);
 
   out.anySent = !!(out.whatsapp?.sent || out.email?.sent);

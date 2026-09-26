@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { verifyState, exchangeCodeForToken, exchangeForLongLivedToken, getManagedPages, getAdAccounts } from "@/lib/meta-oauth";
+import { verifyState, exchangeCodeForToken, exchangeForLongLived, getManagedPages, getAdAccounts } from "@/lib/meta-oauth";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 
@@ -21,15 +21,15 @@ export async function GET(req: NextRequest) {
 
   try {
     const shortToken = await exchangeCodeForToken(code);
-    const longToken = await exchangeForLongLivedToken(shortToken);
+    const { token: longToken, expiresAt } = await exchangeForLongLived(shortToken);
     const pages = await getManagedPages(longToken);
 
     if (pages.length === 0) {
       return redirect("no_pages");
     }
 
-    // Real, but simplified: connect the first real Page returned. A multi-Page picker is a
-    // reasonable future improvement — most sellers manage exactly one Page for their store.
+    // Start with the first Page and the first active ad account; the seller can switch either in
+    // Settings (Meta connection check) if they manage more than one.
     const page = pages[0];
     const adAccounts = await getAdAccounts(longToken);
 
@@ -41,6 +41,8 @@ export async function GET(req: NextRequest) {
         metaPageName: page.name,
         metaInstagramUserId: page.instagram_business_account?.id ?? null,
         metaAdAccountId: adAccounts[0]?.id ?? null,
+        metaUserToken: longToken, // ad accounts need the user token, not the Page token
+        metaUserTokenExpiresAt: expiresAt,
         metaConnectedAt: new Date(),
       },
     });

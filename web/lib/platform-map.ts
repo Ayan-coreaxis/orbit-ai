@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { storeUrl } from "@/lib/public-url";
 import { parseOptionTypes } from "@/lib/variants";
 import type { OrbitDesignDoc } from "@/lib/orbit-design";
 
@@ -15,10 +16,10 @@ ORBIT DASHBOARD — where things are (send the owner to these exact places; neve
 - Store → tabs: Products (add/edit products, photos, variants), Storefront (publish status + quick store controls), Orders, Customers, Discounts (coupons, loyalty points, referrals, gift cards, bundles), Analytics, Messages (form submissions from the store).
 - Orbit Design: the store builder — design / redesign pages, add pages, edit text & images, logo, colours, fonts; Publish button makes the store live.
 - Media: every photo / video / voice note / PDF the owner gave Orbit.
-- Content: Orbit Studio (make product photos, posts, banners, try-ons, reels, UGC and ads — Growth/Scale plans) + posts the AI writes. Ads: Meta campaigns (created paused). Inbox: customer messages.
+- Content: Orbit Studio (make product photos, posts, banners, try-ons, reels, UGC and ads — Growth/Scale plans) + Share (post a finished image/reel to Facebook / Instagram) + what was posted. Ads: complete Meta ads with results (built paused; Activate / Pause there). Inbox: customer messages.
 - Money: real revenue & margins. Tax: tax owed. Returns: returns & disputes. Reviews: product reviews. Experiments: A/B tests. Competitors: competitor scans.
 - Connections (Settings → Connections & Skills): MCP connectors, skills and plugins for agents.
-- Settings & Billing: Facebook/Instagram connect, Payment method (COD / Stripe) + store currency, Delivery fee / free-delivery / tax (store operations), Shipping zones, Chat widget & checkout extra fields, Team, plan & usage.`;
+- Settings & Billing: Facebook/Instagram connect (+ connection check, pick Page / ad account), Domain (the store on its own domain), Payment method (COD / Stripe) + store currency, Delivery fee / free-delivery / tax (store operations), Shipping zones, Chat widget & checkout extra fields, Team, plan & usage.`;
 
 type Doc = Pick<OrbitDesignDoc, "storeName" | "tagline" | "content" | "pages">;
 
@@ -74,7 +75,7 @@ export async function storeStatusContext(businessId: string): Promise<string> {
 
   const lines = [
     `- Store design: ${built ? `built — ${pages.length} pages: ${pages.map((p) => `${p.title} (/${p.slug === "home" ? "" : p.slug})`).join(", ")}` : "not designed yet"}`,
-    `- Live: ${design?.published ? `YES — /store/${businessId}` : "NO (draft only)"}${design?.published && design.backendWiredAt && design.updatedAt > design.backendWiredAt ? " — design edited since last publish; publish again to push everything live" : ""}`,
+    `- Live: ${design?.published ? `YES — ${await storeUrl(businessId)}` : "NO (draft only)"}${design?.published && design.backendWiredAt && design.updatedAt > design.backendWiredAt ? " — design edited since last publish; publish again to push everything live" : ""}`,
     built ? `- Brand on the store: name "${doc?.storeName}", tagline "${doc?.tagline}", logo ${content?.logoUrl ? "set" : "missing"}, announcement bar ${content?.announcement?.enabled ? `"${content.announcement.text}"` : "off"}, contact ${[content?.contactPhone, content?.contactEmail].filter(Boolean).join(" / ") || "missing"}, socials ${Object.entries(content?.socials ?? {}).filter(([, v]) => v).map(([k]) => k).join(", ") || "none"}` : "",
     `- Products: ${products.length} (${products.filter((p) => p.imageUrl).length} with photos)`,
     `- Payments: ${b.paymentProvider === "stripe" ? (b.stripeSecretKey ? "Stripe (connected)" : "Stripe selected but keys missing") : "Cash on delivery"}; currency ${(b.storeCurrency || "usd").toUpperCase()}; delivery fee ${b.shippingFee}; ${zones} shipping zone(s)`,

@@ -199,16 +199,15 @@ export function AgentSettingsForm({
           <div>
             <label className="text-[13.5px] font-medium">Real daily budget cap</label>
             <p className="mt-0.5 text-[12.5px] text-text-faint">
-              Sent to Meta itself as the campaign&apos;s daily budget — Meta enforces this, not just
-              our code. Every real campaign is created PAUSED regardless; you always activate real
-              spend yourself.
+              In your ad account&apos;s own currency (e.g. PKR). Sent to Meta itself as the ad&apos;s
+              daily budget — Meta enforces it, not just our code. Every real ad is created PAUSED;
+              you always activate real spend yourself.
             </p>
             <div className="mt-2.5 flex items-center gap-2">
-              <span className="text-[13px] text-text-dim">$</span>
               <input
                 type="number"
                 min={1}
-                max={1000}
+                max={1000000}
                 defaultValue={settings.adsDailyBudgetUsd}
                 onBlur={(e) => save({ adsDailyBudgetUsd: Number(e.target.value) })}
                 className="w-24 rounded-lg border border-border bg-panel-2 px-3 py-2 text-[13.5px] text-text focus:border-accent focus:outline-none"

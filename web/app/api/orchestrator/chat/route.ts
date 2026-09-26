@@ -15,6 +15,7 @@ import { OPEN_MEDIA_TOOL, attachmentBlocks, attachmentNote, mediaContext, parseL
 import { PLATFORM_MAP, storeStatusContext } from "@/lib/platform-map";
 import { describeDesignJobs, sanitizeDesignJobs, type DesignJob } from "@/lib/design-ops";
 import { describeStudioRequests, sanitizeStudioRequests, studioContext } from "@/lib/studio/ops";
+import { describeMetaOps, metaContext, sanitizeMetaOps } from "@/lib/meta-ops";
 import { READ_PAGE_TOOL, WEB_SEARCH_TOOL, formatResults, readPageText, searchForBusiness, searchStatus } from "@/lib/web-search";
 
 export const maxDuration = 180;
@@ -27,7 +28,7 @@ Ground rules:
 - If the owner is asking for a real step-by-step plan, give the 3-4 highest-leverage steps only, as short bullets — not an exhaustive report. They can always ask "what's next" for more.
 - Everything you say about this business's numbers must trace back to the real data given below. Never invent a revenue, traffic, or conversion figure that isn't there.
 - You may share general growth/marketing expertise and reasoning freely — that's real knowledge, just label it as general guidance, not this business's measured data.
-- You CAN draft and change the owner's growth plan, and PROPOSE store-setting changes (currency, delivery fee, free-delivery threshold, tax) via store_changes and product work via product_changes (edit price, cost, stock, name, description, photos, variants), new_products (add products) and delete_products — see STORE SETTINGS and PRODUCTS below — and make images, reels and ads with create_content (see ORBIT STUDIO). When the owner asks for one of those, do it yourself instead of sending them somewhere. These are PROPOSALS: in your reply say you've proposed it and they should press Apply below — never say it's done ("kar diya", "set kar diya") before they press Apply. Only include changes that differ from the current values. Earlier messages carry [SYSTEM: …] notes saying whether each proposal was applied, dismissed or is still pending — trust them: if the owner still wants something that was dismissed, make a NEW proposal now instead of saying it's already on its way. Anything else (categories, discounts, orders) you can't change from here yet — say so honestly and point them to where to do it (e.g. "Dashboard > Store"). Never tell the owner to enter a number in the wrong currency as a workaround.
+- You CAN draft and change the owner's growth plan, and PROPOSE store-setting changes (currency, delivery fee, free-delivery threshold, tax) via store_changes and product work via product_changes (edit price, cost, stock, name, description, photos, variants), new_products (add products) and delete_products — see STORE SETTINGS and PRODUCTS below — make images, reels and ad creatives with create_content (see ORBIT STUDIO), and post to Facebook / Instagram or set up Meta ads with social_posts / meta_ads (see META). When the owner asks for one of those, do it yourself instead of sending them somewhere. These are PROPOSALS: in your reply say you've proposed it and they should press Apply below — never say it's done ("kar diya", "set kar diya") before they press Apply. Only include changes that differ from the current values. Earlier messages carry [SYSTEM: …] notes saying whether each proposal was applied, dismissed or is still pending — trust them: if the owner still wants something that was dismissed, make a NEW proposal now instead of saying it's already on its way. Anything else (categories, discounts, orders) you can't change from here yet — say so honestly and point them to where to do it (e.g. "Dashboard > Store"). Never tell the owner to enter a number in the wrong currency as a workaround.
 
 Real context for this conversation:
 `;
@@ -133,7 +134,7 @@ Needs from you: ${result.needsUserText}` : result.content;
       }\n`
     : "";
 
-  const planBlock = [PLATFORM_MAP, storeStatus, await planContextBlock(businessId, plan), await storeSettingsContext(businessId), await mediaContext(businessId), await studioContext(businessId)].join("\n");
+  const planBlock = [PLATFORM_MAP, storeStatus, await planContextBlock(businessId, plan), await storeSettingsContext(businessId), await mediaContext(businessId), await studioContext(businessId), await metaContext(businessId)].join("\n");
   // Older turns carry a short note about their files; only THIS turn's files are sent in full.
   const historyNotes = new Map<string, string>();
   for (const m of orderedHistory) {
@@ -253,7 +254,7 @@ Needs from you: ${result.needsUserText}` : result.content;
     const detail = e instanceof Error ? e.message : "Unknown error";
     return NextResponse.json({ error: `Orchestrator couldn't respond: ${detail}` }, { status: 502 });
   }
-  const out = (block?.input ?? {}) as { reply?: string; ops?: unknown; store_changes?: unknown; product_changes?: unknown; new_products?: unknown; delete_products?: unknown; store_design?: unknown; create_content?: unknown; draft_new_plan?: boolean; plan_note?: string; ask_approval?: boolean };
+  const out = (block?.input ?? {}) as { reply?: string; ops?: unknown; store_changes?: unknown; product_changes?: unknown; new_products?: unknown; delete_products?: unknown; store_design?: unknown; create_content?: unknown; social_posts?: unknown; meta_ads?: unknown; draft_new_plan?: boolean; plan_note?: string; ask_approval?: boolean };
   // Only links the model was really shown by web_search can be cited.
   const cited = (Array.isArray((out as { sources?: unknown }).sources) ? ((out as { sources?: unknown[] }).sources as unknown[]) : [])
     .filter((u): u is string => typeof u === "string" && seen.has(u))
@@ -285,6 +286,7 @@ Needs from you: ${result.needsUserText}` : result.content;
   const isLive = !!(await prisma.storeDesign.findUnique({ where: { businessId }, select: { published: true } }))?.published;
   const designJobs: DesignJob[] = sanitizeDesignJobs(out.store_design, isLive);
   const studioJobs = await sanitizeStudioRequests(businessId, out.create_content);
+  const metaOps = await sanitizeMetaOps(businessId, out.social_posts, out.meta_ads);
   try {
     if (out.draft_new_plan === true) {
       const drafted = await draftGrowthPlan(businessId, out.plan_note || message.trim());
@@ -309,15 +311,16 @@ Needs from you: ${result.needsUserText}` : result.content;
     opsState = "failed";
   }
   // Store-setting changes touch the live store — always a proposal, whatever the plan state.
-  if ((storeChanges.length || designJobs.length || studioJobs.length) && opsState !== "failed") {
+  if ((storeChanges.length || designJobs.length || studioJobs.length || metaOps.length) && opsState !== "failed") {
     const cur = (await prisma.business.findUnique({ where: { id: businessId }, select: { storeCurrency: true } }))?.storeCurrency || "usd";
     const storeSummary = [
       ...(await describeStoreChanges(businessId, storeChanges.filter((c) => c.op === "store_setting") as Parameters<typeof describeStoreChanges>[1])),
       ...(await describeProductChanges(businessId, storeChanges.filter((c) => c.op.startsWith("product_")) as Parameters<typeof describeProductChanges>[1], cur)),
       ...describeDesignJobs(designJobs),
       ...describeStudioRequests(studioJobs),
+      ...describeMetaOps(metaOps, (await prisma.adCampaign.findFirst({ where: { businessId, currency: { not: null } }, orderBy: { createdAt: "desc" }, select: { currency: true } }))?.currency ?? cur.toUpperCase()),
     ];
-    const allStoreOps = [...storeChanges, ...designJobs, ...studioJobs];
+    const allStoreOps = [...storeChanges, ...designJobs, ...studioJobs, ...metaOps];
     if (opsState === "pending") {
       pendingOps = JSON.stringify([...JSON.parse(pendingOps ?? "[]"), ...allStoreOps]);
       opsSummary = [...(opsSummary ?? []), ...storeSummary];

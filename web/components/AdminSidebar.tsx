@@ -16,6 +16,7 @@ import {
   Cloud,
   Search,
   Clapperboard,
+  MessageCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -29,6 +30,7 @@ const nav = [
   { href: "/admin/storage", label: "Storage", icon: Cloud },
   { href: "/admin/web-search", label: "Web Search", icon: Search },
   { href: "/admin/studio", label: "Studio", icon: Clapperboard },
+  { href: "/admin/whatsapp", label: "WhatsApp", icon: MessageCircle },
   { href: "/admin/billing", label: "Billing & MRR", icon: CreditCard },
 ];
 

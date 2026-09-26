@@ -13,7 +13,8 @@ import {
 } from "@/lib/agent-settings";
 import { assertUnderUsageCap } from "@/lib/usage-limit";
 import { getInventorySignals } from "@/lib/inventory-analytics";
-import { publishFacebookPost, createPausedAdCampaign, createAdSetWithBudget } from "@/lib/meta-graph";
+import { publishFacebookPost } from "@/lib/meta-graph";
+import { MetaAdError, createPausedAd } from "@/lib/meta-ads";
 import { businessModelGuidanceLine } from "@/lib/business-model";
 import { loadAgentTools, executeAgentTool } from "@/lib/agent-tools";
 import { loadSkillContext } from "@/lib/skills";
@@ -399,6 +400,9 @@ Write ONE short, ready-to-publish Facebook post caption (2-3 sentences, no video
   }
 
   const result = await publishFacebookPost(business.metaPageId!, business.metaAccessToken!, caption);
+  await prisma.socialPost.create({
+    data: { businessId: business.id, platform: "facebook", kind: "text", caption, status: result.ok ? "posted" : "failed", externalId: result.id ?? null, error: result.ok ? null : (result.error ?? "").slice(0, 400), source: "content-agent" },
+  });
   if (!result.ok) {
     return { agent, task: `${planTaskWithTool} (Tried to publish a real caption to ${business.metaPageName ?? "your Facebook Page"} but it failed: ${result.error})`, done: false };
   }
@@ -457,41 +461,45 @@ Write ONE concrete, specific task for this cycle that a real specialist in your 
   await logUsage(business.id, "ads", model, nameMsg.usage);
   const campaignName = (nameMsg.content[0].type === "text" ? nameMsg.content[0].text.trim() : "").replace(/["']/g, "") || `${business.name} — weekly push`;
 
-  const campaignResult = await createPausedAdCampaign({
-    adAccountId: business.metaAdAccountId!,
-    accessToken: business.metaAccessToken!,
-    campaignName,
-    dailyBudgetUsd: settings.adsDailyBudgetUsd,
+  // A real, complete ad (campaign → ad set → creative → ad) for the best-stocked product that has
+  // a photo, created PAUSED. The agent's budget setting is in the ad account's own currency.
+  const product = await prisma.product.findFirst({
+    where: { businessId: business.id, imageUrl: { not: null }, stock: { gt: 0 } },
+    orderBy: { stock: "desc" },
+    select: { id: true, name: true, description: true },
   });
-  if (!campaignResult.ok || !campaignResult.id) {
-    return { agent, task: `${planTask} (Tried to create a real Meta campaign but it failed: ${campaignResult.error})`, done: false };
+  if (!product) return { agent, task: `${planTask} (Real ad not created — no in-stock product has a photo yet.)`, done: false };
+
+  const copyPrompt = `Write Meta ad copy for "${product.name}" from ${business.name} (${business.niche}), following this plan: "${planTask}". Reply as JSON only: {"headline": "max 40 characters", "text": "1-3 short sentences, a hook and a reason to buy, no invented prices or discounts"}`;
+  const copyMsg = await anthropic.messages.create({ model, max_tokens: 300, messages: [{ role: "user", content: copyPrompt }] });
+  await logUsage(business.id, "ads", model, copyMsg.usage);
+  let copy: { headline?: string; text?: string } = {};
+  try {
+    const raw = copyMsg.content[0].type === "text" ? copyMsg.content[0].text : "";
+    copy = JSON.parse(raw.slice(raw.indexOf("{"), raw.lastIndexOf("}") + 1));
+  } catch {
+    copy = {};
   }
 
-  const adSetResult = await createAdSetWithBudget(
-    business.metaAdAccountId!,
-    business.metaAccessToken!,
-    campaignResult.id,
-    `${campaignName} — ad set`,
-    settings.adsDailyBudgetUsd,
-  );
-
-  await prisma.adCampaign.create({
-    data: {
+  try {
+    const row = await createPausedAd({
       businessId: business.id,
-      metaCampaignId: campaignResult.id,
-      metaAdSetId: adSetResult.ok ? adSetResult.id : null,
       name: campaignName,
-      dailyBudgetUsd: settings.adsDailyBudgetUsd,
+      productId: product.id,
+      headline: copy.headline || product.name,
+      primaryText: copy.text || `${product.name} — order now from ${business.name}.`,
+      dailyBudget: settings.adsDailyBudgetUsd,
       reasoning: planTask,
-      status: "paused",
-    },
-  });
-
-  return {
-    agent,
-    task: `${planTask} Created a real Meta campaign "${campaignName}" with a real $${settings.adsDailyBudgetUsd}/day budget cap — saved PAUSED, review and activate it in Dashboard > Ads before it spends anything.`,
-    done: true,
-  };
+      source: "ads-agent",
+    });
+    return {
+      agent,
+      task: `${planTask} Created a real, complete Meta ad "${campaignName}" for ${product.name} at ${row.dailyBudget} ${row.currency}/day — saved PAUSED; review and activate it in Dashboard > Ads before it spends anything.`,
+      done: true,
+    };
+  } catch (e) {
+    return { agent, task: `${planTask} (Tried to create a real Meta ad but it failed: ${e instanceof MetaAdError ? e.message : "unknown error"})`, done: false };
+  }
 }
 
 const NUMBER_GROUND_RULES = `Ground rules for numbers, strictly enforced:

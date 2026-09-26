@@ -2,7 +2,10 @@ import crypto from "crypto";
 
 // v19.0 expired 2026-05-21 — keep this on a live version (see developers.facebook.com/docs/graph-api/changelog/versions).
 const GRAPH_VERSION = "v26.0";
-const GRAPH_BASE = `https://graph.facebook.com/${GRAPH_VERSION}`;
+// META_GRAPH_BASE only exists so tests can point Orbit at a fake Graph API.
+const GRAPH_BASE = process.env.META_GRAPH_BASE?.replace(/\/+$/, "") || `https://graph.facebook.com/${GRAPH_VERSION}`;
+/** Video uploads go to Meta's upload host. */
+const GRAPH_VIDEO_BASE = process.env.META_GRAPH_BASE?.replace(/\/+$/, "") || `https://graph-video.facebook.com/${GRAPH_VERSION}`;
 
 /**
  * Real permissions requested. `instagram_content_publish` + `pages_manage_posts` let the
@@ -18,7 +21,16 @@ const SCOPES = [
   "instagram_content_publish",
   "ads_management",
   "ads_read",
+  "business_management", // Pages / ad accounts owned by a Business portfolio need this
 ].join(",");
+
+/** The permissions each Orbit feature needs — the connection check reports what's missing. */
+export const NEEDED_PERMISSIONS: Record<string, string[]> = {
+  "Post to Facebook": ["pages_show_list", "pages_manage_posts"],
+  "Post to Instagram": ["instagram_basic", "instagram_content_publish"],
+  "Run Meta ads": ["ads_management"],
+  "Read ad results": ["ads_read"],
+};
 
 function getAppCredentials(): { appId: string; appSecret: string } | null {
   const appId = process.env.META_APP_ID;
@@ -99,6 +111,10 @@ export async function exchangeCodeForToken(code: string): Promise<string> {
 
 /** A short-lived user token is only valid ~1-2 hours — exchange it for a real long-lived one (~60 days). */
 export async function exchangeForLongLivedToken(shortToken: string): Promise<string> {
+  return (await exchangeForLongLived(shortToken)).token;
+}
+
+export async function exchangeForLongLived(shortToken: string): Promise<{ token: string; expiresAt: Date | null }> {
   const creds = getAppCredentials();
   if (!creds) throw new Error("Meta App isn't configured.");
   const params = new URLSearchParams({
@@ -110,7 +126,7 @@ export async function exchangeForLongLivedToken(shortToken: string): Promise<str
   const res = await fetch(`${GRAPH_BASE}/oauth/access_token?${params.toString()}`);
   if (!res.ok) throw new Error(`Meta long-lived token exchange failed: ${await res.text()}`);
   const data = (await res.json()) as TokenResponse;
-  return data.access_token;
+  return { token: data.access_token, expiresAt: data.expires_in ? new Date(Date.now() + data.expires_in * 1000) : null };
 }
 
 export interface ConnectedPage {
@@ -133,12 +149,15 @@ export async function getManagedPages(userAccessToken: string): Promise<Connecte
 }
 
 /** Real ad accounts the connected user has access to — null-safe, only present if ads_management was granted and approved. */
-export async function getAdAccounts(userAccessToken: string): Promise<{ id: string; name: string }[]> {
-  const params = new URLSearchParams({ access_token: userAccessToken, fields: "id,name" });
+export async function getAdAccounts(userAccessToken: string): Promise<AdAccountInfo[]> {
+  const params = new URLSearchParams({ access_token: userAccessToken, fields: "id,name,currency,account_status" });
   const res = await fetch(`${GRAPH_BASE}/me/adaccounts?${params.toString()}`);
   if (!res.ok) return [];
-  const data = (await res.json()) as { data: { id: string; name: string }[] };
-  return data.data ?? [];
+  const data = (await res.json()) as { data: AdAccountInfo[] };
+  // Active accounts first — account_status 1 = ACTIVE.
+  return (data.data ?? []).sort((a, b) => Number(b.account_status === 1) - Number(a.account_status === 1));
 }
 
-export { GRAPH_BASE };
+export type AdAccountInfo = { id: string; name: string; currency?: string; account_status?: number };
+
+export { GRAPH_BASE, GRAPH_VIDEO_BASE };

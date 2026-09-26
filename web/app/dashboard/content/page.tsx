@@ -5,6 +5,7 @@ import { getActiveBusinessId } from "@/lib/get-active-business-id";
 import { prisma } from "@/lib/prisma";
 import { FacebookIcon } from "@/components/icons/BrandIcons";
 import { Studio } from "@/components/studio/Studio";
+import { RecentPosts } from "@/components/studio/RecentPosts";
 
 export default async function ContentPage() {
   const plan = await getRealPlan();
@@ -24,6 +25,7 @@ export default async function ContentPage() {
       />
       <div className="grid max-w-[1200px] gap-8 p-10">
         <Studio />
+        <RecentPosts />
         {contentTask && (
           <Card className="p-7">
             <div className="flex items-center gap-2">

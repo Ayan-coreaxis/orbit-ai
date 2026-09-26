@@ -41,6 +41,16 @@ model Business {
   metaInstagramUserId String? // real IG Business Account id linked to the connected Page, if any
   metaAdAccountId     String? // real Ad Account id, only present if the seller granted ads_management
   metaConnectedAt     DateTime?
+  metaUserToken       String? // long-lived USER token (~60 days) — ad accounts need it; a Page token can't run ads
+  metaUserTokenExpiresAt DateTime?
+
+  // The seller's own domain for their store (e.g. shop.mybrand.pk). Live only once DNS is verified.
+  customDomain           String?   @unique // lower-case hostname, no scheme / path
+  customDomainToken      String? // value the seller puts in a TXT record to prove they own it
+  customDomainStatus     String? // pending | verified | failed
+  customDomainCheckedAt  DateTime?
+  customDomainVerifiedAt DateTime?
+  customDomainNote       String? // what's still wrong, in plain words
 
   // Real WhatsApp two-way number — admin-assigned (WhatsApp Business numbers aren't self-serve
   // the way Facebook Login is), so a seller gets a dedicated real Twilio WhatsApp number here.
@@ -153,6 +163,7 @@ model Business {
   members               BusinessMember[]
   mediaAssets MediaAsset[]
   studioJobs  StudioJob[]
+  socialPosts SocialPost[]
 }
 
 /** A staff account with dashboard access to a business it doesn't own — invited by email. If the
@@ -276,10 +287,29 @@ model AdCampaign {
   business       Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
   metaCampaignId String // real Meta campaign id
   metaAdSetId    String? // real Meta ad set id
+  metaCreativeId String?
+  metaAdId       String? // the ad itself — a campaign without one never delivers
   name           String
-  dailyBudgetUsd Float
-  reasoning      String // real reasoning the Ads Agent gave for creating this campaign
-  status         String    @default("paused") // paused | active | error — real Meta status, mirrored here
+  dailyBudgetUsd Float? // legacy rows only; new rows use dailyBudget + currency (the ad account's own currency)
+  dailyBudget    Float?
+  currency       String?
+  reasoning      String // why this campaign exists (Ads Agent / Orchestrator / the owner)
+  status         String    @default("paused") // paused | active | error | deleted — what the owner set
+  metaStatus     String? // Meta's effective_status, e.g. PENDING_REVIEW, ACTIVE, DISAPPROVED, WITH_ISSUES
+  reviewNote     String? // Meta's reason when an ad is rejected / has issues
+  mediaId        String? // the image / video used (MediaAsset); null when the product's own photo was used
+  thumbUrl       String? // picture shown for this ad in Orbit (the photo, or the video's cover)
+  link           String? // where the ad sends people (store / product page)
+  headline       String?
+  primaryText    String?
+  callToAction   String?
+  countries      String? // JSON string[] e.g. ["PK"]
+  endsAt         DateTime?
+  spend          Float? // lifetime, from Meta insights, in `currency`
+  impressions    Int?
+  clicks         Int?
+  syncedAt       DateTime?
+  source         String    @default("ads-agent") // ads-agent | owner | orchestrator
   activatedAt    DateTime?
   createdAt      DateTime  @default(now())
 
@@ -452,6 +482,25 @@ model StudioJob {
 
   @@index([businessId, createdAt])
   @@index([businessId, status])
+}
+
+/** A real post Orbit published to the seller's Facebook Page or Instagram account. */
+model SocialPost {
+  id         String   @id @default(cuid())
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  platform   String // facebook | instagram
+  kind       String // image | video | text
+  mediaId    String?
+  caption    String
+  status     String   @default("posting") // posting | posted | failed
+  externalId String? // Meta's post / media id
+  permalink  String?
+  error      String?
+  source     String   @default("owner") // owner | orchestrator | content-agent
+  createdAt  DateTime @default(now())
+
+  @@index([businessId, createdAt])
 }
 
 model Competitor {

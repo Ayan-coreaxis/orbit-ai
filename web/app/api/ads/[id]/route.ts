@@ -1,44 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getActiveBusinessId } from "@/lib/get-active-business-id";
-import { activateCampaign, pauseCampaign } from "@/lib/meta-graph";
+import { MetaAdError, activateAd, deleteAd, pauseAd } from "@/lib/meta-ads";
 
+/** { action: "activate" | "pause" | "delete" } — the owner's own buttons; activate is the only thing that starts real spend. */
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const businessId = await getActiveBusinessId();
   if (!businessId) return NextResponse.json({ error: "No active business." }, { status: 400 });
 
-  const campaign = await prisma.adCampaign.findUnique({ where: { id } });
-  if (!campaign || campaign.businessId !== businessId) {
-    return NextResponse.json({ error: "Campaign not found." }, { status: 404 });
+  const campaign = await prisma.adCampaign.findFirst({ where: { id, businessId } });
+  if (!campaign) return NextResponse.json({ error: "Campaign not found." }, { status: 404 });
+
+  const { action } = (await req.json().catch(() => ({}))) as { action?: string };
+  try {
+    const updated =
+      action === "activate" ? await activateAd(campaign) : action === "pause" ? await pauseAd(campaign) : action === "delete" ? await deleteAd(campaign) : null;
+    if (!updated) return NextResponse.json({ error: "Invalid action." }, { status: 400 });
+    return NextResponse.json({ campaign: { id: updated.id, status: updated.status } });
+  } catch (e) {
+    return NextResponse.json({ error: e instanceof MetaAdError ? e.message : "Couldn't reach Meta — try again." }, { status: 502 });
   }
-
-  const business = await prisma.business.findUnique({ where: { id: businessId }, select: { metaAccessToken: true } });
-  if (!business?.metaAccessToken) {
-    return NextResponse.json({ error: "Meta isn't connected for this business anymore." }, { status: 400 });
-  }
-
-  const { action } = (await req.json()) as { action?: "activate" | "pause" };
-  if (action !== "activate" && action !== "pause") {
-    return NextResponse.json({ error: "Invalid action." }, { status: 400 });
-  }
-
-  const result =
-    action === "activate"
-      ? await activateCampaign(campaign.metaCampaignId, business.metaAccessToken)
-      : await pauseCampaign(campaign.metaCampaignId, business.metaAccessToken);
-
-  if (!result.ok) {
-    await prisma.adCampaign.update({ where: { id }, data: { status: "error" } });
-    return NextResponse.json({ error: result.error }, { status: 502 });
-  }
-
-  const updated = await prisma.adCampaign.update({
-    where: { id },
-    data: {
-      status: action === "activate" ? "active" : "paused",
-      activatedAt: action === "activate" ? new Date() : campaign.activatedAt,
-    },
-  });
-  return NextResponse.json({ campaign: updated });
 }

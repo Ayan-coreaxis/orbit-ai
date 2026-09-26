@@ -8,6 +8,7 @@ import { uploadMedia } from "@/lib/media-client";
 import { cn } from "@/lib/utils";
 import { CHOICES, missingNeeds, type Aspect, type Need, type StudioFormat, type StudioInput } from "@/lib/studio/formats";
 import { WORKING, type StudioData, type StudioJobView } from "@/components/studio/types";
+import { ShareBox } from "@/components/studio/ShareBox";
 
 const ASPECT_LABEL: Record<Aspect, string> = { "1:1": "Square 1:1", "4:5": "Portrait 4:5", "9:16": "Reel 9:16", "16:9": "Wide 16:9" };
 
@@ -668,6 +669,7 @@ function Progress({ job, format }: { job: StudioJobView; format: StudioFormat })
             It&apos;s saved in your Media library
           </a>
         </div>
+        <ShareBox mediaId={job.result.id} kind={job.result.kind} caption={job.brief?.caption ?? ""} title={job.brief?.title ?? ""} />
         <p className="text-[12px] text-text-faint">Tip: ask your Orchestrator to use it — e.g. &quot;set this as the product photo&quot; or &quot;put it on my home page&quot;.</p>
       </div>
     );

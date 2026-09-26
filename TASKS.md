@@ -228,6 +228,19 @@ User feedback: a separate Strategy Lab page + separate plan chat was wrong — t
 - [x] Verified via API on TERRA: draft → approve → coupon order counted (1 vs 0) → pause → invalid transition rejected. Page renders 200, no server errors.
 - [ ] Not yet: chat-based plan editing/brainstorm (Hissa 2), Orbit executing its own steps automatically (Hissa 3), Jev (Hissa 4, Jev is down), agents-as-data (Hissa 5), events/review loop (Hissa 6). Old weekly `runCompetitorAnalysis` plan still runs in parallel, untouched.
 
+## ✅ Done (added 2026-09-26, ready for Meta ads, social posting, WhatsApp and custom domains)
+- [x] All TypeScript and ESLint errors fixed (0/0), incl. a real hooks-order crash on the store account page
+- [x] Meta ads made real: complete paused ads (campaign, ad set with targeting + account-currency budget, image/video creative, ad), rollback on failure, activate/pause/delete, Meta review status and results on the Ads page
+- [x] Facebook (photo / video / text) and Instagram (photo / Reel) posting from Studio results, with a posts history
+- [x] Meta connection check (permissions, token expiry, Instagram, ad account, public store/files) + Page / ad-account picker
+- [x] Orchestrator can propose posts and ads (Apply; ads still start paused)
+- [x] WhatsApp: Twilio signature verification, replies from the seller's own number, admin test page
+- [x] Sellers can connect their own domain (DNS check, automatic routing, Vercel / Caddy SSL)
+- [ ] Deploy Orbit on a public https domain, then test Meta, Twilio and a real custom domain live
+- [ ] WhatsApp message templates for messages outside the 24-hour window (order updates, cart recovery)
+- [ ] Meta Pixel / Conversions API so ads can optimise for purchases, not just clicks
+- [ ] Instagram / Messenger DMs into the Inbox (Meta webhooks)
+
 ## ✅ Done (added 2026-09-26, Orbit Studio — AI images, reels, UGC, try-on & ads, Growth/Scale plans)
 - [x] 21 content formats (11 image, 10 video) defined as data in `lib/studio/formats.ts` — each shows the seller "what you'll get" and asks only for the material it needs
 - [x] Director (Claude + `lib/studio/director-guide.ts`) plans storyboard, script, caption and exact prompts before anything is spent; seller can change the plan
@@ -237,7 +250,7 @@ User feedback: a separate Strategy Lab page + separate plan chat was wrong — t
 - [x] Orchestrator can propose content (`create_content`); after Apply the result is posted back into the chat
 - [x] Super Admin > Studio: keys, model ids, prices, limits, live test buttons, per-seller spend
 - [ ] Add real Google AI Studio + BytePlus ModelArk keys and confirm model ids with the Test buttons (only mock-tested so far)
-- [ ] Post a finished image/reel straight to Instagram/Facebook from Content (Meta posting code exists; needs a public media URL → R2)
+- [x] ~~Post a finished image/reel straight to Instagram/Facebook from Content~~ — done 2026-09-26 (Instagram still needs R2 or a public domain for file links)
 
 ## 🔲 Not done yet — next up
 

@@ -45,6 +45,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ bus
     select: {
       id: true,
       name: true,
+      whatsappInboundNumber: true,
       paymentProvider: true,
       codVerification: true,
       notifyNewOrders: true,
@@ -283,7 +284,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ bus
   after(async () => {
     await bestEffort("checkout.notifyCustomer", async () => {
       if (needsVerify) {
-        const res = await notifyCustomer({ phone: order.customerPhone, email: order.customerEmail }, "verify_order", {
+        const res = await notifyCustomer({ phone: order.customerPhone, email: order.customerEmail, whatsappFrom: business.whatsappInboundNumber }, "verify_order", {
           storeName: business.name,
           firstName: order.customerName.split(" ")[0] || undefined,
           orderNumber,

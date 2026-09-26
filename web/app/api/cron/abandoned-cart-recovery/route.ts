@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendWhatsAppMessage } from "@/lib/whatsapp";
+import { storeUrl } from "@/lib/public-url";
+import { money } from "@/lib/money";
 
 const RECOVERY_DELAY_MS = 60 * 60 * 1000; // wait 1 hour after the last cart edit before nudging
 
@@ -23,7 +25,7 @@ export async function GET(req: NextRequest) {
   const cutoff = new Date(Date.now() - RECOVERY_DELAY_MS);
   const due = await prisma.abandonedCart.findMany({
     where: { recovered: false, notifiedAt: null, updatedAt: { lte: cutoff } },
-    include: { business: { select: { name: true, id: true } } },
+    include: { business: { select: { name: true, id: true, whatsappInboundNumber: true, storeCurrency: true } } },
   });
 
   const results = [];
@@ -35,9 +37,10 @@ export async function GET(req: NextRequest) {
       items = [];
     }
     const summary = items.map((i) => `${i.name} x${i.qty}`).join(", ") || "your cart";
-    const message = `Hi! You left ${summary} in your cart at ${cart.business.name} (Rs ${cart.total.toLocaleString()}). Reply here or revisit the store to complete your order.`;
+    const cartLink = await storeUrl(cart.business.id, "/cart");
+    const message = `Hi! You left ${summary} in your cart at ${cart.business.name} (${money(cart.total, cart.business.storeCurrency)}). Complete your order here: ${cartLink} — or just reply to this message.`;
 
-    const result = await sendWhatsAppMessage(cart.customerPhone, message);
+    const result = await sendWhatsAppMessage(cart.customerPhone, message, { from: cart.business.whatsappInboundNumber ?? undefined });
     await prisma.abandonedCart.update({
       where: { id: cart.id },
       data: { notifiedAt: new Date(), notifyError: result.error },

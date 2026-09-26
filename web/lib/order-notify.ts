@@ -24,7 +24,7 @@ export async function notifyOrder(
       courierName: true,
       trackingNumber: true,
       trackingUrl: true,
-      business: { select: { name: true, storeCurrency: true } },
+      business: { select: { name: true, storeCurrency: true, whatsappInboundNumber: true } },
     },
   });
   if (!order) return { anySent: false, error: "Order not found." };
@@ -33,7 +33,7 @@ export async function notifyOrder(
   const statusUrl = `${base}/store/${order.businessId}/order/${order.id}`;
 
   const res = await notifyCustomer(
-    { phone: order.customerPhone, email: order.customerEmail },
+    { phone: order.customerPhone, email: order.customerEmail, whatsappFrom: order.business.whatsappInboundNumber },
     template,
     {
       storeName: order.business.name,

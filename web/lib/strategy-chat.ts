@@ -7,6 +7,7 @@ import { after } from "next/server";
 import { STORE_DESIGN_SCHEMA, describeDesignJobs, runDesignJobs, sanitizeStoredDesignJobs } from "@/lib/design-ops";
 import { DELETE_PRODUCTS_SCHEMA, NEW_PRODUCTS_SCHEMA, PRODUCT_CHANGES_SCHEMA, applyProductChanges } from "@/lib/product-ops";
 import { CREATE_CONTENT_SCHEMA, describeStudioRequests, runStudioRequests, sanitizeStoredStudioRequests } from "@/lib/studio/ops";
+import { META_ADS_SCHEMA, SOCIAL_POSTS_SCHEMA, runMetaOps, sanitizeStoredMetaOps } from "@/lib/meta-ops";
 
 /**
  * The growth plan lives inside "Talk to your Orchestrator" — there is one chat, one Orchestrator.
@@ -59,6 +60,8 @@ export const ORCHESTRATOR_TOOL: Anthropic.Messages.Tool = {
       store_design: STORE_DESIGN_SCHEMA as unknown as Record<string, unknown>,
       delete_products: DELETE_PRODUCTS_SCHEMA as unknown as Record<string, unknown>,
       create_content: CREATE_CONTENT_SCHEMA as unknown as Record<string, unknown>,
+      social_posts: SOCIAL_POSTS_SCHEMA as unknown as Record<string, unknown>,
+      meta_ads: META_ADS_SCHEMA as unknown as Record<string, unknown>,
       draft_new_plan: {
         type: "boolean",
         description: "True only when the owner asks for a (new) growth plan to be made. Orbit then drafts a full plan from their real numbers.",
@@ -280,6 +283,7 @@ export async function resolveProposal(businessId: string, messageId: string, act
   }
   const designJobs = sanitizeStoredDesignJobs(Array.isArray(rawAll) ? rawAll : []);
   const studioJobs = sanitizeStoredStudioRequests(Array.isArray(rawAll) ? rawAll : []);
+  const metaOps = sanitizeStoredMetaOps(Array.isArray(rawAll) ? rawAll : []);
   const ops = sanitizeOps(planOps);
   if (ops.length && !m.planId) throw new Error("That plan is no longer open.");
   const applied = [
@@ -288,10 +292,12 @@ export async function resolveProposal(businessId: string, messageId: string, act
     ...(ops.length ? await applyPlanOps(businessId, m.planId!, ops) : []),
     ...describeDesignJobs(designJobs).map((d) => `${d} — Orbit Design is on it; I'll post here when it's done`),
     ...describeStudioRequests(studioJobs).map((d) => `${d.replace(/ — uses 1 .*$/, "")} — being made; it'll show up here and in Content`),
+    ...metaOps.map((o) => (o.op === "social_post" ? "Posting now — I'll tell you here when it's live" : `Building the ad "${o.headline}" in Meta (paused) — I'll tell you here when it's ready`)),
   ];
   // Design work takes a minute or two — run it after the response and report back in the chat.
   if (designJobs.length) after(() => runDesignJobs(businessId, designJobs, m.planId));
   if (studioJobs.length) after(() => runStudioRequests(businessId, studioJobs));
+  if (metaOps.length) after(() => runMetaOps(businessId, metaOps));
   await prisma.orchestratorMessage.update({ where: { id: m.id }, data: { opsState: "applied", opsSummary: JSON.stringify(applied) } });
   return applied;
 }

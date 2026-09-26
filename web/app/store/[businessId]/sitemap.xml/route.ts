@@ -1,10 +1,11 @@
 import { prisma } from "@/lib/prisma";
+import { storeUrl } from "@/lib/public-url";
 
 /** Per-store sitemap: home, designed pages, and every product. */
-export async function GET(req: Request, { params }: { params: Promise<{ businessId: string }> }) {
+export async function GET(_req: Request, { params }: { params: Promise<{ businessId: string }> }) {
   const { businessId } = await params;
-  const origin = new URL(req.url).origin;
-  const base = `${origin}/store/${businessId}`;
+  // The store's real public address — its own domain once verified, so search engines index that.
+  const base = await storeUrl(businessId);
 
   const business = await prisma.business.findUnique({
     where: { id: businessId },

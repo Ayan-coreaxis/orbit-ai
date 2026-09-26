@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { storeUrl } from "@/lib/public-url";
 import { runDesignTurn, loadDoc, type DesignRef } from "@/lib/orbit-design-generate";
 import { collectSlots, planOrbitCode, runOrbitCode } from "@/lib/orbit-code";
 import { wireDoc } from "@/lib/orbit-design-wire";
@@ -182,7 +183,7 @@ export async function runDesignJobs(businessId: string, jobs: DesignJob[], planI
         const r = await publishStore(businessId, j.publish);
         await say(
           r.published
-            ? `Your store is now **live**: /store/${businessId}${r.note ? `\n\n${r.note}` : ""}`
+            ? `Your store is now **live**: ${await storeUrl(businessId)}${r.note ? `\n\n${r.note}` : ""}`
             : "Your store is now offline — customers can't open it until you publish again.",
         );
       }

@@ -32,7 +32,7 @@ export async function requestReviewForOrder(orderId: string): Promise<void> {
   const link = `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/review/${review.id}`;
   const message = `Hi ${order.customerName}! Your order from ${order.business.name} (${productNames}) has been delivered. We'd really appreciate a quick review: ${link}`;
 
-  const result = await sendWhatsAppMessage(order.customerPhone, message);
+  const result = await sendWhatsAppMessage(order.customerPhone, message, { from: order.business.whatsappInboundNumber ?? undefined });
   if (!result.sent) {
     await prisma.review.update({ where: { id: review.id }, data: { notifyError: result.error ?? "Unknown error" } });
   }

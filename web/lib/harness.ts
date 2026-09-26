@@ -259,6 +259,7 @@ const TOOLS: HarnessTool[] = [
         return { status: "needs_connection", summary: "Facebook isn't connected — here's the post to publish yourself, or connect Facebook in Settings.", output: text };
       }
       const r = await publishFacebookPost(b.metaPageId, b.metaAccessToken, text);
+      await prisma.socialPost.create({ data: { businessId, platform: "facebook", kind: "text", caption: text, status: r.ok ? "posted" : "failed", externalId: r.id ?? null, error: r.ok ? null : (r.error ?? "").slice(0, 400), source: "content-agent" } });
       if (!r.ok) return { status: "failed", summary: `Facebook rejected the post: ${r.error}`, output: text };
       return { status: "done", summary: `Published a post to ${b.metaPageName ?? "your Facebook Page"}.`, output: text };
     },

@@ -27,7 +27,7 @@ export interface AgentSettings {
   autoApplyContent: boolean;
   /** Off by default — lets Ads Agent actually create a real (PAUSED) Meta campaign. Activating real spend is always a separate, manual step regardless of this setting. */
   autoApplyAds: boolean;
-  /** Real, Meta-enforced daily budget cap (USD) — required before Ads Agent can create a real campaign. */
+  /** Real, Meta-enforced daily budget, in the ad account's own currency (e.g. PKR) — required before the Ads Agent can create a real ad. */
   adsDailyBudgetUsd: number;
   /**
    * Off by default — COD has no payment guarantee, so even a fraud-clear COD order waits for a real

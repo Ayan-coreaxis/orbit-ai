@@ -8,6 +8,7 @@ import { prisma } from "@/lib/prisma";
 import { isMetaAppConfigured } from "@/lib/meta-oauth";
 import { isPlatformStripeConfigured, PLAN_PRICE_IDS } from "@/lib/platform-stripe";
 import { MetaConnectCard } from "@/components/store/MetaConnectCard";
+import { DomainCard } from "@/components/settings/DomainCard";
 import { PaymentSettingsCard } from "@/components/store/PaymentSettingsCard";
 import { StoreOpsSettingsCard } from "@/components/store/StoreOpsSettingsCard";
 import { WidgetCustomizationCard } from "@/components/store/WidgetCustomizationCard";
@@ -206,6 +207,8 @@ export default async function SettingsPage({
             metaStatus={metaStatus}
           />
         )}
+
+        {businessId && <DomainCard />}
 
         {businessId && (
           <PaymentSettingsCard

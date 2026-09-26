@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
       customerPhone: true,
       customerEmail: true,
       items: true,
-      business: { select: { name: true } },
+      business: { select: { name: true, whatsappInboundNumber: true } },
     },
   });
 
@@ -73,7 +73,7 @@ export async function GET(req: NextRequest) {
     });
 
     const res = await notifyCustomer(
-      { phone: order.customerPhone, email: order.customerEmail },
+      { phone: order.customerPhone, email: order.customerEmail, whatsappFrom: order.business.whatsappInboundNumber },
       "review_request",
       {
         storeName: order.business.name,

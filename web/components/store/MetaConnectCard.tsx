@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Card, SectionLabel, Pill } from "@/components/ui";
 import { Megaphone, AlertTriangle } from "lucide-react";
 import { FacebookIcon, InstagramIcon } from "@/components/icons/BrandIcons";
+import { MetaHealth } from "@/components/settings/MetaHealth";
 
 const META_BLUE = "#1877F2";
 
@@ -89,16 +90,20 @@ export function MetaConnectCard({
             <p className="mt-2 text-[12px] text-text-faint">Connected {new Date(connectedAt).toLocaleDateString()}</p>
           )}
           <p className="mt-3 text-[13px] leading-relaxed text-text-dim">
-            Content Agent can post real captions to this Page when you turn on auto-apply in its
-            settings. {!hasAdAccount && "No real Ad Account access was granted, so the Ads Agent can't create real campaigns yet — reconnect and approve ads access to enable that."}
+            Orbit can post your Studio images and reels to this Page{hasInstagram ? " and Instagram" : ""}, and run Meta ads (built paused — you
+            activate them in Ads). {!hasAdAccount && "No ad account access was granted yet — reconnect and approve ads access to run ads."}
           </p>
-          <button
-            onClick={disconnect}
-            disabled={disconnecting}
-            className="mt-3 text-[12.5px] font-medium text-bad hover:underline"
-          >
-            {disconnecting ? "Disconnecting…" : "Disconnect"}
-          </button>
+          <MetaHealth />
+          <div className="mt-3 flex items-center gap-4">
+            {appConfigured && (
+              <a href="/api/oauth/meta/start" className="text-[12.5px] font-medium hover:underline" style={{ color: META_BLUE }}>
+                Reconnect
+              </a>
+            )}
+            <button onClick={disconnect} disabled={disconnecting} className="text-[12.5px] font-medium text-bad hover:underline">
+              {disconnecting ? "Disconnecting…" : "Disconnect"}
+            </button>
+          </div>
         </div>
       ) : (
         <div className="mt-4">
