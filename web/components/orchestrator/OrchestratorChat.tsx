@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
-import { Send, Mic, Square, Volume2, VolumeX, Compass, ClipboardCheck, Paperclip, AudioLines, Upload, X } from "lucide-react";
+import { Send, Mic, Square, Compass, ClipboardCheck, Paperclip, AudioLines, Upload, X } from "lucide-react";
 import { MessageFiles, PendingFiles, usePendingFiles, useVoiceNote } from "@/components/orchestrator/ChatAttachments";
 import { MEDIA_ACCEPT, type UploadedMedia } from "@/lib/media-client";
 import { cn } from "@/lib/utils";
@@ -84,24 +84,6 @@ function getSpeechRecognition(): (new () => SpeechRecognitionLike) | null {
   return w.SpeechRecognition || w.webkitSpeechRecognition || null;
 }
 
-// The browser's default TTS voice is often an old, robotic-sounding SAPI voice.
-// Modern browsers also ship free, much more natural neural voices (e.g. Edge/Windows
-// "Online (Natural)" voices, Chrome's "Google" voices) — prefer those when present,
-// with no added cost, instead of switching to a paid TTS API.
-function pickBestVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null {
-  const english = voices.filter((v) => v.lang.toLowerCase().startsWith("en"));
-  const pool = english.length > 0 ? english : voices;
-  if (pool.length === 0) return null;
-  const rank = (v: SpeechSynthesisVoice) => {
-    const name = v.name.toLowerCase();
-    if (name.includes("online (natural)") || name.includes("neural")) return 0;
-    if (name.includes("online")) return 1;
-    if (name.includes("google")) return 2;
-    return 3;
-  };
-  return [...pool].sort((a, b) => rank(a) - rank(b))[0];
-}
-
 const noSubscribe = () => () => {};
 
 export function OrchestratorChat({
@@ -123,16 +105,12 @@ export function OrchestratorChat({
   const [stage, setStage] = useState(0);
   const thinking = THINKING_STAGES[stage];
   const [listening, setListening] = useState(false);
-  const [speaking, setSpeaking] = useState(false);
-  const [ttsEnabled, setTtsEnabled] = useState(true);
   // Browser-only capability: false on the server, real value once in the browser.
-  const voiceSupported = useSyncExternalStore(noSubscribe, () => !!getSpeechRecognition() && "speechSynthesis" in window, () => false);
+  const voiceSupported = useSyncExternalStore(noSubscribe, () => !!getSpeechRecognition(), () => false);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const orbRef = useRef<VoiceOrbHandle>(null);
   const micStreamRef = useRef<MediaStream | null>(null);
-  const bestVoiceRef = useRef<SpeechSynthesisVoice | null>(null);
-  const ttsAudioRef = useRef<HTMLAudioElement | null>(null);
   const [revealed, setRevealed] = useState<Record<string, string>>({});
   const typingTimerRef = useRef<number | null>(null);
   // Real-time "who's talking right now" — drives the meeting visualization above the chat.
@@ -159,18 +137,6 @@ export function OrchestratorChat({
     };
     tick();
   }
-
-  useEffect(() => {
-    if (!("speechSynthesis" in window)) return;
-    const loadVoices = () => {
-      bestVoiceRef.current = pickBestVoice(window.speechSynthesis.getVoices());
-    };
-    loadVoices();
-    window.speechSynthesis.onvoiceschanged = loadVoices;
-    return () => {
-      window.speechSynthesis.onvoiceschanged = null;
-    };
-  }, []);
 
   const [wasSending, setWasSending] = useState(sending);
   if (wasSending !== sending) {
@@ -223,75 +189,6 @@ export function OrchestratorChat({
     if (typingTimerRef.current) window.clearTimeout(typingTimerRef.current);
   }, []);
 
-  function speakWithBrowserTts(text: string) {
-    if (!("speechSynthesis" in window)) return;
-    window.speechSynthesis.cancel();
-    const utter = new SpeechSynthesisUtterance(text);
-    if (bestVoiceRef.current) utter.voice = bestVoiceRef.current;
-    utter.rate = 1.05;
-    utter.pitch = 1;
-    utter.onstart = () => {
-      setSpeaking(true);
-      orbRef.current?.setSpeaking(true);
-    };
-    utter.onend = () => {
-      setSpeaking(false);
-      orbRef.current?.setSpeaking(false);
-    };
-    utter.onerror = () => {
-      setSpeaking(false);
-      orbRef.current?.setSpeaking(false);
-    };
-    // Fires once per spoken word in Chrome — drives the orb's pulse off real speech timing
-    // (this fallback path has no real audio stream to analyze, unlike the Google TTS path below).
-    utter.onboundary = () => {
-      orbRef.current?.pulseForSpeech();
-    };
-    window.speechSynthesis.speak(utter);
-  }
-
-  /**
-   * Real neural voice via Google Cloud TTS (server-side) — sounds natural in every browser,
-   * not just Edge. Falls back to the browser's own built-in voice when the server doesn't have
-   * a real Google TTS key configured yet, or the request fails, rather than staying silent.
-   */
-  async function speak(raw: string) {
-    if (!ttsEnabled) return;
-    // Formatting renders in the chat but must never be read aloud as symbols.
-    const text = raw.replace(/\n+Sources:\n[\s\S]*$/, "").replace(/\*\*/g, "").replace(/^\s*(?:[-•*]|\d+[.)])\s+/gm, "");
-    window.speechSynthesis?.cancel();
-    ttsAudioRef.current?.pause();
-    orbRef.current?.detachAudio();
-
-    try {
-      const res = await fetch("/api/orchestrator/tts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
-      });
-      if (!res.ok) throw new Error("not_configured_or_failed");
-      const { audioBase64 } = (await res.json()) as { audioBase64: string };
-
-      const audio = new Audio(`data:audio/mp3;base64,${audioBase64}`);
-      ttsAudioRef.current = audio;
-      audio.onplay = () => {
-        setSpeaking(true);
-        orbRef.current?.setSpeaking(true);
-      };
-      const cleanup = () => {
-        setSpeaking(false);
-        orbRef.current?.setSpeaking(false);
-        orbRef.current?.detachAudio();
-      };
-      audio.onended = cleanup;
-      audio.onerror = cleanup;
-      orbRef.current?.attachAudioElement(audio);
-      await audio.play();
-    } catch {
-      speakWithBrowserTts(text);
-    }
-  }
-
   async function sendMessage(text: string) {
     const trimmed = text.trim();
     if (sending || pending.uploading || voiceNote.recording) return;
@@ -332,9 +229,7 @@ export function OrchestratorChat({
         if (i < turns.length - 1) await new Promise((r) => setTimeout(r, 550));
       }
       lastSeenRef.current = new Date().toISOString();
-      const finalTurn = turns[turns.length - 1];
       if (turns.some((t) => t.opsState)) onPlanChanged?.();
-      speak(finalTurn.content);
       window.setTimeout(() => setActiveSpeaker(null), 900);
     } catch {
       setMessages((m) => [
@@ -392,12 +287,6 @@ export function OrchestratorChat({
       return;
     }
 
-    window.speechSynthesis?.cancel();
-    ttsAudioRef.current?.pause();
-    orbRef.current?.detachAudio();
-    setSpeaking(false);
-    orbRef.current?.setSpeaking(false);
-
     const recognition = new SpeechRecognitionCtor();
     recognition.continuous = false;
     recognition.interimResults = false;
@@ -429,7 +318,7 @@ export function OrchestratorChat({
   }
 
   const lastUserIdx = messages.reduce((last, m, i) => (m.role === "user" ? i : last), -1);
-  const orbStatus = listening ? "Listening…" : speaking ? "Speaking…" : sending ? thinking.text : "Ready";
+  const orbStatus = listening ? "Listening…" : sending ? thinking.text : "Ready";
 
   return (
     <div
@@ -678,16 +567,9 @@ export function OrchestratorChat({
             }}
           />
           <button
-            onClick={() => setTtsEnabled((v) => !v)}
-            className="ml-auto flex h-10 w-10 shrink-0 sm:ml-0 items-center justify-center rounded-full border border-border-strong text-text-dim hover:text-text"
-            title={ttsEnabled ? "Mute voice replies" : "Unmute voice replies"}
-          >
-            {ttsEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
-          </button>
-          <button
             onClick={() => sendMessage(input)}
             disabled={(!input.trim() && !pending.ready) || sending || pending.uploading}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full gradient-fill text-white disabled:opacity-40"
+            className="ml-auto flex h-10 w-10 shrink-0 items-center sm:ml-0 justify-center rounded-full gradient-fill text-white disabled:opacity-40"
             title={pending.uploading ? "Wait for the upload to finish" : "Send"}
           >
             <Send className="h-4 w-4" />

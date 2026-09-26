@@ -18,7 +18,6 @@ export const KEY_ENV_MAP: Record<string, string> = {
   twilio_sid: "TWILIO_ACCOUNT_SID",
   twilio_whatsapp: "TWILIO_WHATSAPP_FROM",
   apify_token: "APIFY_API_TOKEN",
-  google_tts: "GOOGLE_TTS_API_KEY",
   stripe_price_starter: "STRIPE_PRICE_STARTER",
   stripe_price_growth: "STRIPE_PRICE_GROWTH",
   stripe_price_scale: "STRIPE_PRICE_SCALE",

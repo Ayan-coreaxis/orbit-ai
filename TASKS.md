@@ -20,7 +20,7 @@ This file is the running checklist — what's actually built and working vs. wha
 - [x] Hero slider / carousel: swipe, dots, keyboard, smart autoplay
 - [x] Competitor intel reads real catalogs (Shopify / WooCommerce) + product pages
 - [x] Full production-build test: all seller / admin / store pages at desktop + mobile, signup → onboarding → dashboard, shopper order with zone fee, chat
-- [ ] Voice limit per plan — waiting on owner (recommended: Starter browser voice, Growth/Scale limited premium Google TTS)
+- [x] Voice replies removed for now (owner decision) — no voice cost, no per-plan limit needed; mic input + voice notes kept
 - [ ] Owner: set live keys + deploy (see `DEPLOY.md`); test PostEx/Leopards/TCS, Meta, Resend against real accounts
 
 ## ✅ Done

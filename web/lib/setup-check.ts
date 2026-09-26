@@ -44,7 +44,6 @@ export async function setupChecklist(): Promise<SetupItem[]> {
     { id: "email", group: "Email", label: "Resend key + sender address", ok: has("RESEND_API_KEY") && has("EMAIL_FROM"), required: false, fix: "Super Admin > API Keys > Resend / Email sender.", href: "/admin/api-keys" },
     { id: "studio", group: "Studio", label: "Image + video model keys (Gemini, BytePlus)", ok: has("GEMINI_API_KEY") && has("SEEDANCE_API_KEY"), required: false, fix: "Super Admin > Studio, then press Test.", href: "/admin/studio" },
     { id: "search", group: "Extras", label: "Brave web search key", ok: has("BRAVE_SEARCH_API_KEY"), required: false, fix: "Super Admin > Web search.", href: "/admin/web-search" },
-    { id: "tts", group: "Extras", label: "Google voice (TTS) key", ok: has("GOOGLE_TTS_API_KEY"), required: false, fix: "Super Admin > API Keys > Google TTS.", href: "/admin/api-keys" },
     { id: "legal", group: "Extras", label: "Contact email on Privacy / Terms", ok: has("LEGAL_CONTACT_EMAIL"), required: false, fix: "Super Admin > API Keys > Contact email.", href: "/admin/api-keys" },
     { id: "domains", group: "Extras", label: "Custom store domains (Vercel token + project id)", ok: has("VERCEL_TOKEN") && has("VERCEL_PROJECT_ID"), required: false, fix: "Super Admin > API Keys > Vercel.", href: "/admin/api-keys" },
   ];

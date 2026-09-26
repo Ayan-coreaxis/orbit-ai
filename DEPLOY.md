@@ -87,7 +87,6 @@ Recommended hosting: **Vercel** (app + cron jobs) + **Neon** (Postgres) + **Clou
 
 - **Orbit Studio:** Google AI Studio key (`GEMINI_API_KEY`) + BytePlus ModelArk key (`SEEDANCE_API_KEY`) → Super Admin → Studio → Test.
 - **Web search:** Brave Search API key → Super Admin → Web search.
-- **Natural voice:** Google Cloud Text-to-Speech key (`GOOGLE_TTS_API_KEY`).
 - **Sellers' own domains:** Vercel token + project id (+ team id) in Super Admin → API Keys.
 - **Contact email** on Privacy / Terms: `LEGAL_CONTACT_EMAIL`.
 

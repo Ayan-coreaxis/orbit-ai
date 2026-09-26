@@ -8,14 +8,6 @@ export interface VoiceOrbHandle {
   attachMicStream: (stream: MediaStream) => void;
   /** Stop reacting to the mic and settle back down. */
   detachMic: () => void;
-  /** Start reacting to real playing TTS audio's amplitude (Google Cloud TTS path). */
-  attachAudioElement: (audio: HTMLAudioElement) => void;
-  /** Stop reacting to the TTS audio and settle back down. */
-  detachAudio: () => void;
-  /** Call on each TTS word-boundary event — drives a real speech-timed pulse (browser TTS fallback path, which has no audio stream to analyze directly). */
-  pulseForSpeech: () => void;
-  /** Toggle the decay loop that keeps the orb gently moving while browser-TTS audio is playing. */
-  setSpeaking: (speaking: boolean) => void;
 }
 
 function rmsLevel(analyser: AnalyserNode, data: Uint8Array<ArrayBuffer>): number {
@@ -32,12 +24,6 @@ export const VoiceOrb = forwardRef<VoiceOrbHandle, { size?: number }>(function V
   const [level, setLevel] = useState(0);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const micRafRef = useRef<number | null>(null);
-  const ttsAudioCtxRef = useRef<AudioContext | null>(null);
-  const ttsSourceRef = useRef<MediaElementAudioSourceNode | null>(null);
-  const ttsRafRef = useRef<number | null>(null);
-  const speakLevelRef = useRef(0);
-  const speakRafRef = useRef<number | null>(null);
-  const speakingRef = useRef(false);
 
   useImperativeHandle(ref, () => ({
     attachMicStream(stream: MediaStream) {
@@ -63,61 +49,12 @@ export const VoiceOrb = forwardRef<VoiceOrbHandle, { size?: number }>(function V
       audioCtxRef.current = null;
       setLevel(0);
     },
-    attachAudioElement(audio: HTMLAudioElement) {
-      const AudioCtxCtor = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      const ctx = new AudioCtxCtor();
-      const source = ctx.createMediaElementSource(audio);
-      const analyser = ctx.createAnalyser();
-      analyser.fftSize = 256;
-      source.connect(analyser);
-      analyser.connect(ctx.destination); // keep it audible — analyser is a pass-through node
-      ttsAudioCtxRef.current = ctx;
-      ttsSourceRef.current = source;
-      const data = new Uint8Array(analyser.frequencyBinCount);
-
-      const loop = () => {
-        setLevel(rmsLevel(analyser, data));
-        ttsRafRef.current = requestAnimationFrame(loop);
-      };
-      loop();
-    },
-    detachAudio() {
-      if (ttsRafRef.current) cancelAnimationFrame(ttsRafRef.current);
-      ttsRafRef.current = null;
-      ttsSourceRef.current?.disconnect();
-      ttsSourceRef.current = null;
-      ttsAudioCtxRef.current?.close().catch(() => {});
-      ttsAudioCtxRef.current = null;
-      setLevel(0);
-    },
-    pulseForSpeech() {
-      speakLevelRef.current = 1;
-    },
-    setSpeaking(speaking: boolean) {
-      speakingRef.current = speaking;
-      if (speaking && speakRafRef.current === null) {
-        const decay = () => {
-          speakLevelRef.current *= 0.82;
-          setLevel(speakLevelRef.current);
-          if (speakingRef.current || speakLevelRef.current > 0.01) {
-            speakRafRef.current = requestAnimationFrame(decay);
-          } else {
-            speakRafRef.current = null;
-            setLevel(0);
-          }
-        };
-        speakRafRef.current = requestAnimationFrame(decay);
-      }
-    },
   }));
 
   useEffect(
     () => () => {
       if (micRafRef.current) cancelAnimationFrame(micRafRef.current);
-      if (speakRafRef.current) cancelAnimationFrame(speakRafRef.current);
-      if (ttsRafRef.current) cancelAnimationFrame(ttsRafRef.current);
       audioCtxRef.current?.close().catch(() => {});
-      ttsAudioCtxRef.current?.close().catch(() => {});
     },
     [],
   );
