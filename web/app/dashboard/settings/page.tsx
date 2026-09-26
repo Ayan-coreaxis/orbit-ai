@@ -12,6 +12,7 @@ import { MetaConnectCard } from "@/components/store/MetaConnectCard";
 import { DomainCard } from "@/components/settings/DomainCard";
 import { PaymentSettingsCard } from "@/components/store/PaymentSettingsCard";
 import { StoreOpsSettingsCard } from "@/components/store/StoreOpsSettingsCard";
+import { CourierCard } from "@/components/store/CourierCard";
 import { WidgetCustomizationCard } from "@/components/store/WidgetCustomizationCard";
 import { parseWidgetCopy } from "@/lib/widget-copy";
 import { parseCheckoutCustomFields } from "@/lib/checkout-fields";
@@ -251,8 +252,6 @@ export default async function SettingsPage({
               taxInclusive: business?.taxInclusive ?? false,
               codVerification: business?.codVerification ?? false,
               notifyNewOrders: business?.notifyNewOrders ?? true,
-              courierProvider: business?.courierProvider ?? "manual",
-              courierApiKeySet: !!business?.courierApiKey,
               ga4MeasurementId: business?.ga4MeasurementId ?? null,
               metaPixelId: business?.metaPixelId ?? null,
               metaCapiTokenSet: !!business?.metaCapiToken,
@@ -281,6 +280,7 @@ export default async function SettingsPage({
           />
         )}
 
+        {businessId && <CourierCard />}
         {businessId && <ShippingZonesManager businessId={businessId} currency={business?.storeCurrency ?? "usd"} />}
 
         {businessId && <TeamManager />}

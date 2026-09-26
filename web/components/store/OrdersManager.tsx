@@ -50,6 +50,9 @@ interface Order {
   courierName: string | null;
   trackingNumber: string | null;
   trackingUrl: string | null;
+  courierStatus: string | null;
+  courierStatusText: string | null;
+  courierCheckedAt: string | null;
   sellerNote: string | null;
   confirmationNotifiedAt: string | null;
   confirmationNotifyError: string | null;
@@ -458,6 +461,30 @@ export function OrdersManager({
                           {busy === o.id + "book" ? <Loader2 className="h-3 w-3 animate-spin" /> : <Truck className="h-3 w-3" />}
                           Book with {courierProvider}
                         </button>
+                      )}
+
+                      {o.trackingNumber && /postex|leopard|tcs/i.test(o.courierName ?? "") && (
+                        <div className="flex flex-wrap items-center gap-2 text-[11.5px]">
+                          <span
+                            className={`rounded-full px-2 py-0.5 font-medium ${
+                              o.courierStatus === "delivered"
+                                ? "bg-good-soft text-good"
+                                : o.courierStatus === "returned" || o.courierStatus === "returning" || o.courierStatus === "attempted"
+                                  ? "bg-bad-soft text-bad"
+                                  : "bg-panel-2 text-text-dim"
+                            }`}
+                          >
+                            {o.courierName}: {o.courierStatusText || "not checked yet"}
+                          </span>
+                          {o.courierCheckedAt && <span className="text-text-faint">checked {new Date(o.courierCheckedAt).toLocaleString()}</span>}
+                          <button
+                            onClick={() => patch(o.id, { track: true }, "courier")}
+                            disabled={busy === o.id + "courier"}
+                            className="inline-flex items-center gap-1 font-medium text-accent-strong hover:underline disabled:opacity-50"
+                          >
+                            {busy === o.id + "courier" ? <Loader2 className="h-3 w-3 animate-spin" /> : null} Check now
+                          </button>
+                        </div>
                       )}
 
                       <TrackingForm key={o.id} order={o} busy={busy === o.id + "track"} onSave={(vals) => patch(o.id, vals, "track")} />

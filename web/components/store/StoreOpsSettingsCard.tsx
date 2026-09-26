@@ -11,8 +11,6 @@ interface Ops {
   taxInclusive: boolean;
   codVerification: boolean;
   notifyNewOrders: boolean;
-  courierProvider: string;
-  courierApiKeySet: boolean;
   ga4MeasurementId: string | null;
   metaPixelId: string | null;
   metaCapiTokenSet: boolean;
@@ -22,12 +20,6 @@ interface Ops {
   currency: string;
 }
 
-const COURIERS = [
-  { v: "manual", label: "None / manual entry" },
-  { v: "postex", label: "PostEx" },
-  { v: "leopards", label: "Leopards" },
-  { v: "tcs", label: "TCS" },
-];
 
 export function StoreOpsSettingsCard({ initial }: { initial: Ops }) {
   const [f, setF] = useState({
@@ -38,8 +30,6 @@ export function StoreOpsSettingsCard({ initial }: { initial: Ops }) {
     taxInclusive: initial.taxInclusive,
     codVerification: initial.codVerification,
     notifyNewOrders: initial.notifyNewOrders,
-    courierProvider: initial.courierProvider || "manual",
-    courierApiKey: "",
     ga4MeasurementId: initial.ga4MeasurementId ?? "",
     metaPixelId: initial.metaPixelId ?? "",
     metaCapiToken: "",
@@ -62,13 +52,11 @@ export function StoreOpsSettingsCard({ initial }: { initial: Ops }) {
       taxInclusive: f.taxInclusive,
       codVerification: f.codVerification,
       notifyNewOrders: f.notifyNewOrders,
-      courierProvider: f.courierProvider,
       ga4MeasurementId: f.ga4MeasurementId,
       metaPixelId: f.metaPixelId,
       relatedProductsEnabled: f.relatedProductsEnabled,
       recentlyViewedEnabled: f.recentlyViewedEnabled,
     };
-    if (f.courierApiKey.trim()) body.courierApiKey = f.courierApiKey.trim();
     if (f.metaCapiToken.trim()) body.metaCapiToken = f.metaCapiToken.trim();
     const r = await fetch("/api/business/store-ops-settings", {
       method: "PATCH",
@@ -79,7 +67,7 @@ export function StoreOpsSettingsCard({ initial }: { initial: Ops }) {
     if (r.ok) {
       setSaved(true);
       setError(null);
-      setF((s) => ({ ...s, courierApiKey: "", metaCapiToken: "" }));
+      setF((s) => ({ ...s, metaCapiToken: "" }));
     } else {
       setError(((await r.json().catch(() => ({}))) as { error?: string }).error ?? "Couldn't save.");
     }
@@ -90,7 +78,7 @@ export function StoreOpsSettingsCard({ initial }: { initial: Ops }) {
   return (
     <Card className="p-7">
       <SectionLabel>Store operations</SectionLabel>
-      <p className="mt-1.5 text-[13px] text-text-dim">Delivery fee, tax, order confirmation and courier — all applied at checkout.</p>
+      <p className="mt-1.5 text-[13px] text-text-dim">Delivery fee, tax, order confirmation and tracking — all applied at checkout.</p>
 
       <div className="mt-5 grid gap-4 sm:grid-cols-2">
         <label className="grid gap-1.5">
@@ -129,33 +117,6 @@ export function StoreOpsSettingsCard({ initial }: { initial: Ops }) {
           onChange={(v) => setF({ ...f, recentlyViewedEnabled: v })}
           label={'Show "Recently viewed" on product pages'}
         />
-      </div>
-
-      <div className="mt-5 grid gap-4 sm:grid-cols-2">
-        <label className="grid gap-1.5">
-          <span className="text-[12px] font-medium text-text-dim">Courier</span>
-          <select className={input} value={f.courierProvider} onChange={(e) => setF({ ...f, courierProvider: e.target.value })}>
-            {COURIERS.map((c) => (
-              <option key={c.v} value={c.v}>
-                {c.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        {f.courierProvider !== "manual" && (
-          <label className="grid gap-1.5">
-            <span className="text-[12px] font-medium text-text-dim">
-              {f.courierProvider} API key {initial.courierApiKeySet && <span className="text-good">· connected</span>}
-            </span>
-            <input
-              className={input}
-              type="password"
-              value={f.courierApiKey}
-              onChange={(e) => setF({ ...f, courierApiKey: e.target.value })}
-              placeholder={initial.courierApiKeySet ? "•••••• (leave blank to keep)" : f.courierProvider === "leopards" ? "api_key:api_password" : "token"}
-            />
-          </label>
-        )}
       </div>
 
       <div className="mt-5 grid gap-4 sm:grid-cols-2">

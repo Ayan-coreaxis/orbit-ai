@@ -812,6 +812,9 @@ model Order {
   courierName             String?
   trackingNumber          String?
   trackingUrl             String?
+  courierStatus           String? // booked | in_transit | out_for_delivery | delivered | attempted | returning | returned | cancelled | unknown — read from the courier API (lib/courier.ts)
+  courierStatusText       String? // the courier's own words (or the last error)
+  courierCheckedAt        DateTime?
   shippedAt               DateTime?
   fulfilledAt             DateTime? // real delivery/completion time — set when the seller marks the order fulfilled
   cancelledAt             DateTime?

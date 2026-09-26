@@ -3,7 +3,7 @@ import { getActiveBusinessId } from "@/lib/get-active-business-id";
 import { prisma } from "@/lib/prisma";
 import { notifyOrder, originFromRequest } from "@/lib/order-notify";
 import { applyStockDelta } from "@/lib/checkout";
-import { bookShipment } from "@/lib/courier";
+import { bookShipment, syncOrderCourier } from "@/lib/courier";
 
 const STATUSES = ["pending", "confirmed", "shipped", "fulfilled", "cancelled"] as const;
 type Status = (typeof STATUSES)[number];
@@ -34,8 +34,17 @@ export async function PATCH(
     sellerNote?: string | null;
     verified?: boolean;
     book?: boolean;
+    track?: boolean;
     notify?: boolean;
   };
+
+  // ---- read the latest status from the courier ----
+  if (body.track) {
+    const r = await syncOrderCourier(id);
+    const updated = await prisma.order.findUnique({ where: { id } });
+    if (!r.ok) return NextResponse.json({ error: r.error ?? "Couldn't read the courier status.", order: updated }, { status: 502 });
+    return NextResponse.json({ ok: true, order: updated });
+  }
 
   // ---- auto-book a courier shipment ----
   if (body.book) {
@@ -52,6 +61,9 @@ export async function PATCH(
         shippedAt: order.shippedAt ?? new Date(),
         confirmedAt: order.confirmedAt ?? new Date(),
         verified: true,
+        courierStatus: "booked",
+        courierStatusText: "Booked",
+        courierCheckedAt: new Date(),
       },
     });
     await notifyOrder(id, "order_shipped", originFromRequest(req)).catch(() => {});
