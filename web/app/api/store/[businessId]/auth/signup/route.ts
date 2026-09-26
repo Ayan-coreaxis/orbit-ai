@@ -63,5 +63,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ bus
   // code mode: send the code, don't sign in until verified
   const channel = phone ? "phone" : "email";
   const otp = await issueOtp(businessId, channel, (phone || email)!);
+  if (!otp.sent && !otp.devCode) return NextResponse.json({ error: otp.error ?? "Couldn't send the code." }, { status: 503 });
   return NextResponse.json({ ok: true, needsOtp: true, channel, target: phone || email, devCode: otp.devCode });
 }

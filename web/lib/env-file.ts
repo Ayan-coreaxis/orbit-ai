@@ -12,6 +12,8 @@ export const KEY_ENV_MAP: Record<string, string> = {
   meta_login_config_id: "META_LOGIN_CONFIG_ID",
   meta_webhook_verify_token: "META_WEBHOOK_VERIFY_TOKEN",
   legal_contact_email: "LEGAL_CONTACT_EMAIL",
+  resend: "RESEND_API_KEY",
+  email_from: "EMAIL_FROM",
   twilio: "TWILIO_AUTH_TOKEN",
   twilio_sid: "TWILIO_ACCOUNT_SID",
   twilio_whatsapp: "TWILIO_WHATSAPP_FROM",

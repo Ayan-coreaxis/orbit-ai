@@ -16,7 +16,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ bus
   if (!target || !code) return NextResponse.json({ error: "Enter the code we sent you." }, { status: 400 });
 
   if (!(await consumeOtp(businessId, target, code)))
-    return NextResponse.json({ error: "That code is wrong or has expired." }, { status: 401 });
+    return NextResponse.json({ error: "That code is wrong or has expired. After 5 wrong tries, ask for a new code." }, { status: 401 });
 
   const customer = await prisma.storeCustomer.findFirst({
     where: { businessId, ...(phone ? { phone } : { email }) },

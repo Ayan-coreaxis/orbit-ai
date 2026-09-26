@@ -8,9 +8,12 @@ export interface EmailSendResult {
  * Honest like `lib/whatsapp.ts`: if `RESEND_API_KEY` isn't set it does not pretend to send —
  * in dev it logs the message and reports `sent:false`, in production it returns the error.
  */
-export async function sendEmail(to: string, subject: string, text: string, html?: string): Promise<EmailSendResult> {
+export async function sendEmail(to: string, subject: string, text: string, html?: string, opts: { fromName?: string } = {}): Promise<EmailSendResult> {
   const key = process.env.RESEND_API_KEY;
-  const from = process.env.EMAIL_FROM || "Orbit <notifications@orbit.store>";
+  const configured = process.env.EMAIL_FROM || "Orbit <notifications@orbit.store>";
+  // A store's own emails show the store's name; the address stays Orbit's verified sending address.
+  const address = configured.match(/<([^>]+)>/)?.[1] ?? configured.trim();
+  const from = opts.fromName ? `${opts.fromName.replace(/[<>"\r\n]/g, "").slice(0, 60)} <${address}>` : configured;
 
   const target = (to || "").trim();
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(target)) return { sent: false, error: "No valid email address." };

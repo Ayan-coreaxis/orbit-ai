@@ -1076,6 +1076,7 @@ model CustomerOtp {
   code       String // 6-digit
   expiresAt  DateTime
   consumedAt DateTime?
+  attempts   Int       @default(0) // wrong guesses — the code dies after 5
   createdAt  DateTime  @default(now())
 
   @@index([businessId, target])

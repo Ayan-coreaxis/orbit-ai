@@ -27,5 +27,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ bus
   });
 
   const otp = await issueOtp(businessId, channel, target);
+  // Never say "code sent" when it wasn't.
+  if (!otp.sent && !otp.devCode) return NextResponse.json({ error: otp.error ?? "Couldn't send the code." }, { status: /wait|Too many/.test(otp.error ?? "") ? 429 : 503 });
   return NextResponse.json({ ok: true, channel, target, sent: otp.sent, devCode: otp.devCode });
 }
