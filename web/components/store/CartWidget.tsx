@@ -244,6 +244,19 @@ export function CartWidget({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [businessId, JSON.stringify(items), applied, giftCardApplied, requestedPoints, form.city]);
 
+  // city suggestions (delivery-zone cities + main Pakistani cities) so the delivery fee matches
+  const [cities, setCities] = useState<string[]>([]);
+  useEffect(() => {
+    let alive = true;
+    fetch(`/api/store/${businessId}/cities`)
+      .then((r) => r.json())
+      .then((d: { cities?: string[] }) => alive && setCities(d.cities ?? []))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [businessId]);
+
   // "started checkout" — once, when the shopper opens the cart with items
   const tracked = useRef(false);
   useEffect(() => {
@@ -438,7 +451,7 @@ export function CartWidget({
         </div>
       )}
       <div className="odw-row">
-        <span>Delivery</span>
+        <span>Delivery{quote?.shippingZoneName ? ` (${quote.shippingZoneName})` : ""}</span>
         <span>{quote ? (quote.freeShipping || quote.shipping === 0 ? "Free" : money(quote.shipping, currency)) : "—"}</span>
       </div>
       {quote && quote.tax > 0 && (
@@ -699,7 +712,12 @@ export function CartWidget({
               <div className="odw-grid2">
                 <label className="odw-field">
                   <span className="odw-label">City</span>
-                  <input className="odw-input" required value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} autoComplete="address-level2" />
+                  <input className="odw-input" required list="odw-cities" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} autoComplete="address-level2" />
+                  <datalist id="odw-cities">
+                    {cities.map((c) => (
+                      <option key={c} value={c} />
+                    ))}
+                  </datalist>
                 </label>
                 <label className="odw-field">
                   <span className="odw-label">

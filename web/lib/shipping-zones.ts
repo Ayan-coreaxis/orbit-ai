@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { canonicalCity } from "@/lib/pk-cities";
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -12,7 +13,7 @@ export interface ShippingZoneSummary {
 }
 
 function normalizeCity(c: string): string {
-  return c.trim().toLowerCase();
+  return canonicalCity(c);
 }
 
 async function loadZones(businessId: string): Promise<ShippingZoneSummary[]> {
@@ -47,7 +48,7 @@ export interface ShippingRate {
 }
 
 /** The first configured zone (lowest `priority` first) whose city list contains this real shipping
- *  city (case-insensitive, exact match) — or null if none matches (or no zones exist). */
+ *  city (canonical form: case, a "City" suffix and common short names like LHR / Pindi don't matter) — or null if none matches (or no zones exist). */
 export async function matchShippingZone(businessId: string, city: string | null | undefined): Promise<ShippingZoneSummary | null> {
   const c = normalizeCity(city || "");
   if (!c) return null;

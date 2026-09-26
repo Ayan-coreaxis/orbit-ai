@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { listShippingZones } from "@/lib/shipping-zones";
 import { money } from "@/lib/money";
 import { STORE_CURRENCIES } from "@/lib/currencies";
 import { productsContext, sanitizeStoredProductChanges, type ProductChange } from "@/lib/product-ops";
@@ -88,11 +89,12 @@ export async function storeSettingsContext(businessId: string): Promise<string> 
   const b = await current(businessId);
   if (!b) return "";
   const cur = b.storeCurrency || "usd";
+  const zones = await listShippingZones(businessId);
   return `
 STORE SETTINGS (you CAN propose changes to these with store_changes; the owner presses Apply)
 - Currency: ${cur.toUpperCase()} (options: ${CURRENCY_CODES.map((c) => c.toUpperCase()).join(", ")}). Changing it only changes the currency label — product price numbers stay the same, so after switching the owner must make sure prices are entered in the new currency.${b.paymentProvider !== "cod" ? " The store takes Stripe card payments, so the currency must match what their Stripe account settles in — warn them." : ""}
-- Delivery fee: ${money(b.shippingFee, cur)}${b.freeShippingOver != null ? `, free over ${money(b.freeShippingOver, cur)}` : ", never free"}
-- Tax: ${b.taxRatePercent != null ? `${b.taxRatePercent}%` : "not charged"}
+- Delivery fee: ${money(b.shippingFee, cur)}${b.freeShippingOver != null ? `, free over ${money(b.freeShippingOver, cur)}` : ", never free"}${zones.length ? " (used for cities not in a zone below)" : ""}
+${zones.length ? `- City delivery zones (the owner edits these in Settings > Shipping zones — you can't change them, point them there): ${zones.map((z) => `${z.name} [${z.cities.slice(0, 12).join(", ")}${z.cities.length > 12 ? "…" : ""}] ${money(z.fee, cur)}${z.freeOver != null ? `, free over ${money(z.freeOver, cur)}` : ""}`).join(" | ")}\n` : ""}- Tax: ${b.taxRatePercent != null ? `${b.taxRatePercent}%` : "not charged"}
 ${await productsContext(businessId, cur)}`;
 }
 
