@@ -105,7 +105,7 @@ export function AccountDashboard({
   if (me === null) {
     return (
       <div>
-        <p style={{ color: "var(--od-muted)", marginTop: 0 }}>Sign in to see your orders, track deliveries and manage addresses.</p>
+        <p style={{ color: "var(--od-muted)", marginTop: 0, marginBottom: 20 }}>Sign in to see your orders, track deliveries and manage addresses.</p>
         <AuthWidget businessId={businessId} authMode={authMode} onDone={loadMe} widgetCopy={widgetCopy} widgetMotion={widgetMotion} />
       </div>
     );

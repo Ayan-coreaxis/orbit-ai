@@ -146,6 +146,21 @@ export default async function OrderConfirmationPage({
               <span>−{money(order.discountAmount, business?.storeCurrency)}</span>
             </div>
           )}
+          {(
+            [
+              ["Points", -order.loyaltyDiscount],
+              ["Gift card", -order.giftCardDiscount],
+              ["Delivery", order.shippingFee],
+              ["Tax", order.taxAmount],
+            ] as const
+          )
+            .filter(([, v]) => v !== 0)
+            .map(([label, v]) => (
+              <div key={label} style={{ display: "flex", justifyContent: "space-between", marginTop: 10, fontSize: 14, color: v < 0 ? "var(--od-accent)" : "var(--od-muted)" }}>
+                <span>{label}</span>
+                <span>{v < 0 ? "−" : ""}{money(Math.abs(v), business?.storeCurrency)}</span>
+              </div>
+            ))}
           <div style={{ display: "flex", justifyContent: "space-between", marginTop: 14, paddingTop: 14, borderTop: "1px solid var(--od-border)", fontWeight: 700 }}>
             <span>Total ({order.paymentProvider === "stripe" ? "paid by card" : "cash on delivery"})</span>
             <span>{money(order.total, business?.storeCurrency)}</span>

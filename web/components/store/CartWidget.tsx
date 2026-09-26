@@ -527,11 +527,12 @@ export function CartWidget({
               <div style={{ display: "flex", gap: 8 }}>
                 <input
                   className="odw-input"
+                  style={{ flex: 1, minWidth: 0 }}
                   value={couponInput}
                   onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
                   placeholder="Enter code"
                 />
-                <button type="button" className="odw-btn odw-btn-ghost" style={{ padding: "0 16px" }} onClick={applyCoupon}>
+                <button type="button" className="odw-btn odw-btn-ghost" style={{ padding: "0 16px", width: "auto", flexShrink: 0, whiteSpace: "nowrap" }} onClick={applyCoupon}>
                   {copyText("cart.apply", widgetCopy)}
                 </button>
               </div>
@@ -543,11 +544,12 @@ export function CartWidget({
               <div style={{ display: "flex", gap: 8 }}>
                 <input
                   className="odw-input"
+                  style={{ flex: 1, minWidth: 0 }}
                   value={giftCardInput}
                   onChange={(e) => setGiftCardInput(e.target.value.toUpperCase())}
                   placeholder="Enter gift card code"
                 />
-                <button type="button" className="odw-btn odw-btn-ghost" style={{ padding: "0 16px" }} onClick={applyGiftCard}>
+                <button type="button" className="odw-btn odw-btn-ghost" style={{ padding: "0 16px", width: "auto", flexShrink: 0, whiteSpace: "nowrap" }} onClick={applyGiftCard}>
                   {copyText("cart.apply", widgetCopy)}
                 </button>
               </div>
@@ -571,7 +573,7 @@ export function CartWidget({
                     <button
                       type="button"
                       className="odw-btn odw-btn-ghost"
-                      style={{ padding: "0 16px" }}
+                      style={{ padding: "0 16px", width: "auto", flexShrink: 0, whiteSpace: "nowrap" }}
                       onClick={() => {
                         setUseLoyalty(false);
                         setLoyaltyPointsInput("");
@@ -614,6 +616,15 @@ export function CartWidget({
           <button type="button" className="odw-link" style={{ justifySelf: "start" }} onClick={() => setStep("bag")}>
             ← Back to bag
           </button>
+          {/* Guest checkout first — most COD shoppers just want to order. */}
+          <button type="button" className="odw-btn" onClick={() => setStep("checkout")}>
+            {copyText("cart.guestCheckout", widgetCopy)} →
+          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, color: "var(--od-muted)", fontSize: 12.5 }}>
+            <span style={{ flex: 1, height: 1, background: "var(--od-border)" }} />
+            {copyText("cart.orAccount", widgetCopy)}
+            <span style={{ flex: 1, height: 1, background: "var(--od-border)" }} />
+          </div>
           <div className="odw-card" style={{ display: "grid", gap: 12 }}>
             <h2 className="odw-h">{copyText("cart.createAccountToContinue", widgetCopy)}</h2>
             <p className="odw-sub" style={{ margin: 0 }}>Proceeding with your checkout — an account lets you:</p>
@@ -642,9 +653,6 @@ export function CartWidget({
             }}
           />
 
-          <button type="button" className="odw-link" style={{ justifySelf: "center" }} onClick={() => setStep("checkout")}>
-            {copyText("cart.skipGuest", widgetCopy)}
-          </button>
         </div>
       )}
 

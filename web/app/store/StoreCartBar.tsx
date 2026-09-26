@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { usePathname } from "next/navigation";
 import { lineKey, setQty, useCart } from "./cart-store";
 import { money } from "@/lib/money";
 
@@ -36,8 +37,11 @@ export function StoreCartBar({
   const total = lines.reduce((s, l) => s + l.qty * l.price, 0);
   const [openWanted, setOpen] = useState(false);
   const open = openWanted && count > 0; // an emptied cart closes itself
+  const pathname = usePathname() ?? "";
 
-  if (count === 0) return null;
+  // Nothing to show with an empty cart — and never on the cart / checkout page itself, where the
+  // pill would sit on top of the checkout button.
+  if (count === 0 || /\/cart\/?$/.test(pathname)) return null;
 
   return (
     <>
@@ -60,6 +64,8 @@ export function StoreCartBar({
           display: "flex",
           gap: "12px",
           alignItems: "center",
+          whiteSpace: "nowrap",
+          maxWidth: "calc(100vw - 32px)",
           zIndex: 60,
           fontFamily: "system-ui, sans-serif",
         }}

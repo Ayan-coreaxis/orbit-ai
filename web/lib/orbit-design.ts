@@ -261,7 +261,8 @@ const FUNCTIONAL_MARKERS: Record<string, string> = {
 
 export function defaultContent(): DesignContent {
   return {
-    announcement: { enabled: true, text: "Free delivery on orders over Rs 5,000" },
+    // Off by default: a promise like "free delivery over X" must come from the seller's real settings, never a template.
+    announcement: { enabled: false, text: "" },
     logoUrl: "",
     contactEmail: "",
     contactPhone: "",
@@ -421,10 +422,13 @@ function normalizeContent(raw: Partial<DesignContent> | undefined): DesignConten
   const c: Partial<DesignContent> = raw ?? {};
   const s: Partial<DesignContent["socials"]> = c.socials ?? {};
   return {
-    announcement: {
-      enabled: c.announcement?.enabled !== false,
-      text: String(c.announcement?.text ?? defaultContent().announcement.text).slice(0, 200),
-    },
+    announcement: (() => {
+      const text = String(c.announcement?.text ?? defaultContent().announcement.text).slice(0, 200);
+      // The old default ("Free delivery on orders over Rs 5,000") was never a real store rule —
+      // a store that never edited it would promise shoppers something the checkout doesn't do.
+      const legacyDefault = /^free delivery on orders over rs 5,000$/i.test(text.trim());
+      return { enabled: c.announcement?.enabled !== false && !!text.trim() && !legacyDefault, text: legacyDefault ? "" : text };
+    })(),
     logoUrl: String(c.logoUrl ?? "").slice(0, 500),
     contactEmail: String(c.contactEmail ?? "").slice(0, 160),
     contactPhone: String(c.contactPhone ?? "").slice(0, 60),

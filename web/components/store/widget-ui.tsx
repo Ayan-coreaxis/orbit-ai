@@ -72,6 +72,8 @@ export const WIDGET_CSS = `
 textarea.odw-input{min-height:64px;resize:vertical;line-height:1.5}
 select.odw-input{background-image:linear-gradient(45deg,transparent 50%,var(--od-muted) 50%),linear-gradient(135deg,var(--od-muted) 50%,transparent 50%);background-position:calc(100% - 18px) center,calc(100% - 13px) center;background-size:5px 5px,5px 5px;background-repeat:no-repeat;padding-right:36px}
 .odw-btn{width:100%;display:inline-flex;align-items:center;justify-content:center;gap:8px;background:var(--od-accent);color:var(--od-accent-text);border:none;border-radius:var(--od-radius);padding:13px 18px;font:inherit;font-weight:600;font-size:14.5px;cursor:pointer;transition:filter .15s,transform .04s}
+a.odw-btn,#od-store a.odw-btn{color:var(--od-accent-text);text-decoration:none}
+#od-store a.odw-btn-ghost{color:var(--od-text)}
 .odw-btn:hover{filter:brightness(1.07)}
 .odw-btn:active{transform:translateY(1px)}
 .odw-btn:disabled{opacity:.5;cursor:default;filter:none}
