@@ -1,5 +1,5 @@
-import Link from "next/link";
-import { Compass } from "lucide-react";
+import { SiteHeader } from "@/components/marketing/SiteHeader";
+import { SiteFooter } from "@/components/marketing/SiteFooter";
 
 export const LEGAL_UPDATED = "26 September 2026";
 
@@ -23,19 +23,9 @@ export function ContactLine() {
 /** Shared shell for /privacy and /terms — same look as the landing page. */
 export function LegalPage({ title, intro, sections }: { title: string; intro: React.ReactNode; sections: { id: string; title: string; body: React.ReactNode }[] }) {
   return (
-    <div className="min-h-dvh bg-zinc-950 text-zinc-300">
-      <header className="border-b border-zinc-900">
-        <div className="mx-auto flex max-w-3xl items-center justify-between px-6 py-5">
-          <Link href="/" className="flex items-center gap-2 text-[15px] font-semibold text-zinc-100">
-            <Compass className="h-5 w-5" /> orbit.ai
-          </Link>
-          <nav className="flex gap-5 text-[13px] text-zinc-500">
-            <Link href="/privacy" className="hover:text-zinc-200">Privacy</Link>
-            <Link href="/terms" className="hover:text-zinc-200">Terms</Link>
-          </nav>
-        </div>
-      </header>
-      <main className="mx-auto max-w-3xl px-6 py-12">
+    <div className="min-h-dvh bg-[#09090b] text-zinc-300">
+      <SiteHeader />
+      <main className="orbit-fade-up mx-auto max-w-3xl px-5 py-12 sm:px-8">
         <h1 className="text-3xl font-semibold tracking-tight text-zinc-50">{title}</h1>
         <p className="mt-2 text-[13px] text-zinc-500">Last updated {LEGAL_UPDATED}</p>
         <div className="mt-6 text-[15px] leading-relaxed">{intro}</div>
@@ -60,12 +50,7 @@ export function LegalPage({ title, intro, sections }: { title: string; intro: Re
           </section>
         ))}
       </main>
-      <footer className="border-t border-zinc-900">
-        <div className="mx-auto flex max-w-3xl justify-between px-6 py-8 text-[13px] text-zinc-600">
-          <span>© {new Date().getFullYear()} orbit.ai</span>
-          <Link href="/" className="hover:text-zinc-300">Home</Link>
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
   );
 }

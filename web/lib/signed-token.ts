@@ -39,5 +39,15 @@ export function verifyToken(purpose: string, token: string | undefined | null): 
   }
 }
 
+/** Read the subject WITHOUT trusting it — only to look up what the purpose must be, then verifyToken. */
+export function peekSubject(token: string | undefined | null): string | null {
+  try {
+    const parts = Buffer.from(token ?? "", "base64url").toString("utf-8").split(".");
+    return parts.length === 4 ? parts[1] || null : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Cookies are https-only in production. */
 export const secureCookie = () => process.env.NODE_ENV === "production";

@@ -11,24 +11,32 @@ export interface Agent {
 
 export const faqs = [
   {
-    q: "Is orbit.ai built on Shopify or another platform?",
-    a: "No. Orbit is its own store builder — you're not renting space on someone else's platform. Your store, checkout, and data are yours.",
+    q: "Is Orbit built on Shopify?",
+    a: "No. Orbit is its own store platform — your store, checkout, customers and data live in Orbit. You can bring your products over from your existing website during setup.",
   },
   {
-    q: "Do I need to already have a store to use orbit.ai?",
-    a: "No. You can launch a brand-new store with orbit.ai, or connect an existing one during onboarding — the AI team works either way.",
+    q: "Do I need a store or website already?",
+    a: "No. Tell Orbit what you sell and it builds the store with you. If you already have a website, Orbit reads it and imports your products.",
   },
   {
-    q: "How is this different from using separate tools for SEO, ads, content, etc.?",
-    a: "Those tools don't talk to each other. Orbit's Strategy Orchestrator coordinates every specialist agent around one growth plan, so your SEO, content, and ads all point at the same goal instead of working in isolation.",
+    q: "Does it work for cash on delivery?",
+    a: "Yes — Orbit is built COD-first: customers can confirm their order on WhatsApp, suspicious orders are flagged, and you can book PostEx, Leopards or TCS right from the order.",
   },
   {
-    q: "Is the competitor data real?",
-    a: "Yes — orbit.ai actually visits competitor sites, social pages, and public ad libraries. If it can't verify something, it says so instead of making it up.",
+    q: "Will the AI change my store or spend money without asking?",
+    a: "Never. Every change the Orchestrator suggests — prices, products, store design, posts, ads — waits for you to press Apply. Ads are always created paused; spending only starts when you press Activate.",
   },
   {
-    q: "What if I'm just starting out with no data yet?",
-    a: "That's fine. The Competitor Intelligence agent builds your first plan from your competitors and niche, even before you have any sales history.",
+    q: "What does the AI actually do day to day?",
+    a: "It plans your growth with you, builds and edits your store, makes product photos and reels (Growth and Scale), posts to Facebook and Instagram, builds Meta ads, answers customers on WhatsApp, Messenger and Instagram, and follows up on carts, reviews and deliveries.",
+  },
+  {
+    q: "What happens when I hit my plan's limit?",
+    a: "The AI pauses until the limit resets — your store keeps selling normally. You can move to a bigger plan any time from Settings.",
+  },
+  {
+    q: "Can I use my own domain?",
+    a: "Yes. Add your domain in Settings, copy the two DNS records we show you, and your store goes live on it with https.",
   },
 ];
 
@@ -36,41 +44,58 @@ export const pricingTiers = [
   {
     name: "Starter",
     price: 50,
-    desc: "Every agent, full growth plan and execution — the AI won't auto-build or auto-run paid ads and other spend-facing deliverables for you.",
+    desc: "Everything to run and grow your store with your AI Orchestrator.",
     featured: false,
     features: [
-      "Every agent included",
-      "Full growth plan from the Strategy Orchestrator",
-      "Real competitor intelligence",
-      "SEO, content, and retention agents run for you",
-      "Ads Agent gives recommendations — you approve and run them yourself",
-      "Usage-limited, like a standard AI usage plan",
+      "AI store builder + your own domain",
+      "Orchestrator chat & growth plan",
+      "WhatsApp, Messenger & Instagram replies",
+      "Facebook & Instagram posting, Meta ads",
+      "COD confirmation, couriers, delivery zones",
+      "Standard AI allowance",
     ],
   },
   {
     name: "Growth",
     price: 75,
-    desc: "Everything in Starter, plus the AI can build and execute ads and other deliverables for you directly.",
+    desc: "Adds Orbit Studio — AI product photos and reels made from your real products.",
     featured: true,
     features: [
       "Everything in Starter",
-      "AI builds and runs ad campaigns for you",
-      "AI builds and sends content/deliverables directly, not just drafts",
-      "Higher usage limit",
-      "Priority support",
+      "Orbit Studio: 50 images + 5 reels a month",
+      "UGC, try-on, ad creatives and more",
+      "Higher AI allowance",
+      "More web research per month",
     ],
   },
   {
     name: "Scale",
     price: 150,
-    desc: "Highest usage limit, for stores running heavy volume across every channel.",
+    desc: "For stores running heavy volume — more content, more AI, extra specialist agents.",
     featured: false,
     features: [
       "Everything in Growth",
-      "Highest usage limit",
-      "Priority support",
+      "Orbit Studio: 100 images + 12 reels a month",
+      "Orchestrator can hire extra specialist agents",
+      "Highest AI allowance",
+      "Most web research per month",
     ],
   },
+];
+
+/** Feature table on /pricing — only what the code actually does. */
+export const planMatrix: { label: string; values: [string, string, string] }[] = [
+  { label: "AI store builder (Orbit Design) + custom domain", values: ["✓", "✓", "✓"] },
+  { label: "Orchestrator chat & growth plan", values: ["✓", "✓", "✓"] },
+  { label: "WhatsApp chatbot, order updates & COD confirmation", values: ["✓", "✓", "✓"] },
+  { label: "Messenger & Instagram DM replies", values: ["✓", "✓", "✓"] },
+  { label: "Facebook & Instagram posting, Meta ads (you activate)", values: ["✓", "✓", "✓"] },
+  { label: "PostEx / Leopards / TCS booking & tracking", values: ["✓", "✓", "✓"] },
+  { label: "Meta Pixel + Conversions API", values: ["✓", "✓", "✓"] },
+  { label: "Orbit Studio images / reels per month", values: ["—", "50 / 5", "100 / 12"] },
+  { label: "Extra specialist agents hired by the Orchestrator", values: ["—", "—", "✓"] },
+  { label: "AI allowance", values: ["Standard", "Higher", "Highest"] },
+  { label: "Web research per month", values: ["300", "600", "1,500"] },
 ];
 
 export const agents: Agent[] = [

@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
   });
   const restoredBusinessId = business?.id ?? (await getMemberBusinessIds(user.id))[0];
 
-  const response = NextResponse.json({ id: user.id, email: user.email });
+  const response = NextResponse.json({ id: user.id, email: user.email, hasBusiness: !!restoredBusinessId });
   if (restoredBusinessId) {
     response.cookies.set("businessId", restoredBusinessId, { httpOnly: true, secure: secureCookie(), sameSite: "lax", path: "/" });
   }
