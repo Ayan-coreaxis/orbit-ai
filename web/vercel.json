@@ -1,10 +1,6 @@
 {
   "crons": [
     {
-      "path": "/api/cron/weekly-scan",
-      "schedule": "0 6 * * 1"
-    },
-    {
       "path": "/api/cron/abandoned-cart-recovery",
       "schedule": "0 * * * *"
     },

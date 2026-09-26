@@ -2,39 +2,25 @@ import { prisma } from "@/lib/prisma";
 import { getOrderGrowth } from "@/lib/get-order-growth";
 import { businessModelGuidanceLine } from "@/lib/business-model";
 import { sellerAnswersBlock } from "@/lib/onboarding-questions";
+import { latestCompetitors } from "@/lib/competitor-intel";
+import { money } from "@/lib/money";
 
 /**
  * Builds the real, checkable context the Orchestrator chat is grounded in — same
- * "never fabricate a number" rule as the weekly intelligence cycle. Kept compact
+ * "never fabricate a number" rule as everything else. Kept compact
  * on purpose: this is sent on every chat turn, not once per week.
  */
 export async function buildOrchestratorContext(businessId: string): Promise<string> {
   const business = await prisma.business.findUnique({
     where: { id: businessId },
     include: {
-      reports: { orderBy: { createdAt: "desc" }, take: 1 },
       products: true,
       orders: true,
     },
   });
   if (!business) return "No business data available.";
 
-  let plan: {
-    focusProduct?: string;
-    theme?: string;
-    reviewNote?: string;
-    targets?: { label: string; value: string; progress: number }[];
-    tasks?: { agent: string; task: string; done: boolean }[];
-    qaNote?: string;
-    competitors?: { name: string; gap: string }[];
-  } = {};
-  if (business.reports[0]) {
-    try {
-      plan = JSON.parse(business.reports[0].content);
-    } catch {
-      plan = {};
-    }
-  }
+  const { competitors } = await latestCompetitors(businessId);
 
   const lowStock = business.products.filter((p) => p.stock <= 5);
   const revenue = business.orders
@@ -48,18 +34,8 @@ export async function buildOrchestratorContext(businessId: string): Promise<stri
     businessModelGuidance ? `\nHow this seller actually operates (shapes HOW you advise, not the goal itself): ${businessModelGuidance}` : ""
   }${sellerAnswersBlock(business.onboardingAnswers)}
 
-CURRENT PLAN (this cycle's real focus, set by you last cycle):
-Focus: ${plan.focusProduct ?? "no plan generated yet"}
-Reasoning: ${plan.theme ?? "n/a"}
-Your own last review note: ${plan.reviewNote ?? "n/a"}
-Tasks assigned to specialists: ${
-    plan.tasks?.length
-      ? plan.tasks.map((t) => `[${t.agent}] ${t.task} (${t.done ? "done" : "not done"})`).join(" | ")
-      : "none yet"
-  }
-Manager/QA note: ${plan.qaNote ?? "n/a"}
-Competitor gaps on file: ${
-    plan.competitors?.length ? plan.competitors.map((c) => `${c.name}: ${c.gap}`).join(" | ") : "none scanned yet"
+Competitor notes on file (reference only — never the base of a plan): ${
+    competitors.length ? competitors.map((c) => `${c.name}: ${c.gap}`).join(" | ") : "none scanned yet"
   }
 
 REAL BUSINESS DATA (actually in the database right now — never contradict this with a made-up figure):
@@ -72,7 +48,7 @@ REAL BUSINESS DATA (actually in the database right now — never contradict this
       : ""
   }
 - Orders: ${business.orders.length} total, ${pendingOrders} still pending fulfillment.
-- Real revenue from actual orders placed: Rs ${revenue.toLocaleString()} (this is the only real revenue figure — no other sales data exists in this system).
+- Real revenue from actual orders placed: ${money(revenue, business.storeCurrency)} (this is the only real revenue figure — no other sales data exists in this system).
 - Real order growth, week over week: ${orderGrowth.thisWeekOrders} order(s) in the last 7 days vs ${orderGrowth.lastWeekOrders} the week before${
     orderGrowth.orderGrowthPct !== null
       ? ` (${orderGrowth.orderGrowthPct >= 0 ? "+" : ""}${orderGrowth.orderGrowthPct.toFixed(0)}%)`

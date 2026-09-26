@@ -121,7 +121,7 @@ export async function getStoreKpis(businessId: string): Promise<StoreKpis> {
       select: { total: true, createdAt: true },
     }),
     prisma.$queryRaw<{ type: string; c: bigint }[]>`
-      SELECT type, COUNT(DISTINCT sessionId) AS c
+      SELECT "type", COUNT(DISTINCT "sessionId") AS c
       FROM "StoreEvent"
       WHERE "businessId" = ${businessId} AND "createdAt" >= ${since30}
       GROUP BY type`,

@@ -194,11 +194,10 @@ export default function Onboarding() {
     setGenerating(true);
     setError(null);
     const messages = [
-      "Reading about your business…",
+      "Setting up your business…",
       "Importing your products from your website…",
-      "Visiting your competitors' sites…",
-      "Comparing pricing and what's trending…",
-      "Putting together your growth plan…",
+      "Getting your AI team ready…",
+      "Almost there…",
     ];
     let i = 0;
     const interval = setInterval(() => {
@@ -224,7 +223,7 @@ export default function Onboarding() {
       clearInterval(interval);
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || "Something went wrong generating your report.");
+        throw new Error(data.error || "Something went wrong setting up your business.");
       }
       setProgressText("Done — taking you to your dashboard…");
       router.push("/dashboard");
@@ -510,7 +509,7 @@ export default function Onboarding() {
                   <p className="mt-1.5 text-[14.5px] text-zinc-400">
                     {competitors.some(Boolean)
                       ? "AI found these from a real search — remove any that aren't right, or add more."
-                      : "Add 3 to 10 links. We'll study them and build your first growth report."}
+                      : "Add a few links. Your AI team keeps notes on them as reference — your plan is built from your own business, not copied from theirs."}
                   </p>
                   <div className="mt-6 space-y-2.5">
                     {competitors.map((c, i) => (
@@ -587,7 +586,7 @@ export default function Onboarding() {
                   disabled={(step === 0 && !canContinueStep0) || (step === 1 && !businessModel) || (step === 2 && loadingQuestions)}
                   className="group inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-violet-500 via-fuchsia-500 to-orange-500 px-5 py-2.5 text-[14.5px] font-semibold text-white shadow-[0_0_20px_rgba(217,70,239,0.22)] transition-transform hover:scale-[1.02] disabled:opacity-40 disabled:hover:scale-100"
                 >
-                  {step === LAST_INPUT_STEP ? "Generate my growth report" : step === 2 && !Object.values(answers).some((a) => a.trim()) ? "Skip for now" : "Continue"}
+                  {step === LAST_INPUT_STEP ? "Finish setup" : step === 2 && !Object.values(answers).some((a) => a.trim()) ? "Skip for now" : "Continue"}
                   <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
                 </button>
               </div>

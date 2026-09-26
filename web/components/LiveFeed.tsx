@@ -38,7 +38,7 @@ export function LiveFeed({ items }: { items: RealFeedItem[] }) {
       <div ref={listRef} className="mt-4 space-y-0.5">
         {items.length === 0 && (
           <p className="px-2.5 py-2.5 text-[13px] leading-snug text-text-faint">
-            No agent calls yet — this fills in once your weekly cycle runs.
+            No agent calls yet — this fills in once your AI team starts working.
           </p>
         )}
         {items.map((item) => (

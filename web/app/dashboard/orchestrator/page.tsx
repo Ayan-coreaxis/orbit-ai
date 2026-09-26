@@ -4,7 +4,7 @@ import { Topbar } from "@/components/Topbar";
 import { executeActivePlan } from "@/lib/harness";
 import { reviewDueStrategies } from "@/lib/strategy-review";
 import { OrchestratorWorkspace } from "@/components/orchestrator/OrchestratorWorkspace";
-import { getRealPlan } from "@/lib/get-business";
+import { getBusinessSummary } from "@/lib/get-business";
 import { prisma } from "@/lib/prisma";
 import { loadStrategyLab } from "@/lib/strategy-lab";
 import { parseSummary } from "@/lib/strategy-chat";
@@ -17,14 +17,14 @@ function msSince(d: Date | string): number {
 }
 
 export default async function OrchestratorPage() {
-  const real = await getRealPlan();
+  const real = await getBusinessSummary();
 
   if (!real) {
     return (
       <div>
         <Topbar title="Talk to your Orchestrator" subtitle="No business yet" />
         <div className="mx-10 mt-6 rounded-xl border border-border bg-panel-2 px-4 py-3.5 text-[13.5px] text-text-dim">
-          Complete onboarding first — the Orchestrator needs a real business and a first plan to talk about.
+          Complete onboarding first — the Orchestrator needs your business to talk about.
         </div>
       </div>
     );
@@ -58,9 +58,6 @@ export default async function OrchestratorPage() {
       <Topbar title="Talk to your Orchestrator" subtitle={`${real.businessName} — plan, discuss and decide together, on your real data`} />
       <div className="min-h-0 flex-1 px-6 py-5 lg:px-8">
         <OrchestratorWorkspace
-          reportId={real.reportId}
-          wantsToDiscuss={real.wantsToDiscuss}
-          discussReason={real.discussReason}
           active={lab.active}
           canHire={lab.canHire}
           draft={lab.draft}

@@ -17,7 +17,7 @@ export default async function AgentsPage() {
         <Card className="overflow-hidden">
           {rows.length === 0 ? (
             <p className="p-6 text-[13.5px] text-text-faint">
-              No agent calls logged yet — this fills in as real businesses run a weekly cycle or use the
+              No agent calls logged yet — this fills in as real businesses use their growth plan or the
               Orchestrator chat.
             </p>
           ) : (

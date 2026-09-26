@@ -50,7 +50,7 @@ export default function SignupPage() {
 
         <form onSubmit={submit} className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-8">
           <h1 className="text-xl font-semibold text-white">Create your account</h1>
-          <p className="mt-1.5 text-[14px] text-zinc-400">Real account, real weekly plan for your real business.</p>
+          <p className="mt-1.5 text-[14px] text-zinc-400">Real account, real growth plan for your real business.</p>
 
           <div className="mt-6 space-y-3.5">
             <label className="block">

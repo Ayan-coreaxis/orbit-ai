@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/Sidebar";
-import { getRealPlan } from "@/lib/get-business";
+import { getBusinessSummary } from "@/lib/get-business";
 import { getCurrentUser } from "@/lib/auth";
 
 export default async function DashboardLayout({
@@ -11,8 +11,8 @@ export default async function DashboardLayout({
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
-  const real = await getRealPlan();
-  const talkBadge = !!real && real.wantsToDiscuss && real.lastSeenReportId !== real.reportId;
+  const real = await getBusinessSummary();
+  const talkBadge = !!real?.planWaiting; // a drafted growth plan is waiting to be discussed
 
   return (
     <div className="flex h-screen bg-bg">

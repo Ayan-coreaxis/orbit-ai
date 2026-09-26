@@ -41,7 +41,7 @@ npm run db:copy-sqlite prisma/dev.db
 
 | Area | Where |
 |---|---|
-| Onboarding (website scan → model → **AI-written questions** → socials/WhatsApp/currency, competitors, first plan) | `app/onboarding/page.tsx`, `app/api/onboarding/{route,discover,questions}`, `lib/onboarding-questions.ts` (answers → `Business.onboardingAnswers`, read by Orchestrator / weekly plan / Strategy Lab), `lib/scrape.ts`, `lib/social-finder.ts` |
+| Onboarding (website scan → model → **AI-written questions** → socials/WhatsApp/currency, competitors; after it: competitor notes + first growth-plan draft in the background) | `app/onboarding/page.tsx`, `app/api/onboarding/{route,discover,questions}`, `lib/onboarding-questions.ts` (answers → `Business.onboardingAnswers`, read by Orchestrator / weekly plan / Strategy Lab), `lib/scrape.ts`, `lib/social-finder.ts` |
 | **Orchestrator chat** (the main surface) | `app/dashboard/orchestrator`, `components/orchestrator/*`, `app/api/orchestrator/{chat,proposal,messages}` |
 | Growth plan (plan-as-data, measurement, harness, hired agents, reviews) | `lib/strategy-lab.ts`, `strategy-planner.ts`, `strategy-chat.ts`, `harness.ts`, `plan-agents.ts`, `strategy-review.ts`, `components/strategy/*` |
 | Specialist "meeting" in chat | `lib/specialist-consult.ts` |
@@ -84,7 +84,9 @@ npm run db:copy-sqlite prisma/dev.db
 
 - **Growth planning:** competitors are reference knowledge only, never the base. Plans = many creative, testable strategies (no fixed length); measured in code (never AI-invented numbers); discussed with the seller before running; mid-plan changes go back to the seller; say during planning what Orbit can't execute.
 - **Agents as data:** the Orchestrator can hire/retire agents per plan, least-privilege tools/data, budget from the seller's own usage cap — **Scale plan only**.
-- **Jev (TypeSafe) decision layer:** planned for routing/classification only (Claude keeps generation), shadow mode first — **ON HOLD** (Jev is down).
+- **Jev (TypeSafe) decision layer:** **ON HOLD** by the owner (2026-09-26). To be discussed later together with whether Orbit needs RAG or KAG — don't build either until then.
+- **Scope (owner, 2026-09-26):** e-commerce only. Build it fully, run it, fix it — only then anything else. **No Voice/Calling agent for now.** No multi-vertical work.
+- **Old weekly competitor plan is retired (owner, 2026-09-26).** Only the new growth plan (Strategy Lab, discussed in the Orchestrator chat) runs. Competitors are reference notes only: `lib/competitor-intel.ts` (`scanCompetitors` at onboarding + Refresh on the Competitors page, `latestCompetitors`). Removed: `lib/run-intelligence.ts` (weekly focus, specialist tasks, QA, weekly WhatsApp), `/api/cron/weekly-scan`, `/api/orchestrator/seen`, the dashboard "This week" blocks, old per-agent weekly settings (only COD auto-confirm remains). `getRealPlan` → `getBusinessSummary` (`lib/get-business.ts`).
 - **Orbit Design:** design is data (`OrbitDesignDoc`); 8 core pages pre-wired; bespoke per-store output; Orbit Code wires backend; publish re-runs wiring if stale.
 - **Web search:** Brave API ($5/1k, ~1k free/month); per-plan monthly limits (Starter 300 / Growth 600 / Scale 1500). Rejected: self-hosted SearXNG, headless-Chrome Google scraping as the main path.
 - **Storage:** Cloudflare R2 before going to a VPS; admin can migrate local files → R2 (`/admin/storage`).
@@ -105,11 +107,13 @@ npm run db:copy-sqlite prisma/dev.db
 
 **Open / next:**
 - Owner still to do: create a Postgres (Neon/Supabase) and set `DATABASE_URL`/`DIRECT_URL`, run `npx prisma migrate deploy` (and `npm run db:copy-sqlite prisma/dev.db` once for old local data); deploy Orbit on a public https domain (needed for Instagram, ads links, Twilio + Meta webhooks, custom domains), Cloudflare R2 (required on Vercel for uploads), Brave API key, Meta App Review (ads_management, pages_manage_posts, instagram_content_publish, business_management, pages_messaging, pages_manage_metadata, instagram_manage_messages) with `/privacy` as the privacy URL, Meta webhook (callback `/api/webhooks/meta`, verify token in Super Admin, subscribe Page + Instagram `messages`), Twilio keys + webhook URL + the 9 WhatsApp templates (Super Admin > WhatsApp), Stripe: price ids, webhook secret, and save the Customer portal once in Stripe settings; `LEGAL_CONTACT_EMAIL`; have a lawyer review /privacy and /terms (governing law not stated); Vercel token for custom domains, Google AI Studio + BytePlus keys for Studio.
-- Jev layer (on hold).
-- Decide whether to retire the old competitor-based weekly plan (`runCompetitorAnalysis` + "Your Weekly Plan").
+- Jev layer + RAG/KAG: on hold, discuss later.
+- Next e-commerce work: courier integration (PostEx / Leopards / TCS tracking), city-wise delivery fees / shipping zones, real email for store-customer login codes, per-plan voice quota, Inventory agent actions (e.g. pause ads when out of stock), hero carousel, deeper competitor reading (product pages).
 - Detailed task history: `TASKS.md`.
 
 ## 7. Changelog (newest first — add one entry per session/batch of work)
+
+- **2026-09-26 · cloud** — **Old weekly competitor plan retired** (owner's decision): see §5. Onboarding no longer blocks on a competitor scan; competitor notes + first plan draft run in the background. Competitors page: add / remove tracked competitors (`/api/competitors`, `components/CompetitorTracker.tsx`; the old "Track a competitor" button did nothing). Orchestrator context uses competitor notes (reference only) and the store currency (was hard-coded "Rs"; dashboard revenue too). **Postgres bug fixed:** raw SQL `COUNT(DISTINCT sessionId)` failed on Postgres (store analytics + growth-plan snapshot) → quoted `"sessionId"`.
 
 - **2026-09-26 · cloud** — **Everything left that Claude could do.** (1) **Postgres**: datasource → PostgreSQL, one baseline migration `20260926200000_init_postgres`, SQLite history in `prisma/sqlite-archive/`, `scripts/sqlite-to-postgres.mjs` (`npm run db:copy-sqlite`), case-insensitive order search. (2) Uploads served by `app/uploads/[...path]` (range support, traversal-safe); no silent file loss on serverless without R2. (3) **WhatsApp templates** for out-of-window messages (`lib/whatsapp-templates.ts`, Super Admin > WhatsApp). (4) **Pixel + Conversions API + sales-optimised ads** (migration `20260926210000_meta_pixel_capi_sales_ads`; Ads page shows sales, value, return). (5) **Messenger / Instagram DMs** → chatbot + Inbox (`lib/meta-messaging.ts`, `/api/webhooks/meta`). (6) **/privacy + /terms**, linked from landing, pricing, signup. (7) **Billing fixes**: plan change no longer creates a 2nd subscription (double charge), Stripe billing portal, ended subscriptions pause AI, webhook finds seller by customer. (8) **AI onboarding questions** (migration `20260926220000_onboarding_answers`). Tests 48 green; tsc/eslint 0; production build + `next start` checked (uploads 200/206).
 

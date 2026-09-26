@@ -1,17 +1,18 @@
 import Link from "next/link";
 import { Topbar } from "@/components/Topbar";
-import { Card, SectionLabel, StatusBadge, Pill, ProgressBar } from "@/components/ui";
+import { Card, SectionLabel, StatusBadge } from "@/components/ui";
 import { AgentNetwork, type AgentActivitySummary } from "@/components/AgentNetwork";
 import { LiveFeed, type RealFeedItem } from "@/components/LiveFeed";
 import { agents } from "@/lib/mock-data";
-import { getRealPlan } from "@/lib/get-business";
+import { getBusinessSummary } from "@/lib/get-business";
 import { getRealAgentActivity, getRecentAgentActivity } from "@/lib/get-agent-activity";
 import { getOrderGrowth } from "@/lib/get-order-growth";
 import { formatRelativeTime } from "@/lib/format-time";
 import { prisma } from "@/lib/prisma";
 import { loadStrategyLab } from "@/lib/strategy-lab";
 import { GrowthPlanOverview } from "@/components/strategy/GrowthPlanOverview";
-import { CheckCircle2, Circle, Sparkles, TrendingUp, TrendingDown, Store } from "lucide-react";
+import { Sparkles, TrendingUp, TrendingDown, Store } from "lucide-react";
+import { money } from "@/lib/money";
 
 const layers = Array.from(new Set(agents.map((a) => a.layer)));
 const ACTIVE_WINDOW_MS = 60 * 60 * 1000;
@@ -28,7 +29,7 @@ function agentLabel(agentId: string): string {
 }
 
 export default async function DashboardPage() {
-  const real = await getRealPlan();
+  const real = await getBusinessSummary();
   const now = new Date();
 
   const activityMap = real ? await getRealAgentActivity(real.businessId) : {};
@@ -89,13 +90,13 @@ export default async function DashboardPage() {
 
   return (
     <div>
-      <Topbar title="Overview" subtitle={real ? real.businessName : "No real plan yet"} />
+      <Topbar title="Overview" subtitle={real ? real.businessName : "No business yet"} />
       <div className="max-w-[1400px] space-y-10 p-10">
         {!real && (
           <div className="flex items-start gap-3 rounded-xl border border-accent/25 bg-accent-soft px-4 py-3.5">
             <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-accent-strong" />
             <p className="text-[13.5px] leading-relaxed text-accent-strong">
-              No real weekly plan yet. <a href="/onboarding" className="underline">Complete onboarding</a> to generate your real one — nothing fake is shown here in the meantime.
+              No business yet. <a href="/onboarding" className="underline">Complete onboarding</a> to set up your store and growth plan — nothing fake is shown here in the meantime.
             </p>
           </div>
         )}
@@ -145,21 +146,6 @@ export default async function DashboardPage() {
           </Card>
         )}
 
-        {real?.whatsappNotified && (
-          <div className="flex items-start gap-3 rounded-xl border border-good/25 bg-good-soft px-4 py-3.5">
-            <p className="text-[13.5px] leading-relaxed text-good">
-              ✓ This plan was sent to your WhatsApp — real message, sent by the Retention Agent via Twilio.
-            </p>
-          </div>
-        )}
-        {real?.whatsappError && (
-          <div className="flex items-start gap-3 rounded-xl border border-warn/25 bg-warn-soft px-4 py-3.5">
-            <p className="text-[13.5px] leading-relaxed text-warn">
-              WhatsApp notification wasn&apos;t sent: {real.whatsappError}
-            </p>
-          </div>
-        )}
-
         {/* Real orders + growth — the actual thing this whole platform exists to move */}
         {orderGrowth && (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -193,49 +179,12 @@ export default async function DashboardPage() {
             </Card>
             <Card className="p-6">
               <SectionLabel>Real revenue — last 7 days</SectionLabel>
-              <div className="mt-2 text-3xl font-semibold">Rs {orderGrowth.thisWeekRevenue.toLocaleString()}</div>
+              <div className="mt-2 text-3xl font-semibold">{money(orderGrowth.thisWeekRevenue, currency)}</div>
               <p className="mt-1.5 text-[12px] text-text-faint">
-                Rs {orderGrowth.lastWeekRevenue.toLocaleString()} the week before.
+                {money(orderGrowth.lastWeekRevenue, currency)} the week before.
               </p>
             </Card>
           </div>
-        )}
-
-        {/* Roadmap focus */}
-        {real && (
-          <Card className="p-7">
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <SectionLabel>This week, we&apos;re focused on</SectionLabel>
-              <Pill tone="accent">Decided by your AI</Pill>
-            </div>
-            <h2 className="mt-3 text-2xl font-semibold">{real.focusProduct}</h2>
-            <p className="mt-2 text-[14.5px] text-text-dim">{real.theme}</p>
-            {real.reviewNote && (
-              <p className="mt-2.5 text-[13px] text-text-faint">
-                <span className="font-medium text-text-dim">Orchestrator&apos;s review of last cycle:</span>{" "}
-                {real.reviewNote}
-              </p>
-            )}
-
-            {real.targets.length > 0 && (
-              <div className="mt-7 grid grid-cols-1 gap-6 sm:grid-cols-3">
-                {real.targets.map((t) => (
-                  <div key={t.label}>
-                    <div className="flex items-baseline justify-between">
-                      <span className="text-[13.5px] text-text-dim">{t.label}</span>
-                      <span className="text-[15px] font-semibold">{t.value}</span>
-                    </div>
-                    <div className="mt-2.5">
-                      <ProgressBar value={t.progress} />
-                    </div>
-                    <div className="mt-1.5 text-[12.5px] text-text-faint">
-                      {t.progress}% of this week&apos;s goal
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </Card>
         )}
 
         {/* Agent network + real activity */}
@@ -264,38 +213,6 @@ export default async function DashboardPage() {
             <LiveFeed items={feedItems} />
           </Card>
         </div>
-
-        {/* Tasks this week */}
-        {real && real.tasks.length > 0 && (
-          <Card className="p-7">
-            <SectionLabel>What&apos;s happening this week</SectionLabel>
-            <div className="mt-4 divide-y divide-border">
-              {real.tasks.map((t) => (
-                <div key={t.task} className="flex items-center gap-4 py-3.5">
-                  {t.done ? (
-                    <CheckCircle2 className="h-5 w-5 shrink-0 text-good" />
-                  ) : (
-                    <Circle className="h-5 w-5 shrink-0 text-text-faint" />
-                  )}
-                  <span className="w-44 shrink-0 text-[13px] font-medium text-text-faint">
-                    {t.agent}
-                  </span>
-                  <span className={"text-[14.5px] " + (t.done ? "text-text-dim line-through" : "text-text")}>
-                    {t.task}
-                  </span>
-                </div>
-              ))}
-            </div>
-            {real.qaNote && (
-              <div className="mt-4 flex items-start gap-2 rounded-lg bg-panel-2 px-3.5 py-2.5">
-                <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-good" />
-                <span className="text-[12.5px] text-text-dim">
-                  <b className="text-text">Manager/QA:</b> {real.qaNote}
-                </span>
-              </div>
-            )}
-          </Card>
-        )}
 
         {/* Agent grid */}
         <div>

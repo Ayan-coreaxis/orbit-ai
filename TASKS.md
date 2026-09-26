@@ -265,6 +265,10 @@ User feedback: a separate Strategy Lab page + separate plan chat was wrong — t
 
 ## 🔲 Not done yet — next up
 
+- [x] ~~Retire the old weekly competitor plan~~ — done 2026-09-26 (owner decision; growth plan only, competitors = reference notes)
+- [ ] Courier integration (PostEx / Leopards / TCS) · city-wise delivery fees · real email for store login codes · per-plan voice quota · Inventory agent actions · hero carousel · deeper competitor reading
+- On hold by owner: Jev + RAG/KAG discussion, Voice/Calling agent, multi-vertical
+
 - [ ] **Twilio credentials not yet added** — the WhatsApp send code is real and wired in, but nobody has added a Twilio Account SID / Auth Token / WhatsApp sender in Admin yet, so it's never actually fired. Get a Twilio account (they offer a free WhatsApp sandbox number for testing — no paid plan needed to try it) and add the 3 keys to test end-to-end.
 - [x] ~~**AI-dynamic onboarding questions**~~ — done 2026-09-26 (`lib/onboarding-questions.ts`; fixed fallback set when AI is unavailable)
 

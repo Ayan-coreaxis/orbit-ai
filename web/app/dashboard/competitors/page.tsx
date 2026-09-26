@@ -1,12 +1,14 @@
 import { Topbar } from "@/components/Topbar";
-import { Card, SectionLabel, Button } from "@/components/ui";
-import { getRealPlan } from "@/lib/get-business";
-import { RefreshAnalysisButton } from "@/components/RefreshAnalysisButton";
-import { ExternalLink, Plus, Sparkles, Package, Megaphone, Lightbulb } from "lucide-react";
+import { Card, SectionLabel } from "@/components/ui";
+import { prisma } from "@/lib/prisma";
+import { CompetitorTracker } from "@/components/CompetitorTracker";
+import { getBusinessSummary } from "@/lib/get-business";
+import { ExternalLink, Sparkles, Package, Megaphone, Lightbulb } from "lucide-react";
 
 export default async function CompetitorsPage() {
-  const real = await getRealPlan();
+  const real = await getBusinessSummary();
   const list = real && real.competitors.length > 0 ? real.competitors : null;
+  const tracked = real ? await prisma.competitor.findMany({ where: { businessId: real.businessId }, orderBy: { createdAt: "asc" }, select: { id: true, url: true } }) : [];
 
   return (
     <div>
@@ -19,25 +21,20 @@ export default async function CompetitorsPage() {
         }
       />
       <div className="max-w-[1200px] space-y-6 p-10">
-        {!list && (
+        {!real && (
           <div className="flex items-start gap-3 rounded-xl border border-accent/25 bg-accent-soft px-4 py-3.5">
             <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-accent-strong" />
             <p className="text-[13.5px] leading-relaxed text-accent-strong">
-              No real competitor analysis yet.{" "}
-              <a href="/onboarding" className="underline">Complete onboarding</a> to get a real
-              analysis of your competitors — nothing fake is shown here in the meantime.
+              <a href="/onboarding" className="underline">Complete onboarding</a> first — nothing fake is shown here in the meantime.
             </p>
           </div>
         )}
 
+        {real && <CompetitorTracker initial={tracked} />}
+
         <div className="flex items-center justify-between">
           <SectionLabel>What we found</SectionLabel>
-          <div className="flex items-center gap-2.5">
-            {list && <RefreshAnalysisButton />}
-            <Button variant="secondary">
-              <Plus className="h-4 w-4" /> Track a competitor
-            </Button>
-          </div>
+          {real?.competitorsScannedAt && <span className="text-[12px] text-text-faint">Last read {real.competitorsScannedAt.toLocaleDateString()}</span>}
         </div>
 
         <div className="space-y-4">
@@ -97,7 +94,7 @@ export default async function CompetitorsPage() {
             ))
           ) : (
             <Card className="p-8 text-center text-[13.5px] text-text-faint">
-              No competitors analyzed yet.
+              {tracked.length ? "Press Refresh analysis to read the competitors you track." : "Add a competitor above to get notes on what they sell and where you could win."}
             </Card>
           )}
         </div>

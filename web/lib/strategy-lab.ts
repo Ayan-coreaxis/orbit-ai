@@ -165,7 +165,7 @@ export async function getBusinessSnapshot(businessId: string): Promise<BusinessS
     prisma.product.findMany({ where: { businessId }, select: { name: true, price: true, costPrice: true, stock: true }, take: 60 }),
     prisma.coupon.findMany({ where: { businessId, active: true }, select: { code: true }, take: 20 }),
     prisma.growthReport.findFirst({ where: { businessId }, orderBy: { createdAt: "desc" }, select: { content: true } }),
-    prisma.$queryRaw<{ c: bigint }[]>`SELECT COUNT(DISTINCT sessionId) AS c FROM "StoreEvent" WHERE "businessId" = ${businessId} AND "type" = 'view_store' AND "createdAt" >= ${since30}`,
+    prisma.$queryRaw<{ c: bigint }[]>`SELECT COUNT(DISTINCT "sessionId") AS c FROM "StoreEvent" WHERE "businessId" = ${businessId} AND "type" = 'view_store' AND "createdAt" >= ${since30}`,
   ]);
 
   const earlier = orderPhones(allPhones);

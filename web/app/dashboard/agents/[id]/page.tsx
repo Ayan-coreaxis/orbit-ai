@@ -3,21 +3,12 @@ import { notFound } from "next/navigation";
 import { Topbar } from "@/components/Topbar";
 import { Card, SectionLabel, StatusBadge, Pill } from "@/components/ui";
 import { agents } from "@/lib/mock-data";
-import { getRealPlan } from "@/lib/get-business";
+import { getBusinessSummary } from "@/lib/get-business";
 import { getAgentUsage } from "@/lib/get-agent-usage";
 import { getAgentSettings, DEFAULT_AGENT_SETTINGS } from "@/lib/agent-settings";
 import { AgentSettingsForm } from "@/components/AgentSettingsForm";
-import { ArrowLeft, DollarSign, Activity, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, DollarSign, Activity } from "lucide-react";
 
-const TASK_AGENT_NAMES: Record<string, string[]> = {
-  seo: ["SEO Agent"],
-  content: ["Content Agent"],
-  ads: ["Ads Agent", "Ads & Growth"],
-  retention: ["Retention Agent"],
-  competitor: ["Competitor Intel", "Competitor Intelligence"],
-  inventory: ["Inventory & Fulfillment"],
-  pricing: ["Pricing Agent"],
-};
 
 // Which model each live agent actually runs on — cheaper Haiku for high-volume,
 // lower-stakes specialist calls; Sonnet where reasoning quality matters most.
@@ -36,7 +27,7 @@ const AGENT_MODEL: Record<string, string> = {
 
 /** Runs as real deterministic code, not an AI call — no prompt, no spend, ever. */
 const NO_AI_AGENTS = new Set(["fraud", "finance", "reviews", "personalization", "returns", "experimentation", "tax"]);
-/** Makes real AI calls, but isn't part of the weekly cycle — triggered live by real customer messages instead. */
+/** Makes real AI calls, triggered live by real customer messages. */
 const NO_CYCLE_AI_AGENTS = new Set(["chatbot"]);
 
 const NO_AI_DESCRIPTION: Record<string, React.ReactNode> = {
@@ -124,14 +115,9 @@ export default async function AgentDetailPage({
   const agent = agents.find((a) => a.id === id);
   if (!agent) notFound();
 
-  const real = await getRealPlan();
+  const real = await getBusinessSummary();
   const usage = await getAgentUsage(id);
   const settings = real ? await getAgentSettings(real.businessId) : DEFAULT_AGENT_SETTINGS;
-
-  const matchingTasks =
-    real && TASK_AGENT_NAMES[id]
-      ? real.tasks.filter((t) => TASK_AGENT_NAMES[id].includes(t.agent))
-      : [];
 
   const realStatus = !usage?.lastRunAt
     ? ("never" as const)
@@ -182,47 +168,21 @@ export default async function AgentDetailPage({
             <p className="mt-4 text-[14px] text-text-dim">{NO_AI_DESCRIPTION[id]}</p>
           ) : NO_CYCLE_AI_AGENTS.has(id) ? (
             <p className="mt-4 text-[14px] text-text-dim">
-              This agent doesn&apos;t run on a weekly cycle — it answers real customer questions on
+              This agent answers real customer questions on
               your live storefront in real time, grounded in your real product catalog. See real
               usage below; there&apos;s no single &quot;task&quot; to show.
             </p>
           ) : real ? (
-            id === "orchestrator" ? (
-              <div className="mt-4 space-y-2">
-                <div className="text-[14.5px] font-medium">{real.focusProduct}</div>
-                <p className="text-[13.5px] text-text-dim">{real.theme}</p>
-                {real.reviewNote && (
-                  <p className="mt-2 text-[13px] text-text-faint">
-                    <span className="font-medium text-text-dim">Review of last cycle:</span>{" "}
-                    {real.reviewNote}
-                  </p>
-                )}
-              </div>
-            ) : id === "qa" ? (
-              <p className="mt-4 text-[14px] text-text-dim">
-                {real.qaNote || "Reviewed this cycle's tasks — no note recorded."}
-              </p>
-            ) : matchingTasks.length > 0 ? (
-              <div className="mt-4 space-y-3">
-                {matchingTasks.map((t) => (
-                  <div key={t.task} className="flex items-start gap-2.5">
-                    <CheckCircle2
-                      className={
-                        "mt-0.5 h-4 w-4 shrink-0 " + (t.done ? "text-good" : "text-text-faint")
-                      }
-                    />
-                    <span className="text-[14px] text-text-dim">{t.task}</span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="mt-4 text-[14px] text-text-faint">
-                No task from this agent in the latest cycle yet.
-              </p>
-            )
+            <p className="mt-4 text-[14px] text-text-dim">
+              This agent works on the steps of your growth plan that need it — see what it&apos;s doing in{" "}
+              <Link href="/dashboard/orchestrator" className="underline">
+                Talk to your Orchestrator
+              </Link>
+              . Real usage is below.
+            </p>
           ) : (
             <p className="mt-4 text-[14px] text-text-faint">
-              No real cycle has run yet.{" "}
+              No business yet.{" "}
               <Link href="/onboarding" className="underline">
                 Complete onboarding
               </Link>{" "}
@@ -308,12 +268,7 @@ export default async function AgentDetailPage({
           </div>
         </Card>
 
-        {/* Settings — real, saved to this business, actually change the next cycle's prompt */}
-        {agent.live && !NO_AI_AGENTS.has(id) && !NO_CYCLE_AI_AGENTS.has(id) && real && (
-          <AgentSettingsForm agentId={id} initialSettings={settings} />
-        )}
-
-        {/* Fraud has one real setting too — COD auto-confirm — even though it's not AI and doesn't need a weekly cycle to exist */}
+        {/* The only agent setting still in use: COD auto-confirm (the old weekly-cycle settings are gone) */}
         {agent.live && id === "fraud" && <AgentSettingsForm agentId={id} initialSettings={settings} />}
 
         {/* External tools live in one shared pool now — this agent pulls in whatever fits its task at run time */}

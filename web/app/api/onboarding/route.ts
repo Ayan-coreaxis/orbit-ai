@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse, after } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { runCompetitorAnalysis } from "@/lib/run-intelligence";
+import { scanCompetitors } from "@/lib/competitor-intel";
 import { importWebsiteProducts } from "@/lib/onboarding-products";
 import { draftGrowthPlan } from "@/lib/strategy-planner";
 import { getCurrentUser } from "@/lib/auth";
@@ -80,12 +80,14 @@ export async function POST(req: NextRequest) {
   const importPromise = importWebsiteProducts(business.id, body.website).catch(() => 0);
 
   try {
-    const { reportId } = await runCompetitorAnalysis(business.id);
     const productsImported = await importPromise;
-    // Strategy Lab: draft the seller's first growth plan right after onboarding (in the background,
-    // once products are in) so it's waiting for them to discuss. Nothing runs until they approve it.
-    after(() => draftGrowthPlan(business.id).catch((err) => console.warn("[onboarding] first plan draft failed", err)));
-    const response = NextResponse.json({ businessId: business.id, reportId, productsImported });
+    // In the background: read the competitors (reference notes only), then draft the seller's first
+    // growth plan so it's waiting for them to discuss. Nothing runs until they approve it.
+    after(async () => {
+      await scanCompetitors(business.id).catch((err) => console.warn("[onboarding] competitor scan failed", err));
+      await draftGrowthPlan(business.id).catch((err) => console.warn("[onboarding] first plan draft failed", err));
+    });
+    const response = NextResponse.json({ businessId: business.id, productsImported });
     response.cookies.set("businessId", business.id, { httpOnly: true, sameSite: "lax", path: "/" });
     return response;
   } catch (e) {

@@ -20,7 +20,7 @@ export const faqs = [
   },
   {
     q: "How is this different from using separate tools for SEO, ads, content, etc.?",
-    a: "Those tools don't talk to each other. Orbit's Strategy Orchestrator coordinates every specialist agent around one weekly plan, so your SEO, content, and ads all point at the same goal instead of working in isolation.",
+    a: "Those tools don't talk to each other. Orbit's Strategy Orchestrator coordinates every specialist agent around one growth plan, so your SEO, content, and ads all point at the same goal instead of working in isolation.",
   },
   {
     q: "Is the competitor data real?",
@@ -36,11 +36,11 @@ export const pricingTiers = [
   {
     name: "Starter",
     price: 50,
-    desc: "Every agent, full weekly plan and execution — the AI won't auto-build or auto-run paid ads and other spend-facing deliverables for you.",
+    desc: "Every agent, full growth plan and execution — the AI won't auto-build or auto-run paid ads and other spend-facing deliverables for you.",
     featured: false,
     features: [
       "Every agent included",
-      "Full weekly plan from the Strategy Orchestrator",
+      "Full growth plan from the Strategy Orchestrator",
       "Real competitor intelligence",
       "SEO, content, and retention agents run for you",
       "Ads Agent gives recommendations — you approve and run them yourself",

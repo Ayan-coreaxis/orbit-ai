@@ -1,7 +1,7 @@
 import { Topbar } from "@/components/Topbar";
 import { Card, SectionLabel, Pill, ProgressBar } from "@/components/ui";
 import { pricingTiers } from "@/lib/mock-data";
-import { getRealPlan } from "@/lib/get-business";
+import { getBusinessSummary } from "@/lib/get-business";
 import { getUsageStatus, PLAN_LABELS, PLAN_PRICE_USD } from "@/lib/usage-limit";
 import { getActiveBusinessId } from "@/lib/get-active-business-id";
 import { prisma } from "@/lib/prisma";
@@ -30,7 +30,7 @@ export default async function SettingsPage({
   searchParams: Promise<{ meta?: string; billing?: string }>;
 }) {
   const { meta: metaStatus, billing: billingStatus } = await searchParams;
-  const real = await getRealPlan();
+  const real = await getBusinessSummary();
   const usage = real ? await getUsageStatus(real.businessId) : null;
   const businessId = await getActiveBusinessId();
   const business = businessId

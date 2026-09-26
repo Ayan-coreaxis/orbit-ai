@@ -111,7 +111,7 @@ export default async function UsagePage() {
         <Card className="overflow-hidden">
           {businessRows.length === 0 ? (
             <p className="p-6 text-[13.5px] text-text-faint">
-              No AI usage recorded yet — this fills in as real businesses run their weekly cycle or use the Orchestrator chat.
+              No AI usage recorded yet — this fills in as real businesses use the Orchestrator chat and their growth plan.
             </p>
           ) : (
             <table className="w-full text-[14px]">
@@ -181,7 +181,7 @@ export default async function UsagePage() {
         <Card className="p-6">
           <p className="text-[12.5px] leading-relaxed text-text-dim">
             Every row here comes from the real <code>AgentUsage</code> table — logged on every actual
-            Anthropic API call (weekly intelligence cycle and Orchestrator chat), with the real token
+            Anthropic API call (Orchestrator chat, growth plan, content and chatbot), with the real token
             counts and cost computed from Anthropic&apos;s published per-model pricing. Nothing on this
             page is estimated or seeded.
           </p>

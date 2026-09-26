@@ -7,7 +7,7 @@ import { Faq } from "@/components/Faq";
 
 const matrix: { label: string; values: [string, string, string] }[] = [
   { label: "Every agent included", values: ["✓", "✓", "✓"] },
-  { label: "Weekly plan from the Strategy Orchestrator", values: ["✓", "✓", "✓"] },
+  { label: "Growth plan from the Strategy Orchestrator", values: ["✓", "✓", "✓"] },
   { label: "Real competitor intelligence", values: ["✓", "✓", "✓"] },
   { label: "AI builds and runs ads for you", values: ["—", "✓", "✓"] },
   { label: "AI builds and sends deliverables directly", values: ["—", "✓", "✓"] },

@@ -104,28 +104,15 @@ function pickBestVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | n
 const noSubscribe = () => () => {};
 
 export function OrchestratorChat({
-  reportId,
-  wantsToDiscuss,
-  discussReason,
   initialMessages,
   onPlanChanged,
   onReviewPlan,
 }: {
-  reportId: string;
-  wantsToDiscuss: boolean;
-  discussReason?: string;
   initialMessages: ChatMessage[];
   onPlanChanged?: () => void;
   onReviewPlan?: () => void;
 }) {
-  const openingLine =
-    wantsToDiscuss && discussReason && initialMessages.length === 0
-      ? { id: "opening", role: "assistant" as const, content: discussReason }
-      : null;
-
-  const [messages, setMessages] = useState<ChatMessage[]>(
-    openingLine ? [openingLine, ...initialMessages] : initialMessages,
-  );
+  const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const [input, setInput] = useState("");
   const pending = usePendingFiles();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -194,14 +181,6 @@ export function OrchestratorChat({
     const timers = THINKING_STAGES.slice(1).map((s, i) => window.setTimeout(() => setStage(i + 1), s.after));
     return () => timers.forEach((t) => window.clearTimeout(t));
   }, [sending]);
-
-  useEffect(() => {
-    fetch("/api/orchestrator/seen", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ reportId }),
-    }).catch(() => {});
-  }, [reportId]);
 
   const firstScrollRef = useRef(true);
   useEffect(() => {

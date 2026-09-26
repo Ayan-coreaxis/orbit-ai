@@ -11,18 +11,12 @@ import type { PlanView } from "@/lib/strategy-lab";
  * next to it. The chat drafts / changes the plan; the panel shows it and approves it.
  */
 export function OrchestratorWorkspace({
-  reportId,
-  wantsToDiscuss,
-  discussReason,
   initialMessages,
   active,
   draft,
   currency,
   canHire,
 }: {
-  reportId: string;
-  wantsToDiscuss: boolean;
-  discussReason?: string;
   initialMessages: ChatMessage[];
   active: PlanView | null;
   draft: PlanView | null;
@@ -43,9 +37,6 @@ export function OrchestratorWorkspace({
     <div className="grid h-full min-h-0 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(360px,460px)] lg:grid-rows-[minmax(0,1fr)]">
       <div className="h-[70dvh] min-h-0 lg:h-full">
         <OrchestratorChat
-          reportId={reportId}
-          wantsToDiscuss={wantsToDiscuss}
-          discussReason={discussReason}
           initialMessages={initialMessages}
           onPlanChanged={refreshPlan}
           onReviewPlan={() => setReviewing(true)}

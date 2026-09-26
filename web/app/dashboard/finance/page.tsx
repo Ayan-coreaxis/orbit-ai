@@ -1,13 +1,13 @@
 import Link from "next/link";
 import { Topbar } from "@/components/Topbar";
 import { Card, SectionLabel, Pill } from "@/components/ui";
-import { getRealPlan } from "@/lib/get-business";
+import { getBusinessSummary } from "@/lib/get-business";
 import { getRealFinance } from "@/lib/get-real-finance";
 import { RevenueChart } from "@/components/RevenueChart";
 import { CircleDollarSign, TrendingUp } from "lucide-react";
 
 export default async function FinancePage() {
-  const real = await getRealPlan();
+  const real = await getBusinessSummary();
   const finance = real ? await getRealFinance(real.businessId) : null;
 
   return (
