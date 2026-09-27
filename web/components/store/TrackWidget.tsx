@@ -8,7 +8,7 @@ interface TrackedOrder {
   id: string;
   total: number;
   status: string;
-  items: { name: string; qty: number; price: number }[];
+  items: { name: string; qty: number; price: number; variantLabel?: string | null }[];
   createdAt: string;
   courierName: string | null;
   trackingNumber: string | null;
@@ -129,6 +129,7 @@ export function OrderTimeline({
         {order.items.map((it, i) => (
           <li key={i}>
             {it.qty}× {it.name}
+            {it.variantLabel ? ` · ${it.variantLabel}` : ""}
           </li>
         ))}
       </ul>

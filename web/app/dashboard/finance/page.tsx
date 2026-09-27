@@ -3,12 +3,17 @@ import { Topbar } from "@/components/Topbar";
 import { Card, SectionLabel, Pill } from "@/components/ui";
 import { getBusinessSummary } from "@/lib/get-business";
 import { getRealFinance } from "@/lib/get-real-finance";
+import { prisma } from "@/lib/prisma";
+import { money } from "@/lib/money";
 import { RevenueChart } from "@/components/RevenueChart";
 import { CircleDollarSign, TrendingUp } from "lucide-react";
 
 export default async function FinancePage() {
   const real = await getBusinessSummary();
   const finance = real ? await getRealFinance(real.businessId) : null;
+  const currency = real
+    ? ((await prisma.business.findUnique({ where: { id: real.businessId }, select: { storeCurrency: true } }))?.storeCurrency ?? "pkr")
+    : "pkr";
 
   return (
     <div>
@@ -25,7 +30,7 @@ export default async function FinancePage() {
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <Card className="p-5">
                 <div className="text-[12.5px] font-medium text-text-faint">Revenue, last 7 days</div>
-                <div className="mt-2.5 text-2xl font-semibold">Rs {finance.revenueLast7Days.toLocaleString()}</div>
+                <div className="mt-2.5 text-2xl font-semibold">{money(finance.revenueLast7Days, currency)}</div>
               </Card>
               <Card className="p-5">
                 <div className="text-[12.5px] font-medium text-text-faint">Orders, last 7 days</div>
@@ -37,7 +42,7 @@ export default async function FinancePage() {
                   <>
                     <div className="mt-2.5 flex items-center gap-2 text-2xl font-semibold">
                       <TrendingUp className="h-5 w-5 text-good" />
-                      Rs {finance.realGrossProfitLast7Days.toLocaleString()}
+                      {money(finance.realGrossProfitLast7Days, currency)}
                     </div>
                     {finance.costCoverageRatio < 0.99 && (
                       <div className="mt-1.5 text-[11.5px] text-text-faint">
@@ -49,7 +54,7 @@ export default async function FinancePage() {
                 ) : (
                   <div className="mt-2.5 text-[13px] text-text-faint">
                     No real cost prices on file yet.{" "}
-                    <Link href="/dashboard" className="underline">
+                    <Link href="/dashboard/store" className="underline">
                       Add one on a product
                     </Link>{" "}
                     to see real margin.
@@ -61,7 +66,7 @@ export default async function FinancePage() {
             <Card className="p-7">
               <SectionLabel>Revenue, last 7 days</SectionLabel>
               <div className="mt-4">
-                <RevenueChart data={finance.dailyRevenue} />
+                <RevenueChart data={finance.dailyRevenue} currency={currency} />
               </div>
             </Card>
 

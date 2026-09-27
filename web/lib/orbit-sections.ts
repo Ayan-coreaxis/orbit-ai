@@ -388,8 +388,10 @@ function attribution(q: { name: string; role?: string }): string {
   return name || `<strong style="color:var(--od-text)">${role}</strong>` || "";
 }
 const testimonial = {
+  // No quote → no section: an empty pair of quote marks on a live store looks broken.
   carousel(p: Record<string, unknown>, _c: RenderCtx, i: number): string {
     const qs = quotes(p);
+    if (!qs.length) return "";
     return `<section class="od-section"${band(i)}><div class="od-container">
       ${head(p)}
       <div data-od-carousel data-od-autoplay="6000" style="margin-top:var(--od-s8);position:relative">
@@ -406,6 +408,7 @@ const testimonial = {
   },
   grid(p: Record<string, unknown>, _c: RenderCtx, i: number): string {
     const qs = quotes(p);
+    if (!qs.length) return "";
     return `<section class="od-section"${band(i)}><div class="od-container">
       ${head(p)}
       <div class="od-grid" style="--od-col-min:280px;margin-top:var(--od-s8)">
@@ -418,6 +421,7 @@ const testimonial = {
   },
   single(p: Record<string, unknown>, _c: RenderCtx, i: number): string {
     const q = quotes(p)[0] || { quote: String(p.heading || ""), name: String(p.body || ""), role: "" };
+    if (!q.quote.trim()) return "";
     return `<section class="od-section"${band(i)}><div class="od-container-narrow" style="text-align:center">
       <p style="font-family:var(--od-font-heading);font-weight:var(--od-heading-weight);font-size:var(--od-text-3xl);line-height:1.28;color:var(--od-text)">&ldquo;${esc(q.quote)}&rdquo;</p>
       ${attribution(q) ? `<p class="od-body" style="margin-top:var(--od-s5);color:var(--od-muted)">${attribution(q)}</p>` : ""}

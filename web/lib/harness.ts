@@ -5,6 +5,7 @@ import { estimateCostUsd } from "@/lib/pricing";
 import { assertUnderUsageCap } from "@/lib/usage-limit";
 import { parseCheckoutCustomFields } from "@/lib/checkout-fields";
 import { createBundle } from "@/lib/bundles";
+import { twilioConfigured } from "@/lib/whatsapp";
 import { publishFacebookPost } from "@/lib/meta-graph";
 import { parseMetric, parseSteps } from "@/lib/strategy-lab";
 import { staffPlan, retireIdleAgents, parseJsonList } from "@/lib/plan-agents";
@@ -156,6 +157,12 @@ const TOOLS: HarnessTool[] = [
       const b = await prisma.business.findUniqueOrThrow({ where: { id: businessId }, select: { codVerification: true } });
       if (b.codVerification) return { status: "skipped", summary: "COD confirmation was already on." };
       await prisma.business.update({ where: { id: businessId }, data: { codVerification: true } });
+      if (!twilioConfigured())
+        return {
+          status: "done",
+          summary:
+            "Turned on COD order confirmation — for now it only works for shoppers who give an email, because WhatsApp messaging isn't switched on yet. Other COD orders come in as normal; call to confirm them.",
+        };
       return { status: "done", summary: "Turned on COD order confirmation." };
     },
   },

@@ -4,6 +4,7 @@ import { businessModelGuidanceLine } from "@/lib/business-model";
 import { sellerAnswersBlock } from "@/lib/onboarding-questions";
 import { latestCompetitors } from "@/lib/competitor-intel";
 import { money } from "@/lib/money";
+import { totalStock } from "@/lib/variants";
 
 /**
  * Builds the real, checkable context the Orchestrator chat is grounded in — same
@@ -20,7 +21,9 @@ export async function buildOrchestratorContext(businessId: string): Promise<stri
 
   const [productCount, lowStock, orderCount, pendingOrders, revenueAgg] = await Promise.all([
     prisma.product.count({ where: { businessId } }),
-    prisma.product.findMany({ where: { businessId, stock: { lte: 5 }, variants: { none: {} } }, select: { name: true }, take: 10 }),
+    prisma.product
+      .findMany({ where: { businessId }, select: { name: true, stock: true, optionTypes: true, variants: { select: { stock: true } } } })
+      .then((ps) => ps.filter((p) => totalStock(p, p.variants) <= 5).slice(0, 10)),
     prisma.order.count({ where: { businessId } }),
     prisma.order.count({ where: { businessId, status: "pending" } }),
     prisma.order.aggregate({ where: { businessId, status: { not: "cancelled" } }, _sum: { total: true } }),

@@ -26,6 +26,42 @@ import {
 } from "@/lib/orbit-design";
 import { SECTION_KINDS, isOrbitKind } from "@/lib/orbit-sections";
 import { DEFAULT_WIDGET_COPY, parseWidgetCopy, type WidgetCopyKey } from "@/lib/widget-copy";
+import { toStorefrontProducts } from "@/lib/storefront-products";
+
+/** Products as the storefront renders them — variant stock and "from" prices included, so the design QA and audit never see a variant product as sold out. */
+const DESIGN_PRODUCT_SELECT = {
+  id: true,
+  name: true,
+  price: true,
+  imageUrl: true,
+  description: true,
+  stock: true,
+  optionTypes: true,
+  category: { select: { name: true } },
+  variants: { select: { price: true, stock: true } },
+} as const;
+
+/**
+ * The store's real, published customer reviews for the design prompts — the only thing a
+ * testimonial may quote. With none, the model is told so and builds a promise section instead.
+ */
+async function realReviewsNote(businessId: string): Promise<string> {
+  const reviews = await prisma.review
+    .findMany({
+      where: { businessId, published: true, rating: { gte: 4 }, comment: { not: null } },
+      orderBy: { respondedAt: "desc" },
+      take: 6,
+      select: { customerName: true, rating: true, comment: true },
+    })
+    .catch(() => []);
+  const usable = reviews.filter((r) => (r.comment ?? "").trim().length >= 12);
+  if (!usable.length) {
+    return "REAL CUSTOMER REVIEWS: none yet. Do NOT add a testimonial section or any quote attributed to a customer, and no customer names, ratings, stats or press. Use a promise section for proof. A promise may only state what the seller told you or the store settings show (cash on delivery, the delivery fee / free-delivery amount, what's in the product) — never invent a policy they didn't give: no 'open the parcel before you pay', returns, refunds, money-back, guarantees or delivery times.";
+  }
+  return `REAL CUSTOMER REVIEWS (the only quotes a testimonial may use — copy them word for word, name as given):\n${usable
+    .map((r) => `- "${(r.comment ?? "").trim().slice(0, 240)}" — ${r.customerName?.trim() || "a verified customer"} (${r.rating}/5)`)
+    .join("\n")}`;
+}
 
 const tokenProps = {
   accent: { type: "string" },
@@ -166,7 +202,7 @@ SECTION & COMPONENT HTML — hard rules:
   - marquee row: <div data-od-marquee="28"><div style="display:inline-flex;gap:48px">…logos or phrases…</div></div>
   - sticky shrinking header: add data-od-shrink to a position:sticky <header> — it compacts and gains a soft shadow on scroll automatically.
   Style every hook fully with inline styles + tokens.
-- Ground all copy in what the seller told you. Never invent fake reviews, fake stats, fake founding years, fake awards.
+- Ground all copy in what the seller told you. Never invent reviews or customer quotes, customer names, stats, founding years, awards or press mentions — shoppers read them as real. Social proof comes only from the REAL CUSTOMER REVIEWS given to you; with none, show promises the seller can keep instead — only ones they told you or the store settings show (cash on delivery, the delivery fee), never an invented policy (open-before-you-pay, returns, money-back, delivery times).
 - REFERENCE IMAGES: if the seller attaches screenshots or a shot of a site they like, read the layout, spacing, type treatment, colour mood and section rhythm from it and rebuild that feel for THIS store's brand and products. Match the vibe, not the pixels — never copy their copy, logo, product names or claims.
 
 DESIGN QUALITY — hold every page to a real design-team standard. Work from Apple's three principles: CLARITY (legible type at every size, precise spacing, nothing decorative that isn't earning its place), DEFERENCE (the UI never competes with the product — content leads, chrome recedes), DEPTH (clear layers and restrained motion convey hierarchy).
@@ -873,7 +909,7 @@ Judge against a senior bar and the brand's concept:
 - CONTRAST: every text/background pair must be clearly readable (esp. any accent band). Fix via token_fixes.
 - FIT: is each section using the best variant for its content and the concept's structural stance? If a hero looks weak, try a different hero variant. If two neighbours use the same variant, change one.
 - COPY: headings sharp and specific, body substantial (not one thin line), items filled (a feature/steps/faq with < 3 items is thin — add items via section_edits props). No lorem, no invented stats/reviews.
-- COMPLETENESS: if the brief named a section that isn't in the INDEX, add it via section_adds. A retail Home with fewer than 6 sections is INCOMPLETE — add the missing story (story/editorial), social proof (testimonial/logos) and a slim trust bar via section_adds, with real copy. If the brief mentions shop/filtering/catalog and there is no shop page, that's a gap to flag.
+- COMPLETENESS: if the brief named a section that isn't in the INDEX, add it via section_adds. A retail Home with fewer than 6 sections is INCOMPLETE — add the missing story (story/editorial), a proof section (a testimonial only of real reviews already on the page, otherwise a promise/guarantee section — never invent quotes, names, stats or press) and a slim trust bar via section_adds, with real copy. Never add sections to the product / cart / account / sign-in pages or use {{product.name}}-style tokens — those pages are platform widgets. If the brief mentions shop/filtering/catalog and there is no shop page, that's a gap to flag.
 - ORDER & RHYTHM: hero first, cta last, varied variants, no dead weight. Alternate section width + background (contained / full-bleed, plain / banded / inverted) — if every section is the same contained width on the same background, break it up via section_edits/reorder.
 - AI-LOOK TELLS to correct: a low-contrast gradient hero; every section a centered heading + 3 cards; everything in rounded drop-shadow cards; a blue/purple accent on a brand that isn't tech; body font left on plain Inter when the concept wanted character. Nudge tokens/variants away from these.
 - Keep the concept's point of view — don't flatten bold choices. A polished-but-generic page still needs fixes.
@@ -1019,7 +1055,7 @@ async function visualReviewAndFix(
         max_tokens: 14000,
         system: `You are a senior product designer doing a QA pass on a real storefront, holding it to Apple's Human Interface Guidelines (Clarity, Deference, Depth). You see desktop AND mobile screenshots of each page.
 
-FIRST — COMPLETENESS. Compare the SELLER ASKED brief to the SECTION INDEX. If any PAGE the seller listed was never built, add it via page_adds. If any SECTION they asked for is missing (a testimonial carousel, an FAQ accordion, a newsletter signup, a multi-column footer), add it via section_adds — fully built, on-brand. A half-built store is the #1 defect.
+FIRST — COMPLETENESS. Compare the SELLER ASKED brief to the SECTION INDEX. If any PAGE the seller listed was never built, add it via page_adds. If any SECTION they asked for is missing (an FAQ accordion, a newsletter signup, a multi-column footer), add it via section_adds — fully built, on-brand. Never add customer quotes, names, stats or press you weren't given — shoppers read them as real. The product, cart, account and sign-in pages are platform widgets ({{product}}, {{cart}}, {{account}}, {{auth}}): never add a section that re-creates them by hand, and never use tokens like {{product.name}} / {{product.price}} — they don't exist and print literally. Restyle around the widget instead. A half-built store is the #1 defect.
 
 ${
   bespoke
@@ -1248,9 +1284,9 @@ export async function runStoreAudit(
   const doc = await loadDoc(businessId);
   const business = await prisma.business.findUnique({
     where: { id: businessId },
-    select: { name: true, niche: true, products: { select: { id: true, name: true, price: true, imageUrl: true, description: true, stock: true }, take: 24 } },
+    select: { name: true, niche: true, products: { select: DESIGN_PRODUCT_SELECT, take: 24 } },
   });
-  const products: StorefrontProduct[] = (business?.products ?? []).map((p) => ({ id: p.id, name: p.name, price: p.price, imageUrl: p.imageUrl, description: p.description, stock: p.stock }));
+  const products: StorefrontProduct[] = toStorefrontProducts(business?.products ?? []);
   if (!process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY === "paste_your_key_here")
     return { summary: "", findings: [], error: "no api key" };
 
@@ -2123,11 +2159,11 @@ ${VARIANT_LINES}
 PROPS per kind (fill real, brand-grounded copy — no lorem, no invented stats/reviews):
 - hero: { heading, eyebrow?, body, cta:{label}, cta2?:{label}, figure?:"photo brief", stats?:[{value,label}] (showcase only, ≤3) }
 - feature: { heading, eyebrow?, body?, items:[{title, body, icon?:0-7}] (3–6) }
-- stat: { heading? (band variant only), items:[{value:"12k+"|"98%"|"1,830", label}] (2–4) }
+- stat: { heading? (band variant only), items:[{value:"12k+"|"98%"|"1,830", label}] (2–4) } — ONLY numbers the seller gave you (years, customers, cities). Never make one up; without real numbers, don't use this kind.
 - story: { heading, eyebrow?, body:"paragraph one\\n\\nparagraph two", figure?:"photo brief" }
 - steps: { heading, body?, items:[{title, body}] (3–6) }
-- testimonial: { heading, body?, items:[{quote, name (a real-sounding first + last name — always include it), role? (their title or city)}] (2–6) }
-- logos: { heading?:"AS SEEN IN", items:["Vogue","Monocle",…] (5–10) }
+- testimonial: { heading, body?, items:[{quote, name, role?}] (2–6) } — ONLY quotes copied from the REAL CUSTOMER REVIEWS given to you, with the name as given. Never write a quote or a customer name yourself; with no real reviews, don't use this kind.
+- logos: { heading?:"AS SEEN IN", items:[…] (5–10) } — ONLY press / stockists the seller actually named. Never list brands or outlets they didn't give you.
 - faq: { heading, body?, items:[{q, a}] (4–10) }
 - cta: { heading, eyebrow?, body?, cta:{label}, placeholder?:"you@email.com" }  (banner/split/invert render a newsletter form; if you only want a link, still pass cta.label)
 - gallery: { heading?, items:["photo brief","photo brief",…] }
@@ -2150,7 +2186,7 @@ WORKED EXAMPLE — a good retail Home (8 sections), for a handmade-footwear bran
   3 story:split          — "Made in one workshop" — 2 paragraphs on the makers
   4 product-grid:standard (only because there is no shop page)
   5 feature:checklist    — "Why hand-lasted" — 4 concrete points
-  6 testimonial:carousel — 3 real-sounding customer quotes with names
+  6 feature:checklist    — "Our promise" — cash on delivery and other facts the seller gave (never an invented policy or delivery time) (a testimonial:carousel goes here instead ONLY when real reviews are given)
   7 trust:row            — Free returns · 60-day trial · Carbon-neutral
   8 cta:banner           — newsletter
 BAD Home (never ship this): hero → collections → product-grid → cta. Four sections, no story, no proof — reads half-built.
@@ -2160,14 +2196,14 @@ RULES:
 - PAGES — you ALWAYS build these FOUR content pages, designed to THIS brand, even if the brief never mentions them:
     home    — the storytelling homepage (6–9 sections, shape below)
     shop    — the catalogue: a one-line centered hero + optional \`collections\` tiles + exactly ONE \`product-grid\`
-    about   — the brand story: \`story\` + \`values\` + (\`steps\` or \`testimonial\`) + \`cta\`
+    about   — the brand story: \`story\` + \`values\` + \`steps\` (or a \`testimonial\` of real reviews) + \`cta\`
     contact — one \`contact\` section (+ \`faq\` if the brief asks) + \`cta\`
   PLUS any extra page the brief NAMES explicitly (Lookbook, Journal, Wholesale, Size Guide, a custom collection page like "Men's" or "Gifting"…). Do NOT invent pages beyond the four core ones unless the brief names them.
   NEVER build a cart, checkout, sign-in / log-in, my-account or order-tracking page, and never put a \`slot\` for those — the platform ships those as pre-wired core pages automatically, matched to your tokens + header. Just don't mention them.
-- Home: 6–9 sections for retail, and it MUST tell a story, not just list things. Required shape: hero → (collections OR gallery) → a brand moment (story / editorial / feature) → social proof (testimonial / logos) → a slim trust bar → cta. Put the product-grid on the SHOP page, never Home.
+- Home: 6–9 sections for retail, and it MUST tell a story, not just list things. Required shape: hero → (collections OR gallery) → a brand moment (story / editorial / feature) → proof (a testimonial of REAL reviews if given; otherwise a promise/guarantee section — never invented quotes, names, stats or press) → a slim trust bar → cta. Put the product-grid on the SHOP page, never Home.
 - The shop page's product-grid is where the real cards render — one grid, on shop, always. It auto-renders its own working filters (category + size/colour attribute pills + price range + search + sort) — NEVER add your own filter / search / sort section or controls.
 - EXCEPTION — a category-scoped custom page (e.g. "Men's Wear"): if the brief asks for a page showing one product category, give that page a product-grid section whose html contains the comment <!--grid-only:<category-slug>--> (e.g. <!--grid-only:mens-wear-->). The platform renders a real, filtered grid there (that category only, no category pills, keeps attribute + price filters). Still just a heading + one intro line + that comment — never hand-write cards.
-- About: story + values + (steps or testimonial). Contact: one contact section (+ faq if asked).
+- About: story + values + steps (or a testimonial of real reviews). Contact: one contact section (+ faq if asked).
 - Every page ends on a \`cta\`. Two adjacent sections must never both be near-empty of real content (e.g. collections tiles with no photos + an empty product-grid) — separate them with a copy-rich section.
 - VARY variants down each page — never the same variant twice in a row. Pick variants that fit the concept's structural stance.
 - Every section needs a short kebab \`id\` (unique on its page) and a \`label\` for the studio list.
@@ -2282,7 +2318,7 @@ const KIND_TO_TYPE: Record<string, DesignSection["type"]> = {
 async function composeStore(
   brief: string,
   images: DesignRef[],
-  business: { name: string; niche: string },
+  business: { name: string; niche: string; proof?: string },
   refNote?: string,
 ): Promise<ComposedPlan | null> {
   const userContent: Anthropic.ContentBlockParam[] = [
@@ -2298,7 +2334,7 @@ async function composeStore(
         .stream({
           model: MODEL,
           max_tokens: 32000,
-          system: `You are Orbit Design, an award-tier art director. Business "${business.name}" — sells ${business.niche}.\n\n${COMPOSE_GUIDE}\n\nCall compose_store.`,
+          system: `You are Orbit Design, an award-tier art director. Business "${business.name}" — sells ${business.niche}.\n\n${COMPOSE_GUIDE}${business.proof ? `\n\n${business.proof}` : ""}\n\nCall compose_store.`,
           tools: [COMPOSE_TOOL],
           tool_choice: { type: "tool", name: "compose_store" },
           messages,
@@ -2663,7 +2699,7 @@ export function isWholeStoreRequest(m: string): boolean {
 export async function runWholeStoreBuild(businessId: string, message: string, refs: { images?: DesignRef[]; siteUrl?: string; siteHint?: string } = {}): Promise<TurnResult> {
   const business = await prisma.business.findUnique({
     where: { id: businessId },
-    select: { name: true, niche: true, products: { select: { id: true, name: true, price: true, imageUrl: true, description: true, stock: true }, take: 24 } },
+    select: { name: true, niche: true, products: { select: DESIGN_PRODUCT_SELECT, take: 24 } },
   });
   const doc = await loadDoc(businessId);
   if (!business) return { reply: "", doc, error: "Business not found" };
@@ -2676,7 +2712,7 @@ export async function runWholeStoreBuild(businessId: string, message: string, re
     throw e;
   }
 
-  const products: StorefrontProduct[] = business.products.map((p) => ({ id: p.id, name: p.name, price: p.price, imageUrl: p.imageUrl, description: p.description, stock: p.stock }));
+  const products: StorefrontProduct[] = toStorefrontProducts(business.products);
   const images = (refs.images ?? []).slice(0, 4);
 
   const refNote =
@@ -2703,7 +2739,7 @@ export async function runWholeStoreBuild(businessId: string, message: string, re
   if (!next) {
     if (bespoke) console.warn("[runWholeStoreBuild] bespoke build too thin — trying the kit");
     else console.warn("[runWholeStoreBuild] planStore returned nothing — trying the kit");
-    const composed = await composeStore(message, images, business, refNote);
+    const composed = await composeStore(message, images, { ...business, proof: await realReviewsNote(businessId) }, refNote);
     if (composed) {
       concept = composed.concept;
       replyText = composed.reply;
@@ -2793,15 +2829,13 @@ export async function runDesignTurn(
       name: true,
       niche: true,
       widgetCopy: true,
-      products: { select: { id: true, name: true, price: true, imageUrl: true, description: true, stock: true }, take: 24 },
+      products: { select: DESIGN_PRODUCT_SELECT, take: 24 },
     },
   });
   if (!business) return { reply: "", doc: defaultDoc("Store", "products"), error: "Business not found" };
 
   const doc = await loadDoc(businessId);
-  const products: StorefrontProduct[] = business.products.map((p) => ({
-    id: p.id, name: p.name, price: p.price, imageUrl: p.imageUrl, description: p.description, stock: p.stock,
-  }));
+  const products: StorefrontProduct[] = toStorefrontProducts(business.products);
 
   if (!process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY === "paste_your_key_here") {
     return { reply: "Design AI isn't configured yet — add ANTHROPIC_API_KEY.", doc, error: "no api key" };
@@ -2844,6 +2878,7 @@ export async function runDesignTurn(
     ),
   ];
 
+  const proofNote = await realReviewsNote(businessId);
   const callModel = () =>
     anthropic.messages.create({
       model: MODEL,
@@ -2854,7 +2889,9 @@ export async function runDesignTurn(
           business.niche,
           business.products.map((p) => p.name),
           products.filter((p): p is StorefrontProduct & { imageUrl: string } => !!p.imageUrl).map((p) => ({ name: p.name, imageUrl: p.imageUrl })),
-        ) + WIDGET_SETTINGS_PROMPT,
+        ) +
+        WIDGET_SETTINGS_PROMPT +
+        `\n\n${proofNote}`,
       tools: [EDIT_TOOL],
       tool_choice: { type: "tool", name: "edit_storefront" },
       messages: [...history, { role: "user", content: userBlocks }],

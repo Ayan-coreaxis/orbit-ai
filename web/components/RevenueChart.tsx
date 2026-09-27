@@ -9,12 +9,13 @@ import {
   ResponsiveContainer,
   CartesianGrid,
 } from "recharts";
+import { money } from "@/lib/money";
 export interface RevenuePoint {
   day: string;
   revenue: number;
 }
 
-export function RevenueChart({ data }: { data: RevenuePoint[] }) {
+export function RevenueChart({ data, currency = "pkr" }: { data: RevenuePoint[]; currency?: string }) {
   return (
     <ResponsiveContainer width="100%" height={240}>
       <AreaChart data={data} margin={{ left: -20, right: 10, top: 10 }}>
@@ -37,7 +38,7 @@ export function RevenueChart({ data }: { data: RevenuePoint[] }) {
           fontSize={12}
           tickLine={false}
           axisLine={false}
-          tickFormatter={(v) => `$${v / 1000}k`}
+          tickFormatter={(v: number) => (v >= 1000 ? `${money(0, currency).replace(/0$/, "")}${+(v / 1000).toFixed(1)}k` : money(v, currency))}
         />
         <Tooltip
           contentStyle={{
@@ -49,7 +50,7 @@ export function RevenueChart({ data }: { data: RevenuePoint[] }) {
           }}
           labelStyle={{ color: "var(--text-dim)" }}
           itemStyle={{ color: "var(--text)" }}
-          formatter={(v) => [`$${Number(v).toLocaleString()}`, "Revenue"]}
+          formatter={(v) => [money(Number(v), currency), "Revenue"]}
         />
         <Area
           type="monotone"

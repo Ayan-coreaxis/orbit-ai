@@ -22,6 +22,7 @@ import {
 interface OrderItem {
   productId?: string;
   name?: string;
+  variantLabel?: string | null;
   price?: number;
   qty?: number;
 }
@@ -345,7 +346,9 @@ export function OrdersManager({
                         {o.items.map((it, i) => (
                           <div key={i} className="flex justify-between">
                             <span className="text-text-dim">
-                              {it.name} <span className="text-text-faint">× {it.qty}</span>
+                              {it.name}
+                              {it.variantLabel && <span className="font-medium text-text"> · {it.variantLabel}</span>}{" "}
+                              <span className="text-text-faint">× {it.qty}</span>
                             </span>
                             <span className="tabular-nums">{money((it.price || 0) * (it.qty || 0), currency)}</span>
                           </div>

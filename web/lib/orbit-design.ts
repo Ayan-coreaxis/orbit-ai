@@ -191,6 +191,8 @@ export interface StorefrontProduct {
   hasVariants?: boolean;
   /** lowest variant price, for a "from Rs X" grid label */
   fromPrice?: number;
+  /** highest variant price — when it differs from fromPrice the grid says "From" */
+  maxPrice?: number;
   /** option name → its values (e.g. { Size: ["S","M","L"], Colour: ["Black"] }) — powers the shop attribute filters */
   options?: Record<string, string[]>;
 }
@@ -510,7 +512,12 @@ export function normalizeDoc(doc: OrbitDesignDoc, storeName: string, niche: stri
       pageType: pp.pageType,
       navShow: NAV_SHOWS.includes(pp.navShow as NavShow) ? pp.navShow : undefined,
       navLocked: pp.navLocked === true,
-      sections: (Array.isArray(pp.sections) ? pp.sections : []).map(normalizeSection),
+      sections: (Array.isArray(pp.sections) ? pp.sections : [])
+        .map(normalizeSection)
+        // a hand-written fake of a core widget ({{product.name}}…) never survives a save
+        .filter((s) => !fakesCoreWidget(s.html))
+        // two sections sharing an id make edits land on the wrong one — keep ids unique
+        .map((s, i, all) => (all.findIndex((x) => x.id === s.id) === i ? s : { ...s, id: `${s.id}-${i}` })),
     };
   });
   if (!pages.length) pages = defaultDoc(storeName, niche).pages;
@@ -791,7 +798,7 @@ function productCardsHtml(
         : p.hasVariants
           ? `<a ${link} style="${btnStyle}">Choose options</a>`
           : `<button type="button"${preview ? "" : ` data-od-buy="${escapeAttr(p.id)}"`} style="${btnStyle}">Add to cart</button>`;
-      const priceLabel = p.hasVariants && p.fromPrice != null && p.fromPrice < p.price
+      const priceLabel = p.hasVariants && p.fromPrice != null && (p.fromPrice < p.price || (p.maxPrice ?? p.fromPrice) > p.fromPrice)
         ? `From ${money(p.fromPrice, currency)}`
         : money(p.price, currency);
       const optVals = Object.entries(p.options ?? {})
@@ -982,6 +989,8 @@ function rewriteLinks(html: string, businessId: string, preview: boolean, doc?: 
       const qm = h.match(/\?.*$/);
       const qs = qm ? qm[0] : "";
       const path = qs ? h.slice(0, h.length - qs.length) : h;
+      // a bare "/" (a footer "Home") means this store's home, not the Orbit site root
+      if (path === "/" || /^\/index\.html?$/i.test(path)) return withQuery(toHref("home"), qs);
       // "#about" — only rewrite when it's an EXACT page slug (a bare "#reviews" may be an in-page anchor)
       const hash = /^#([a-z][\w-]*)$/i.exec(path);
       if (hash) return slugs.has(hash[1].toLowerCase()) ? withQuery(toHref(hash[1].toLowerCase()), qs) : full;
@@ -1134,7 +1143,16 @@ function substituteContent(html: string, doc: OrbitDesignDoc): string {
     "social.x": escapeAttr(c.socials.x),
     "social.youtube": escapeAttr(c.socials.youtube),
   };
-  return html.replace(/\{\{\s*([a-z.]+)\s*\}\}/gi, (m, key: string) => (key in map ? map[key] : m));
+  return (
+    html
+      // A social link whose account isn't set would point nowhere — drop the whole link, icon and all.
+      .replace(/<a\b[^>]*href="\s*\{\{\s*(social\.[a-z]+)\s*\}\}\s*"[^>]*>[\s\S]*?<\/a>/gi, (m, key: string) => (map[key] ? m : ""))
+      // …and a column left with only its heading ("FOLLOW US" over an empty row) goes too.
+      .replace(/<div\b[^>]*>\s*<(div|h[1-6]|p|span|strong)\b[^>]*>[^<]{1,40}<\/\1>\s*<(div|ul|nav|p)\b[^>]*>\s*<\/\2>\s*<\/div>/gi, "")
+      // "© 2026 {{store.name}}." for a name that already ends in a full stop ("Chai Wala Co.").
+      .replace(/\{\{\s*store\.name\s*\}\}\./gi, (m) => (doc.storeName.trim().endsWith(".") ? "{{store.name}}" : m))
+      .replace(/\{\{\s*([a-z.]+)\s*\}\}/gi, (m, key: string) => (key in map ? map[key] : m))
+  );
 }
 
 /**
@@ -1649,7 +1667,7 @@ function prepareFooter(doc: OrbitDesignDoc, businessId: string, preview: boolean
     if (!/©|&copy;|all rights reserved/i.test(f)) {
       f = f.replace(
         /<\/footer>/i,
-        `<div style="margin-top:var(--od-s6);padding-top:var(--od-s4);border-top:1px solid var(--od-border);color:var(--od-muted);font-size:13px">&copy; ${new Date().getFullYear()} ${escapeHtml(doc.storeName)}. All rights reserved.</div></footer>`,
+        `<div style="margin-top:var(--od-s6);padding-top:var(--od-s4);border-top:1px solid var(--od-border);color:var(--od-muted);font-size:13px">&copy; ${new Date().getFullYear()} ${escapeHtml(doc.storeName.trim().replace(/\.+$/, ""))}. All rights reserved.</div></footer>`,
       );
     }
     return f;
@@ -1687,7 +1705,7 @@ function prepareFooter(doc: OrbitDesignDoc, businessId: string, preview: boolean
       ${cols.join("\n      ")}
   </div>
   <div style="max-width:var(--od-container);margin:40px auto 0;padding-top:24px;border-top:1px solid var(--od-border);color:var(--od-muted);font-size:13px">
-    &copy; ${new Date().getFullYear()} ${escapeHtml(doc.storeName)}. All rights reserved.
+    &copy; ${new Date().getFullYear()} ${escapeHtml(doc.storeName.trim().replace(/\.+$/, ""))}. All rights reserved.
   </div>
 </footer>`;
 }
@@ -1736,6 +1754,16 @@ function legacyGridIntro(html: string): string {
 }
 
 /** The <body> markup for one page + the functional widgets it needs mounted. */
+/**
+ * A section that hand-writes a core page with made-up field tokens ({{product.name}},
+ * {{product.price}}, {{cart.total}}…). Only the bare {{product}} / {{cart}} / {{account}} /
+ * {{auth}} / {{track}} markers exist — the dotted ones print literally, with a dead "Add to cart"
+ * and no size picker. Such a section is never rendered; the real widget section is.
+ */
+export function fakesCoreWidget(html: string | undefined): boolean {
+  return !!html && /\{\{\s*(product|cart|account|auth|track|checkout)\.[a-z_]+\s*\}\}/i.test(html);
+}
+
 export function renderPageBody(doc: OrbitDesignDoc, opts: RenderOpts): { html: string; widgets: PageWidget[] } {
   const page = resolvePage(doc, opts.pageSlug);
   const preview = !!opts.preview;
@@ -1764,7 +1792,7 @@ export function renderPageBody(doc: OrbitDesignDoc, opts: RenderOpts): { html: s
     },
   };
   const sections = page.sections
-    .filter((s) => s.visible)
+    .filter((s) => s.visible && !fakesCoreWidget(s.html))
     .map((s, idx) => {
       // A curated component block takes precedence over legacy html.
       const raw = s.block ? renderBlock(s.block, rctx, idx) : s.html;
@@ -2184,7 +2212,7 @@ if('IntersectionObserver' in window){var dio=new IntersectionObserver(function(e
 setTimeout(function(){dr.forEach(go)},2500);})();
 // parallax — [data-od-parallax] (opt "0.15".."0.6" strength) drifts as it scrolls through the viewport
 var px=[].slice.call(document.querySelectorAll('[data-od-parallax]'));
-if(px.length&&!RM){px.forEach(function(el){el.style.willChange='transform'});var pt=false;var ppump=function(){pt=false;var vh=window.innerHeight||800;px.forEach(function(el){var r=el.getBoundingClientRect();var mid=r.top+r.height/2;var prog=(mid-vh/2)/(vh);var str=parseFloat(el.getAttribute('data-od-parallax'))||0.22;el.style.transform='translate3d(0,'+(-prog*str*vh).toFixed(1)+'px,0)'})};var pon=function(){if(!pt){pt=true;requestAnimationFrame(ppump)}};ppump();window.addEventListener('scroll',pon,{passive:true});window.addEventListener('resize',pon)}
+if(px.length&&!RM){px.forEach(function(el){el.style.willChange='transform'});var pt=false;var ppump=function(){pt=false;var vh=window.innerHeight||800;if((window.innerWidth||1024)<768){px.forEach(function(el){el.style.transform=''});return}px.forEach(function(el){var r=el.getBoundingClientRect();var mid=r.top+r.height/2;var prog=(mid-vh/2)/(vh);var str=parseFloat(el.getAttribute('data-od-parallax'))||0.22;el.style.transform='translate3d(0,'+(-prog*str*vh).toFixed(1)+'px,0)'})};var pon=function(){if(!pt){pt=true;requestAnimationFrame(ppump)}};ppump();window.addEventListener('scroll',pon,{passive:true});window.addEventListener('resize',pon)}
 // Material-style ripple — one shared handler for every .od-btn/.odw-btn so clickable surfaces
 // give real tactile feedback, colour-matched to the element's own text colour (currentColor).
 document.addEventListener('pointerdown',function(ev){

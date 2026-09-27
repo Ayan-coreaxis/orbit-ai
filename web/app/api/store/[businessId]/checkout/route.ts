@@ -18,6 +18,8 @@ import { earnPointsForOrder, redeemPoints, LoyaltyError } from "@/lib/loyalty";
 import { qualifyReferralForOrder } from "@/lib/referral";
 import { redeemGiftCard, GiftCardError } from "@/lib/gift-cards";
 import { money } from "@/lib/money";
+import { twilioConfigured } from "@/lib/whatsapp";
+import { emailConfigured } from "@/lib/email";
 import { pauseAdsForSoldOut } from "@/lib/inventory-ads";
 import { parseCheckoutCustomFields, validateCustomFieldAnswers } from "@/lib/checkout-fields";
 
@@ -224,7 +226,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ bus
   }
 
   // ---------------- Cash on delivery ----------------
-  const needsVerify = business.codVerification;
+  // Only ask the shopper to confirm when the confirmation can actually reach them — otherwise the
+  // order would sit unconfirmed and auto-cancel while the page claims a message was sent.
+  const canReachShopper = twilioConfigured() || (!!email && emailConfigured());
+  const needsVerify = business.codVerification && canReachShopper;
   const settings = await getAgentSettings(businessId).catch(() => null);
   const autoConfirm = !needsVerify && !fraud.flagged && settings?.autoConfirmCod;
 

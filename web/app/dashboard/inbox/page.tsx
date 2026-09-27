@@ -73,8 +73,12 @@ export default async function InboxPage() {
           conversations.map((c) => {
             const lastMessage = c.messages[c.messages.length - 1];
             return (
-              <details key={`${c.channel}:${c.customerRef}`} className="group">
-                <Card className="p-0">
+              // <summary> must be the <details>' first child or the browser hides the whole thread
+              // behind its own "Details" label — so the card styling lives on <details> itself.
+              <details
+                key={`${c.channel}:${c.customerRef}`}
+                className="group rounded-2xl border border-border bg-panel shadow-[0_1px_2px_rgba(30,28,24,0.04)]"
+              >
                   <summary className="flex cursor-pointer list-none items-center gap-3 p-5">
                     <ChannelIcon channel={c.channel} />
                     <div className="min-w-0 flex-1">
@@ -85,7 +89,7 @@ export default async function InboxPage() {
                         <Pill tone={c.channel === "website" ? "neutral" : "good"}>{c.channel}</Pill>
                       </div>
                       <p className="mt-0.5 truncate text-[12.5px] text-text-faint">
-                        {lastMessage.role === "user" ? "" : "You: "}
+                        {lastMessage.role === "user" ? "" : "Assistant: "}
                         {lastMessage.content}
                       </p>
                     </div>
@@ -97,7 +101,7 @@ export default async function InboxPage() {
                     {c.messages.map((m, i) => (
                       <div key={i} className={`flex ${m.role === "user" ? "justify-start" : "justify-end"}`}>
                         <div
-                          className={`max-w-[75%] rounded-xl px-3.5 py-2 text-[13px] leading-relaxed ${
+                          className={`max-w-[75%] whitespace-pre-line rounded-xl px-3.5 py-2 text-[13px] leading-relaxed ${
                             m.role === "user" ? "bg-panel-2 text-text-dim" : "bg-accent-soft text-accent-strong"
                           }`}
                         >
@@ -106,7 +110,6 @@ export default async function InboxPage() {
                       </div>
                     ))}
                   </div>
-                </Card>
               </details>
             );
           })

@@ -127,11 +127,25 @@ export interface RawStrategy {
 /** Models occasionally send a nested array as a JSON *string*; accept both. */
 export function coerceArray<T>(v: unknown): T[] {
   if (typeof v === "string") {
+    const s = v;
     try {
-      v = JSON.parse(v);
+      v = JSON.parse(s);
     } catch {
-      return [];
+      // Sometimes the array arrives wrapped in stray text — keep just the [...] part.
+      const start = s.indexOf("[");
+      const end = s.lastIndexOf("]");
+      if (start < 0 || end <= start) return [];
+      try {
+        v = JSON.parse(s.slice(start, end + 1));
+      } catch {
+        return [];
+      }
     }
+  }
+  // …or wrapped one level deep, e.g. { strategies: [...] }.
+  if (v && typeof v === "object" && !Array.isArray(v)) {
+    const inner = Object.values(v).find(Array.isArray);
+    if (inner) v = inner;
   }
   return Array.isArray(v) ? (v as T[]) : [];
 }
@@ -230,13 +244,14 @@ ${sellerNote?.trim() ? `\nTHE SELLER SAYS: ${sellerNote.trim().slice(0, 1500)}` 
 Draft the plan now with the propose_growth_plan tool.`;
 
   // The nested tool payload occasionally comes back malformed (e.g. the strategies array as broken
-  // text). Try twice before giving up — a transient model glitch shouldn't cost the seller a plan.
+  // text, or cut off at the token limit). Try three times before giving up — a transient model
+  // glitch shouldn't cost the seller a plan.
   let input: { title?: string; diagnosis?: string; strategies?: unknown } = {};
   let strategies: RawStrategy[] = [];
-  for (let attempt = 1; attempt <= 2; attempt++) {
+  for (let attempt = 1; attempt <= 3; attempt++) {
     const msg = await anthropic.messages.create({
       model: MODEL,
-      max_tokens: 8000,
+      max_tokens: 16000,
       system,
       tools: [PLAN_TOOL],
       tool_choice: { type: "tool", name: PLAN_TOOL.name },
@@ -257,7 +272,11 @@ Draft the plan now with the propose_growth_plan tool.`;
     // Validate shape even though the tool call "succeeded" — a parsed-but-wrong shape must not crash.
     strategies = coerceArray<RawStrategy>(input.strategies).filter((x) => !!x && typeof x.title === "string");
     if (input.diagnosis && strategies.length > 0) break;
-    console.warn(`[strategy-planner] unusable plan (attempt ${attempt})`, msg.stop_reason, JSON.stringify(input).slice(0, 400));
+    console.warn(`[strategy-planner] unusable plan (attempt ${attempt})`, msg.stop_reason, {
+      keys: Object.keys(input),
+      strategies: typeof input.strategies,
+      start: String(typeof input.strategies === "string" ? input.strategies : JSON.stringify(input.strategies)).slice(0, 300),
+    });
   }
   if (!input.diagnosis || strategies.length === 0) {
     throw new Error("The planner didn't return a usable plan — try again.");

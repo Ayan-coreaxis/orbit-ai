@@ -1,4 +1,5 @@
 import type Anthropic from "@anthropic-ai/sdk";
+import { marketCurrency } from "@/lib/market-country";
 import { anthropic, MODEL } from "@/lib/anthropic";
 import { prisma } from "@/lib/prisma";
 import { estimateCostUsd } from "@/lib/pricing";
@@ -15,7 +16,7 @@ import type { BusinessSnapshot } from "@/lib/strategy-lab";
 const FRESH_DAYS = 14;
 const WEB_SEARCH_USD = 0.01; // Anthropic web search: $10 per 1,000 searches
 
-export type MarketResearch = { at: string; brief: string; sources: string[] };
+export type MarketResearch = { at: string; brief: string; sources: string[]; country?: string };
 
 const COUNTRY: Record<string, string> = { pkr: "Pakistan", inr: "India", aed: "the UAE", sar: "Saudi Arabia", bdt: "Bangladesh", gbp: "the UK", usd: "the US" };
 
@@ -24,12 +25,13 @@ export function countryOf(currency: string): string {
 }
 
 /** The newest research saved with any of this business's plans, if still fresh. */
-async function cached(businessId: string): Promise<MarketResearch | null> {
+async function cached(businessId: string, country: string): Promise<MarketResearch | null> {
   const plans = await prisma.growthPlan.findMany({ where: { businessId }, orderBy: { createdAt: "desc" }, take: 5, select: { snapshot: true } });
   for (const p of plans) {
     try {
       const r = (JSON.parse(p.snapshot ?? "{}") as { research?: MarketResearch }).research;
-      if (r?.brief && Date.now() - new Date(r.at).getTime() < FRESH_DAYS * 86400000) return r;
+      // Research for another market (the store's currency / country changed since) isn't reused.
+      if (r?.brief && r.country === country && Date.now() - new Date(r.at).getTime() < FRESH_DAYS * 86400000) return r;
     } catch {
       /* ignore */
     }
@@ -38,11 +40,11 @@ async function cached(businessId: string): Promise<MarketResearch | null> {
 }
 
 export async function researchMarket(businessId: string, s: BusinessSnapshot, opts: { force?: boolean } = {}): Promise<MarketResearch | null> {
+  const country = countryOf(marketCurrency(s.currency, [s.name, s.niche, s.onboardingAnswers ?? ""].join(" ")));
   if (!opts.force) {
-    const hit = await cached(businessId);
+    const hit = await cached(businessId, country);
     if (hit) return hit;
   }
-  const country = countryOf(s.currency);
   const today = new Date().toISOString().slice(0, 10);
   const products = s.products.slice(0, 12).map((p) => `${p.name} (${p.price} ${s.currency.toUpperCase()})`).join(", ");
 
@@ -109,7 +111,7 @@ Then write a RESEARCH BRIEF, max 350 words, plain text, grouped under those 5 he
       ),
     ].slice(0, 12);
     if (!brief) return null;
-    return { at: new Date().toISOString(), brief: brief.slice(0, 4000), sources };
+    return { at: new Date().toISOString(), brief: brief.slice(0, 4000), sources, country };
   } catch (e) {
     console.warn("[growth-research] failed", e instanceof Error ? e.message : e);
     return null; // research is an enhancement — a plan can still be made without it

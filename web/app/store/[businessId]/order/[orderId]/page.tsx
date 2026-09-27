@@ -13,6 +13,7 @@ export const dynamic = "force-dynamic";
 interface Line {
   productId?: string;
   name: string;
+  variantLabel?: string | null;
   price: number;
   qty: number;
 }
@@ -136,7 +137,8 @@ export default async function OrderConfirmationPage({
           {lines.map((l, i) => (
             <div key={i} style={{ display: "flex", justifyContent: "space-between", marginTop: 10, fontSize: 14 }}>
               <span>
-                {l.name} × {l.qty}
+                {l.name}
+                {l.variantLabel ? ` · ${l.variantLabel}` : ""} × {l.qty}
               </span>
               <span>{money(l.price * l.qty, business?.storeCurrency)}</span>
             </div>

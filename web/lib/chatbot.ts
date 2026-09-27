@@ -117,7 +117,12 @@ ${pagesBlock ? `\nReal store pages (policies, about, etc.):\n${pagesBlock}` : ""
     },
   });
 
-  const reply = await keepScript(message, msg.content[0].type === "text" ? msg.content[0].text.trim() : "", businessId, "chatbot") || "Sorry, I had trouble responding — try again?";
+  const raw = await keepScript(message, msg.content[0].type === "text" ? msg.content[0].text.trim() : "", businessId, "chatbot") || "Sorry, I had trouble responding — try again?";
+  // Chat bubbles show plain text, so markdown "**Rs 750**" would show its asterisks. WhatsApp has
+  // its own bold (*Rs 750*); everywhere else just drop the marks.
+  const reply = raw
+    .replace(/\*\*([^*\n]+)\*\*/g, conversation?.channel === "whatsapp" ? "*$1*" : "$1")
+    .replace(/^#{1,6}\s+/gm, "");
 
   if (conversation) {
     await logMessage(businessId, conversation.channel, conversation.customerRef, "user", message.trim());

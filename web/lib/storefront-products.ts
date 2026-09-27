@@ -35,6 +35,7 @@ export function toStorefrontProducts(products: ProductWithVariants[]): Storefron
       stock: p.variants.reduce((s, v) => s + Math.max(0, v.stock), 0),
       hasVariants: true,
       fromPrice: prices.length ? Math.min(...prices) : p.price,
+      maxPrice: prices.length ? Math.max(...prices) : p.price,
       options,
     };
   });

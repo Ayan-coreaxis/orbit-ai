@@ -118,7 +118,7 @@ export function AgentNetwork({
           <Compass className="h-6 w-6 text-text-faint" strokeWidth={2} />
         </div>
         <p className="max-w-[220px] text-[13px] text-text-faint">
-          No agent has made a real call yet — nodes appear here the moment one actually runs.
+          Specialists (content, ads, SEO…) appear here once the Orchestrator brings one into a task.
         </p>
       </div>
     );

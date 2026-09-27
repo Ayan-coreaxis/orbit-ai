@@ -50,16 +50,16 @@ export default async function ReviewsPage() {
 
             <Card className="p-6">
               <p className="text-[13px] leading-relaxed text-text-dim">
-                A real review request is sent by WhatsApp automatically when you mark an order{" "}
-                <b>fulfilled</b> in your Store page — real send, tracked honestly (if Twilio isn&apos;t
-                connected or the send fails, it&apos;s recorded, not hidden).
+                Three days after you mark an order <b>delivered</b> in your Store page, Orbit asks that
+                customer for a review on WhatsApp (or email) — once per order. If the message can&apos;t be
+                sent, that&apos;s recorded here, not hidden.
               </p>
             </Card>
 
             <Card className="overflow-hidden">
               {reviews.length === 0 ? (
                 <p className="p-6 text-[13.5px] text-text-faint">
-                  No review requests yet — mark a real order fulfilled to send your first one.
+                  No review requests yet — the first one goes out 3 days after you mark an order delivered.
                 </p>
               ) : (
                 <div className="divide-y divide-border">

@@ -42,7 +42,7 @@ export async function sendWhatsAppMessage(
   opts: { from?: string; mediaUrl?: string; template?: { kind: WaTemplateKind; vars: (string | null | undefined)[] } } = {},
 ): Promise<WhatsAppSendResult> {
   if (!twilioConfigured()) {
-    return { sent: false, error: "Twilio isn't connected yet — add Account SID, Auth Token, and WhatsApp sender in Admin > API Keys." };
+    return { sent: false, error: "WhatsApp messaging isn't switched on for Orbit stores yet, so the customer wasn't messaged — call them instead." };
   }
   const sid = process.env.TWILIO_ACCOUNT_SID!;
   const token = process.env.TWILIO_AUTH_TOKEN!;

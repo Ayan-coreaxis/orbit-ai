@@ -33,6 +33,8 @@ import { loadStrategyLab } from "@/lib/strategy-lab";
 import { GrowthPlanOverview } from "@/components/strategy/GrowthPlanOverview";
 import { CountUp } from "@/components/dashboard/CountUp";
 import { money } from "@/lib/money";
+import { totalStock } from "@/lib/variants";
+import { agentLabel as readableAgent } from "@/lib/admin-stats";
 
 export const dynamic = "force-dynamic";
 
@@ -45,7 +47,7 @@ function agentLabel(agentId: string): string {
     const name = agents.find((a) => a.id === agentId.replace("orchestrator-meeting-", ""))?.name;
     return name ? `${name} (in meeting)` : agentId;
   }
-  return agents.find((a) => a.id === agentId)?.name ?? agentId;
+  return agents.find((a) => a.id === agentId)?.name ?? readableAgent(agentId);
 }
 
 function greeting(d: Date) {
@@ -97,12 +99,15 @@ export default async function DashboardPage() {
     prisma.order.findMany({ where: { businessId }, orderBy: { createdAt: "desc" }, take: 6, select: { id: true, customerName: true, total: true, status: true, verified: true, createdAt: true, paymentProvider: true } }),
     prisma.order.count({ where: { businessId, verified: false, status: "pending" } }),
     prisma.order.count({ where: { businessId, flagged: true, status: { in: ["pending", "confirmed"] } } }),
-    prisma.product.findMany({ where: { businessId, stock: { lte: 5 } }, select: { name: true, stock: true }, take: 5, orderBy: { stock: "asc" } }),
+    // variant products keep stock per size/colour — count those, not the (unused) product-level number
+    prisma.product
+      .findMany({ where: { businessId }, select: { name: true, stock: true, optionTypes: true, variants: { select: { stock: true } } } })
+      .then((ps) => ps.map((p) => ({ name: p.name, stock: totalStock(p, p.variants) })).filter((p) => p.stock <= 5).sort((a, b) => a.stock - b.stock).slice(0, 5)),
     prisma.storeDesign.findUnique({ where: { businessId }, select: { published: true } }),
     prisma.product.count({ where: { businessId } }),
     prisma.$queryRaw<{ c: bigint }[]>`SELECT COUNT(DISTINCT "sessionId") AS c FROM "StoreEvent" WHERE "businessId" = ${businessId} AND "type" = 'view_store' AND "createdAt" >= ${since7}`.catch(() => [{ c: BigInt(0) }]),
     getRealAgentActivity(businessId),
-    getRecentAgentActivity(businessId, 8),
+    getRecentAgentActivity(businessId, 40),
   ]);
   const currency = business?.storeCurrency ?? "pkr";
   const visitors7 = Number(visitors[0]?.c ?? 0);
@@ -110,6 +115,7 @@ export default async function DashboardPage() {
 
   // What to do next — only real, checkable facts, most urgent first.
   const todos: Todo[] = [];
+  if (!productCount) todos.push({ href: "/dashboard/store", icon: PackageX, title: "Add your products", body: "Your store is empty — add what you sell, with prices and photos, so there's something to buy.", tone: "accent" });
   if (real.planWaiting) todos.push({ href: "/dashboard/orchestrator", icon: Sparkles, title: "Your growth plan is ready", body: "Talk it through with your Orchestrator and approve it.", tone: "accent" });
   if (flagged) todos.push({ href: "/dashboard/store", icon: AlertTriangle, title: `${flagged} order${flagged === 1 ? "" : "s"} look suspicious`, body: "Check them before you ship.", tone: "bad" });
   if (unconfirmed) todos.push({ href: "/dashboard/store", icon: MessageSquare, title: `${unconfirmed} COD order${unconfirmed === 1 ? "" : "s"} waiting for the customer`, body: "They were asked to confirm on WhatsApp.", tone: "warn" });
@@ -138,7 +144,18 @@ export default async function DashboardPage() {
       lastRunLabel: a.lastRunAt ? `Last call ${formatRelativeTime(a.lastRunAt, now)} · ${a.callsAllTime} all time` : "Not run yet",
     };
   }
-  const feedItems: RealFeedItem[] = recent.map((r, i) => ({ id: `${r.agentId}-${i}`, agentLabel: agentLabel(r.agentId), when: formatRelativeTime(r.createdAt, now) }));
+  // One line per run of the same agent ("Orbit Design — wiring ×8"), newest first, at most 8 lines.
+  const feedItems: RealFeedItem[] = [];
+  for (const r of recent) {
+    const last = feedItems[feedItems.length - 1];
+    if (last && last.id.startsWith(`${r.agentId}|`)) {
+      const n = Number(last.id.split("|")[1]) + 1;
+      last.id = `${r.agentId}|${n}`;
+      last.agentLabel = `${agentLabel(r.agentId)} ×${n}`;
+    } else if (feedItems.length < 8) {
+      feedItems.push({ id: `${r.agentId}|1`, agentLabel: agentLabel(r.agentId), when: formatRelativeTime(r.createdAt, now) });
+    }
+  }
   const hasActivity = recent.length > 0;
 
   const growth = orderGrowth.orderGrowthPct;

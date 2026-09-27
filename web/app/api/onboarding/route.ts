@@ -9,6 +9,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { UsageCapExceededError, PLAN_DEFAULT_CAP_USD } from "@/lib/usage-limit";
 import { VALID_BUSINESS_MODELS } from "@/lib/business-model";
 import { cleanAnswers } from "@/lib/onboarding-questions";
+import { mentionsPakistan } from "@/lib/market-country";
 
 export const maxDuration = 120;
 
@@ -52,6 +53,8 @@ export async function POST(req: NextRequest) {
     : host.endsWith(".uk") || phone.startsWith("+44") ? "gbp"
     : host.endsWith(".sa") || phone.startsWith("+966") ? "sar"
     : host.endsWith(".bd") || phone.startsWith("+880") ? "bdt"
+    // No site or number: what they wrote — a Pakistani city, "Rs 450", PKR — still says where they sell.
+    : mentionsPakistan([body.businessName, body.niche, ...(body.answers ?? []).map((x) => x.answer)].join(" ")) ? "pkr"
     : undefined;
 
   const business = await prisma.business.create({

@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { totalStock } from "@/lib/variants";
 
 /**
  * Strategy Lab — shared types + everything that is REAL CODE (never AI): the business snapshot the
@@ -166,7 +167,7 @@ export async function getBusinessSnapshot(businessId: string): Promise<BusinessS
     prisma.order.findMany({ where: { businessId, createdAt: { gte: since60, lt: since30 }, ...validOrder }, select: { total: true } }),
     prisma.order.count({ where: { businessId, ...validOrder } }),
     prisma.order.findMany({ where: { businessId, ...validOrder, createdAt: { lt: since30 } }, select: { customerPhone: true } }),
-    prisma.product.findMany({ where: { businessId }, select: { name: true, price: true, costPrice: true, stock: true }, take: 60 }),
+    prisma.product.findMany({ where: { businessId }, select: { name: true, price: true, costPrice: true, stock: true, optionTypes: true, variants: { select: { stock: true } } }, take: 60 }),
     prisma.coupon.findMany({ where: { businessId, active: true }, select: { code: true }, take: 20 }),
     prisma.growthReport.findFirst({ where: { businessId }, orderBy: { createdAt: "desc" }, select: { content: true } }),
     prisma.$queryRaw<{ c: bigint }[]>`SELECT COUNT(DISTINCT "sessionId") AS c FROM "StoreEvent" WHERE "businessId" = ${businessId} AND "type" = 'view_store' AND "createdAt" >= ${since30}`,
@@ -222,7 +223,8 @@ export async function getBusinessSnapshot(businessId: string): Promise<BusinessS
       price: p.price,
       costPrice: p.costPrice,
       marginPct: p.costPrice != null && p.price > 0 ? Math.round(((p.price - p.costPrice) / p.price) * 100) : null,
-      stock: p.stock,
+      // A product sold in sizes/flavours keeps its stock on the variants, not the product row.
+      stock: totalStock(p, p.variants),
     })),
     connected: {
       facebook: !!business.metaPageId,

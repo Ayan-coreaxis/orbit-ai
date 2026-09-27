@@ -3,6 +3,11 @@ export interface EmailSendResult {
   error?: string;
 }
 
+export function emailConfigured(): boolean {
+  const key = process.env.RESEND_API_KEY;
+  return !!key && key !== "paste_your_key_here";
+}
+
 /**
  * Sends a real transactional email via Resend's REST API (no SDK dependency — just fetch).
  * Honest like `lib/whatsapp.ts`: if `RESEND_API_KEY` isn't set it does not pretend to send —
