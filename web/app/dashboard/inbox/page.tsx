@@ -2,7 +2,7 @@ import { Topbar } from "@/components/Topbar";
 import { Card, Pill } from "@/components/ui";
 import { getActiveBusinessId } from "@/lib/get-active-business-id";
 import { prisma } from "@/lib/prisma";
-import { MessageCircle } from "lucide-react";
+import { Mail, MessageCircle } from "lucide-react";
 import { FacebookIcon, InstagramIcon, WhatsAppIcon } from "@/components/icons/BrandIcons";
 
 function ChannelIcon({ channel }: { channel: string }) {
@@ -48,19 +48,54 @@ export default async function InboxPage() {
     }
   }
   const conversations = Array.from(groups.values()).sort((a, b) => b.lastAt.getTime() - a.lastAt.getTime());
+  // The storefront's contact form lands here too, so one page holds everything customers sent.
+  const contactMessages = businessId
+    ? await prisma.contactMessage.findMany({ where: { businessId }, orderBy: { createdAt: "desc" }, take: 30 })
+    : [];
+  const total = conversations.length + contactMessages.length;
 
   return (
     <div>
       <Topbar
         title="Customer Messages"
         subtitle={
-          conversations.length > 0
-            ? `${conversations.length} real conversation${conversations.length === 1 ? "" : "s"}`
+          total > 0
+            ? [
+                conversations.length ? `${conversations.length} chat${conversations.length === 1 ? "" : "s"}` : "",
+                contactMessages.length ? `${contactMessages.length} contact-form message${contactMessages.length === 1 ? "" : "s"}` : "",
+              ]
+                .filter(Boolean)
+                .join(" · ")
             : "No conversations yet"
         }
       />
       <div className="max-w-[1200px] space-y-4 p-5 sm:p-8 lg:p-10">
-        {conversations.length === 0 ? (
+        {contactMessages.length > 0 && (
+          <Card className="p-0">
+            <div className="flex items-center gap-2 border-b border-border px-5 py-3.5 text-[12.5px] font-medium text-text-dim">
+              <Mail className="h-4 w-4 text-text-faint" /> From your store&apos;s contact form
+            </div>
+            <div className="divide-y divide-border">
+              {contactMessages.map((m) => (
+                <div key={m.id} className="px-5 py-4">
+                  <div className="flex flex-wrap items-center gap-x-2 text-[13px]">
+                    <span className="font-medium">{m.name}</span>
+                    {m.email && (
+                      <a href={`mailto:${m.email}`} className="text-accent-strong underline-offset-2 hover:underline">
+                        {m.email}
+                      </a>
+                    )}
+                    <span className="ml-auto text-[11.5px] text-text-faint">
+                      {m.createdAt.toLocaleDateString()} {m.createdAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                  </div>
+                  <p className="mt-1.5 whitespace-pre-line text-[13px] leading-relaxed text-text-dim">{m.message}</p>
+                </div>
+              ))}
+            </div>
+          </Card>
+        )}
+        {total === 0 ? (
           <Card className="flex flex-col items-center gap-3 p-12 text-center">
             <MessageCircle className="h-6 w-6 text-text-faint" />
             <p className="max-w-md text-[13.5px] leading-relaxed text-text-faint">

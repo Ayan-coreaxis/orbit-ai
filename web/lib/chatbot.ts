@@ -86,8 +86,28 @@ export async function getChatbotReply(
     `Payment: ${business.paymentProvider === "stripe" ? "card online" : business.paymentProvider === "both" ? "cash on delivery or card online" : "cash on delivery"}.`,
   ].join("\n");
 
+  // Only offers that apply by themselves at checkout — a code the seller hands out privately
+  // (win-back, a partner's audience) must not be given to anyone who asks the chat.
+  const now = new Date();
+  const autoOffers = await prisma.coupon.findMany({
+    where: { businessId, active: true, autoApply: true, OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] },
+    take: 5,
+  });
+  const offerLines = autoOffers
+    .filter((c) => c.usageLimit == null || c.usedCount < c.usageLimit)
+    .map((c) => {
+      const off = c.type === "percent" ? `${c.value}% off` : `${money(c.value, cur)} off`;
+      const bits = [c.minSubtotal ? `on orders over ${money(c.minSubtotal, cur)}` : "", c.firstOrderOnly ? "first order only" : "", c.freeShipping ? "free delivery" : ""].filter(Boolean);
+      return `- ${off}${bits.length ? ` (${bits.join(", ")})` : ""}, applied automatically at checkout${c.expiresAt ? `, until ${c.expiresAt.toISOString().slice(0, 10)}` : ""}`;
+    });
+  const offersBlock = offerLines.length
+    ? ["Offers running now:", ...offerLines].join("\n")
+    : "Offers: none that apply automatically right now.";
+
   const context = `Store: ${business.name}, sells: ${business.niche}.
 ${deliveryBlock}
+${offersBlock}
+Discount codes: never invent or guess a code. If asked, mention the offers above; for a code, say the seller shares codes on their own channels.
 Real products currently in the catalog:
 ${productBlock || "No products listed yet."}
 ${pagesBlock ? `\nReal store pages (policies, about, etc.):\n${pagesBlock}` : ""}`;

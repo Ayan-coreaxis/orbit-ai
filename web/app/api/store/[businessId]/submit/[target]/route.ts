@@ -1,6 +1,7 @@
 import { throttle } from "@/lib/guard";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { saveContactMessage } from "@/lib/contact-message";
 import { getStoreCustomer } from "@/lib/store-auth";
 import { storeExists } from "@/lib/store-backend";
 
@@ -36,7 +37,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ bus
 
   if (target === "contact") {
     if (!name || !message) return NextResponse.json({ error: "Name and message are required." }, { status: 400 });
-    await prisma.contactMessage.create({ data: { businessId, name, email, message } });
+    await saveContactMessage(businessId, { name, email, message });
     return NextResponse.json({ ok: true });
   }
 

@@ -139,6 +139,7 @@ model Business {
   customerOtps          CustomerOtp[]
   storeRecords          StoreRecord[]
   storeDesign           StoreDesign?
+  designSnapshots       DesignSnapshot[]
   orbitDesignTurns      OrbitDesignTurn[]
   pages                 Page[]
   orchestratorMessages  OrchestratorMessage[]
@@ -857,6 +858,18 @@ model OrbitDesignTurn {
  * each a self-contained block of inline-styled HTML. The live /store URL renders nothing until
  * `published` is explicitly flipped on, so no half-designed store leaks to the public.
  */
+// The design as it was before each saved change — the studio's Undo walks back through these.
+// Only the last few are kept (see lib/orbit-design-generate.ts saveDoc).
+model DesignSnapshot {
+  id         String   @id @default(cuid())
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  doc        String // JSON: OrbitDesignDoc
+  createdAt  DateTime @default(now())
+
+  @@index([businessId, createdAt])
+}
+
 model StoreDesign {
   id             String    @id @default(cuid())
   businessId     String    @unique

@@ -19,6 +19,7 @@ import { qualifyReferralForOrder } from "@/lib/referral";
 import { redeemGiftCard, GiftCardError } from "@/lib/gift-cards";
 import { money } from "@/lib/money";
 import { twilioConfigured } from "@/lib/whatsapp";
+import { displayCity } from "@/lib/pk-cities";
 import { emailConfigured } from "@/lib/email";
 import { pauseAdsForSoldOut } from "@/lib/inventory-ads";
 import { parseCheckoutCustomFields, validateCustomFieldAnswers } from "@/lib/checkout-fields";
@@ -93,7 +94,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ bus
     if (existing) return NextResponse.json({ orderId: existing.id, total: existing.total, duplicate: true });
   }
 
-  const structured = b.shipping && typeof b.shipping === "object" ? b.shipping : null;
+  const structured = b.shipping && typeof b.shipping === "object" ? { ...b.shipping, city: displayCity(b.shipping.city) } : null;
   const address = structured ? formatAddress(structured, (b.address ?? "").trim()) : (b.address ?? "").trim();
   if (!name || !phone || !address)
     return NextResponse.json({ error: "Name, phone and address are all required." }, { status: 400 });

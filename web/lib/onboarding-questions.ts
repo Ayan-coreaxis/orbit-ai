@@ -84,6 +84,18 @@ const QUESTIONS_TOOL = {
   },
 };
 
+/**
+ * The seller can tick several options, so a catch-all ("A mix of all", "All of the above", "Both")
+ * only adds noise — the model still writes one now and then, so it's dropped here.
+ */
+export function usableOptions(options: unknown[]): string[] {
+  const catchAll = /^(a\s+)?(mix|mixture|combination)\b|\ball of (the )?(above|these|them)\b|^both\b|^(all|any|everything)\b/i;
+  return options
+    .map((o) => String(o).trim().slice(0, 60))
+    .filter((o) => o && !catchAll.test(o))
+    .slice(0, 6);
+}
+
 export async function generateOnboardingQuestions(input: { name: string; niche: string; businessModel?: string | null; website?: string | null }): Promise<{ questions: OnboardingQuestion[]; ai: boolean }> {
   if (!process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY === "paste_your_key_here") return { questions: FALLBACK_QUESTIONS, ai: false };
   try {
@@ -110,14 +122,17 @@ Write 4–5 questions that only THIS seller can answer and that would most chang
     const questions = raw
       .filter((q) => q && typeof q.question === "string" && q.question.trim())
       .slice(0, 5)
-      .map((q, i) => ({
-        id: String(q.id || `q${i + 1}`).replace(/[^a-z0-9_]/gi, "_").slice(0, 40),
-        question: q.question.trim().slice(0, 200),
-        why: String(q.why ?? "").trim().slice(0, 160),
-        type: q.type === "choice" && Array.isArray(q.options) && q.options.length >= 2 ? ("choice" as const) : ("text" as const),
-        options: q.type === "choice" && Array.isArray(q.options) ? q.options.map((o) => String(o).slice(0, 60)).slice(0, 6) : undefined,
-        placeholder: q.placeholder ? String(q.placeholder).slice(0, 120) : undefined,
-      }));
+      .map((q, i) => {
+        const options = q.type === "choice" && Array.isArray(q.options) ? usableOptions(q.options) : [];
+        return {
+          id: String(q.id || `q${i + 1}`).replace(/[^a-z0-9_]/gi, "_").slice(0, 40),
+          question: q.question.trim().slice(0, 200),
+          why: String(q.why ?? "").trim().slice(0, 160),
+          type: options.length >= 2 ? ("choice" as const) : ("text" as const),
+          options: options.length >= 2 ? options : undefined,
+          placeholder: q.placeholder ? String(q.placeholder).slice(0, 120) : undefined,
+        };
+      });
     return questions.length >= 3 ? { questions, ai: true } : { questions: FALLBACK_QUESTIONS, ai: false };
   } catch {
     return { questions: FALLBACK_QUESTIONS, ai: false };

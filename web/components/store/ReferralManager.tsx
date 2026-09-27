@@ -70,6 +70,7 @@ export function ReferralManager({ businessId }: { businessId: string }) {
           type="button"
           role="switch"
           aria-checked={settings.referralEnabled}
+          aria-label="Referral program on"
           onClick={() => save({ referralEnabled: !settings.referralEnabled })}
           className="flex items-center gap-2 text-[13px] font-medium"
         >

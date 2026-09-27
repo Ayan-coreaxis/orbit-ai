@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canonicalCity } from "@/lib/pk-cities";
+import { canonicalCity, displayCity } from "@/lib/pk-cities";
 
 describe("canonicalCity", () => {
   it("treats common spellings as the same city", () => {
@@ -12,5 +12,15 @@ describe("canonicalCity", () => {
     expect(canonicalCity("Lahore City, Pakistan")).toBe("lahore");
     expect(canonicalCity("Lahore Cantt")).toBe("lahore");
     expect(canonicalCity("Karachi District")).toBe("karachi");
+  });
+});
+
+describe("displayCity", () => {
+  it("spells known cities properly and capitalises the rest", () => {
+    expect(displayCity("lahore")).toBe("Lahore");
+    expect(displayCity(" LHR ")).toBe("Lahore");
+    expect(displayCity("chak jhumra")).toBe("Chak Jhumra");
+    expect(displayCity("DHA Phase 5")).toBe("DHA Phase 5");
+    expect(displayCity("")).toBe("");
   });
 });

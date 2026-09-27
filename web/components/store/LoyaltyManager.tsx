@@ -108,6 +108,7 @@ export function LoyaltyManager({ businessId, currency }: { businessId: string; c
           type="button"
           role="switch"
           aria-checked={settings.loyaltyEnabled}
+          aria-label="Loyalty points on"
           onClick={() => save({ loyaltyEnabled: !settings.loyaltyEnabled })}
           className="flex items-center gap-2 text-[13px] font-medium"
         >

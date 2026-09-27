@@ -50,3 +50,16 @@ export function canonicalCity(input: string | null | undefined): string {
   if (!/^wah\b/.test(c)) c = c.replace(/\s+(city|district|cantt|cant|cantonment)$/, "").trim();
   return ALIASES[c] ?? c;
 }
+
+/**
+ * How a city is shown on the order / label: a known city in its proper spelling ("lhr" →
+ * "Lahore"), anything else as typed with each word capitalised ("model colony" → "Model Colony").
+ */
+export function displayCity(input: string | null | undefined): string {
+  const raw = (input ?? "").trim().replace(/\s+/g, " ");
+  if (!raw) return "";
+  const canon = canonicalCity(raw);
+  const known = PK_CITIES.find((c) => c.toLowerCase() === canon);
+  if (known) return known;
+  return raw === raw.toLowerCase() ? raw.replace(/(^|\s)\p{L}/gu, (m) => m.toUpperCase()) : raw;
+}

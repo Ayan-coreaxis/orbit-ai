@@ -64,14 +64,15 @@ Use web search (several focused searches) to find what is TRUE NOW for this nich
 Then write a RESEARCH BRIEF, max 350 words, plain text, grouped under those 5 headings. Only facts you found or that are well established — say "not found" rather than guess. Mention dates and numbers only when a source showed them.`;
 
   try {
-    // Long server-side search turns can come back as "pause_turn" — continue them (max 3 times).
+    // Long server-side search turns can come back as "pause_turn" — continue once. Every round re-sends
+    // all the search results so far (the bulk of the cost), so searches and rounds are both capped.
     const messages: Anthropic.Messages.MessageParam[] = [{ role: "user", content: prompt }];
     const all: Anthropic.Messages.ContentBlock[] = [];
-    for (let round = 0; round < 4; round++) {
+    for (let round = 0; round < 2; round++) {
       const msg = await anthropic.messages.create({
         model: MODEL,
         max_tokens: 6000,
-        tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 6 } as unknown as Anthropic.Messages.Tool],
+        tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 5 } as unknown as Anthropic.Messages.Tool],
         messages,
       });
       const searches = (msg.usage as { server_tool_use?: { web_search_requests?: number } }).server_tool_use?.web_search_requests ?? 0;

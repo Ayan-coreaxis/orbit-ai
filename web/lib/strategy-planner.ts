@@ -199,6 +199,7 @@ export function plannerPrinciples(): string {
 - To invent the originals, think from angles like these (angles, not ideas to copy): the product's own story and origin; the buyer's daily or seasonal rituals; a local moment or place only this city has; an unusual partner whose customers overlap; a twist on the product itself (size, format, personalisation, a kit); a service wrapped around the product (advice, a routine, a follow-up); something the buyer can show or gift to others. Each original must use a real fact from the snapshot or the research.
 - Make the store fit the plan: at least one strategy must include an "orbit" step that shapes the storefront around it with Orbit Design (hero message, a trust / proof section, a landing page for the offer, a gift or bundle page) — the store should look like it was built for this plan.
 - Health, food and beauty: never plan cure or treatment claims, "guaranteed results" or fake reviews.
+- Never promise shoppers a policy the seller didn't give you — "open the parcel before you pay", free returns, refunds, money-back, a delivery time. A step that needs one is owner "seller" with a note to decide it first, and nothing on the store may state it until they have.
 - Never assume the seller has something they didn't tell you — a shop, a pickup point, an address, staff, a supplier, a certificate, a family recipe. A step that depends on one is owner "seller" with a note to confirm it first, and no "orbit" step may put it on the store or the checkout until they have.
 
 HONEST EXECUTION TAGS — for EVERY step:

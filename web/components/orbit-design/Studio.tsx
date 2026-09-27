@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Sparkles, Braces, SlidersHorizontal, Type, Download, ClipboardCopy, Send, Globe, Loader2, Check, ArrowUp, Menu, ChevronRight, MousePointerClick, MessageSquare, Trash2, Files, ScanEye } from "lucide-react";
+import { Sparkles, Braces, SlidersHorizontal, Type, Download, ClipboardCopy, Send, Globe, Loader2, Check, ArrowUp, Menu, ChevronRight, MousePointerClick, MessageSquare, Trash2, Files, ScanEye, Undo2 } from "lucide-react";
 import { renderPageDocument, type DesignContent, type DesignTokens, type OrbitDesignDoc, type StorefrontProduct } from "@/lib/orbit-design";
 import type { AuditFinding } from "@/lib/orbit-design-generate";
 import { AuditOverlay } from "./AuditOverlay";
@@ -142,7 +142,7 @@ export function Studio({
       if (Array.isArray(data.questions) && data.questions.length) {
         setMessages([
           { role: "user", content: message, images: images.length ? images : undefined },
-          { role: "assistant", content: "A few things before I build — set them on the right, or hit “Decide for me”." },
+          { role: "assistant", content: data.intro || "A few things before I build — set them on the right, or hit “Decide for me”." },
         ]);
         setPlan({ brief: message, images, summary: data.summary || "", questions: data.questions, answers: {} });
         setMobileTab("preview");
@@ -218,7 +218,7 @@ export function Studio({
         latestTokens.current = data.doc.tokens;
         // A fresh whole-store build is exactly the case Audit Design exists for — run it
         // automatically once the build lands, instead of waiting for the seller to remember to.
-        if (heavy) void runAudit();
+        if (heavy) void runAudit(true);
       }
       // Post-handoff: Orbit Code reacts to a new interactive part the seller just designed.
       const oc = data.orbitCode as { questions?: { id: string; q: string; options?: string[] }[]; rewired?: string } | undefined;
@@ -313,6 +313,28 @@ export function Studio({
     }
   }
 
+  // Undo walks back through the versions saved before each change (AI edits included).
+  const [undoing, setUndoing] = useState(false);
+  async function undoLast() {
+    if (undoing) return;
+    setUndoing(true);
+    try {
+      const res = await fetch("/api/orbit-design/undo", { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.doc) {
+        flash(data.error ?? "Couldn't undo — try again.");
+        return;
+      }
+      setDoc(data.doc);
+      latestTokens.current = data.doc.tokens;
+      flash(data.left ? `Undone — ${data.left} more step${data.left === 1 ? "" : "s"} back available.` : "Undone.");
+    } catch {
+      flash("Network error — couldn't undo.");
+    } finally {
+      setUndoing(false);
+    }
+  }
+
   const [cleaning, setCleaning] = useState(false);
   async function cleanSlate() {
     if (cleaning) return;
@@ -390,10 +412,12 @@ export function Studio({
   const [auditFindings, setAuditFindings] = useState<AuditFinding[]>([]);
   const [auditSummary, setAuditSummary] = useState<string | null>(null);
   const [auditError, setAuditError] = useState<string | null>(null);
+  const [auditInBackground, setAuditInBackground] = useState(false);
   const closeAudit = useCallback(() => setAuditPhase("idle"), []);
 
-  async function runAudit() {
+  async function runAudit(background = false) {
     if (auditPhase === "scanning" || auditPhase === "applying") return;
+    setAuditInBackground(background);
     setAuditError(null);
     setAuditFindings([]);
     setAuditSummary(null);
@@ -564,12 +588,22 @@ export function Studio({
             {handingOff ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ClipboardCopy className="h-3.5 w-3.5" />} {wiredOnce ? "Re-wire" : "Handoff"}
           </button>
           <button
-            onClick={runAudit}
+            onClick={() => void runAudit()}
             disabled={auditPhase === "scanning" || auditPhase === "applying"}
             title="Deep QA pass — checks alignment, responsiveness and contrast on every page, then asks before fixing anything"
             className="hidden items-center gap-1.5 rounded-lg border border-border px-2.5 py-2 text-[12.5px] font-medium text-text-dim hover:text-text disabled:opacity-60 md:flex"
           >
             {auditPhase === "scanning" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ScanEye className="h-3.5 w-3.5" />} Audit Design
+          </button>
+          <button
+            onClick={undoLast}
+            disabled={undoing}
+            title="Undo the last change to the design"
+            aria-label="Undo"
+            className="flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-2 text-[12.5px] font-medium text-text-dim hover:text-text disabled:opacity-50"
+          >
+            {undoing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Undo2 className="h-3.5 w-3.5" />}
+            <span className="hidden sm:inline">Undo</span>
           </button>
           <button
             onClick={cleanSlate}
@@ -840,6 +874,7 @@ export function Studio({
               error={auditError}
               onApply={applyAudit}
               onClose={closeAudit}
+              startMinimized={auditInBackground}
             />
           )}
 

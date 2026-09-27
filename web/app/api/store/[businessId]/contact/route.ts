@@ -1,6 +1,7 @@
 import { throttle } from "@/lib/guard";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { saveContactMessage } from "@/lib/contact-message";
 
 /** Public storefront contact form → one ContactMessage row the seller sees in their dashboard. */
 export async function POST(req: NextRequest, { params }: { params: Promise<{ businessId: string }> }) {
@@ -19,8 +20,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ bus
     return NextResponse.json({ ok: false, error: "Enter a valid email address." }, { status: 400 });
   }
 
-  await prisma.contactMessage.create({
-    data: { businessId, name: name.slice(0, 120), email: email.slice(0, 160), message: message.slice(0, 4000) },
-  });
+  await saveContactMessage(businessId, { name, email, message });
   return NextResponse.json({ ok: true });
 }

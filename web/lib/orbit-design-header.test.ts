@@ -58,6 +58,15 @@ describe("core pages", () => {
     expect(html).not.toContain("{{product.name}}");
     expect(html).toContain('data-od-widget="product"');
   });
+
+  it("drops a hand-drawn sign-in form that would sit dead above the real one", () => {
+    const doc = defaultDoc("Chai Wala Co.", "chai");
+    const login = doc.pages.find((p) => p.slug === "login")!;
+    login.sections.unshift({ id: "login-main", type: "custom", label: "Sign in", visible: true, html: `<section><h1>Sign in</h1><label>Email</label><input type="email"/><label>Password</label><input type="password"/><button>Sign in</button></section>` });
+    const html = renderPageDocument(doc, { products: [], businessId: "b1", pageSlug: "login" });
+    expect(html).not.toContain('type="password"');
+    expect(html).toContain('data-od-widget="auth"');
+  });
 });
 
 describe("links", () => {

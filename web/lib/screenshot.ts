@@ -101,7 +101,14 @@ export async function renderDocShots(pages: { label: string; html: string }[]): 
           await guardBrowserPage(page);
           try {
             await page.setContent(html, { waitUntil: "load", timeout: 15000 });
-            await page.waitForTimeout(1400); // fonts + scroll-reveal + marquee settle
+            // A full-page shot never scrolls, so scroll-reveal content below the fold would still be
+            // invisible — the reviewer then reports a real section as an "empty gap" and deletes it.
+            // Show everything in its final state first.
+            await page.addStyleTag({
+              content:
+                "[data-od-reveal],[data-od-reveal-stagger]>*{opacity:1!important;transform:none!important;transition:none!important}[data-od-parallax]{transform:none!important}",
+            });
+            await page.waitForTimeout(1400); // fonts + marquee settle
             const buf = await page.screenshot({ type: "jpeg", quality: 68, fullPage: view.name === "desktop" });
             shots.push({ label: `${label} · ${view.name}`, data: buf.toString("base64"), mediaType: "image/jpeg" });
           } catch {

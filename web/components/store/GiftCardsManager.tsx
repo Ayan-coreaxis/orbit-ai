@@ -121,6 +121,7 @@ export function GiftCardsManager({ businessId, currency }: { businessId: string;
           type="button"
           role="switch"
           aria-checked={settings.giftCardsEnabled}
+          aria-label="Gift cards on"
           onClick={() => save({ giftCardsEnabled: !settings.giftCardsEnabled })}
           className="flex items-center gap-2 text-[13px] font-medium"
         >

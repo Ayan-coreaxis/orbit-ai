@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, Loader2, ScanEye, X } from "lucide-react";
+import { Check, Loader2, Minimize2, ScanEye, X } from "lucide-react";
 import type { AuditFinding } from "@/lib/orbit-design-generate";
 import { BuildingCanvas } from "./BuildingCanvas";
 
@@ -27,6 +27,7 @@ export function AuditOverlay({
   error,
   onApply,
   onClose,
+  startMinimized = false,
 }: {
   phase: "scanning" | "review" | "applying" | "done";
   summary: string | null;
@@ -34,12 +35,15 @@ export function AuditOverlay({
   error: string | null;
   onApply: (approvedIds: string[]) => void;
   onClose: () => void;
+  /** The automatic check after a build starts tucked away, so the seller sees their new store first. */
+  startMinimized?: boolean;
 }) {
-  const [checked, setChecked] = useState<Set<string>>(() => new Set(findings.filter((f) => f.fix).map((f) => f.id)));
+  const [minimized, setMinimized] = useState(startMinimized);
+  const [checked, setChecked] = useState<Set<string>>(() => new Set(findings.map((f) => f.id)));
   const [seenFindings, setSeenFindings] = useState(findings);
   if (seenFindings !== findings) {
     setSeenFindings(findings); // new audit results — pre-tick every fixable finding again
-    setChecked(new Set(findings.filter((f) => f.fix).map((f) => f.id)));
+    setChecked(new Set(findings.map((f) => f.id)));
   }
 
   const scanning = phase === "scanning" || phase === "applying";
@@ -64,6 +68,31 @@ export function AuditOverlay({
   }, [phase]);
   const canvasLabel = phase === "scanning" ? AUDIT_STEPS[stepIdx] : phase === "applying" ? "Applying fixes" : "Done";
 
+  // Tucked away: a small pill over the preview, so the store stays usable while the check runs.
+  if (minimized) {
+    const label =
+      phase === "scanning"
+        ? "Checking your store…"
+        : phase === "applying"
+          ? "Applying fixes…"
+          : phase === "review"
+            ? error
+              ? "Audit couldn't finish"
+              : findings.length
+                ? `Audit: ${findings.length} thing${findings.length === 1 ? "" : "s"} to review`
+                : "Audit: all clear"
+            : "Fixes applied";
+    return (
+      <button
+        onClick={() => setMinimized(false)}
+        className="absolute bottom-4 right-4 z-40 flex items-center gap-2 rounded-full border border-white/10 bg-[#07060c]/90 px-4 py-2.5 text-[12.5px] font-medium text-white shadow-lg backdrop-blur hover:bg-[#07060c]"
+      >
+        {scanning ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ScanEye className="h-3.5 w-3.5" />}
+        {label}
+      </button>
+    );
+  }
+
   return (
     <div className="od-audit absolute inset-0 z-40 flex flex-col overflow-hidden">
       <div className="absolute inset-0">
@@ -87,6 +116,14 @@ export function AuditOverlay({
             </div>
           </div>
         </div>
+        {scanning && (
+          <button
+            onClick={() => setMinimized(true)}
+            className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12px] font-medium text-white/60 hover:bg-white/10 hover:text-white"
+          >
+            <Minimize2 className="h-3.5 w-3.5" /> Keep checking in the background
+          </button>
+        )}
         {phase !== "scanning" && phase !== "applying" && (
           <button onClick={onClose} className="flex h-7 w-7 items-center justify-center rounded-lg text-white/50 hover:bg-white/10 hover:text-white" aria-label="Close">
             <X className="h-4 w-4" />
@@ -122,13 +159,12 @@ export function AuditOverlay({
                 {findings.map((f) => (
                   <label
                     key={f.id}
-                    className={`flex items-start gap-3 rounded-xl border border-white/10 bg-white/[0.04] p-3.5 transition ${f.fix ? "cursor-pointer hover:bg-white/[0.07]" : "opacity-70"}`}
+                    className="flex cursor-pointer items-start gap-3 rounded-xl border border-white/10 bg-white/[0.04] p-3.5 transition hover:bg-white/[0.07]"
                   >
                     <input
                       type="checkbox"
                       checked={checked.has(f.id)}
-                      onChange={() => f.fix && toggle(f.id)}
-                      disabled={!f.fix}
+                      onChange={() => toggle(f.id)}
                       className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--od-accent,#c9803f)]"
                     />
                     <div className="min-w-0 flex-1">
@@ -138,7 +174,7 @@ export function AuditOverlay({
                       </div>
                       <p className="mt-1 text-[13px] leading-snug text-white/85">{f.issue}</p>
                       <p className="mt-0.5 text-[12px] leading-snug text-white/45">
-                        {f.fix ? `Fix: ${f.fixSummary}` : `Needs a manual edit — ${f.fixSummary}`}
+                        Fix: {f.fixSummary}
                       </p>
                     </div>
                   </label>

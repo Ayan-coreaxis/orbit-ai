@@ -786,7 +786,7 @@ function productCardsHtml(
       // makes CSS grid mis-size the row and squish the card (the jagged/uneven-card bug).
       const inner = p.imageUrl
         ? `<img src="${escapeAttr(p.imageUrl)}" alt="${escapeAttr(p.name)}" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block">`
-        : imgSlot(`Product photo: ${p.name}`, "width:100%;height:100%;border-radius:0");
+        : imgSlot(`Product photo: ${p.name}`, "width:100%;height:100%;border-radius:0", false, preview);
       const img = `<div style="width:100%;height:clamp(180px, 22vw, 260px);overflow:hidden;border-radius:var(--od-radius);background:var(--od-surface)">${inner}</div>`;
       // A product with option axes is never "sold out" at the card — availability is per-variant on
       // the product page (and its `stock` is the summed variant stock, which can lag).
@@ -886,7 +886,7 @@ function catSlug(name?: string | null): string {
  * read as one repeated broken image. Four background treatments, rotating hue, varied mark. Reads as
  * a deliberate editorial holding-graphic — clearly "a photo goes here" via the brief pill.
  */
-function imgSlot(brief: string, sizing: string, bg = false): string {
+function imgSlot(brief: string, sizing: string, bg = false, caption = true): string {
   const brf = escapeHtml(brief);
   let seed = 0;
   for (let i = 0; i < brief.length; i++) seed = (seed * 31 + brief.charCodeAt(i)) >>> 0;
@@ -915,18 +915,21 @@ function imgSlot(brief: string, sizing: string, bg = false): string {
       : seed % 3 === 1
         ? `<svg viewBox="0 0 100 100" style="position:absolute;inset:0;width:100%;height:100%;opacity:.13" aria-hidden="true"><defs><pattern id="od-dot-${seed % 999}" width="16" height="16" patternUnits="userSpaceOnUse"><circle cx="3" cy="3" r="2.4" fill="#fff"/></pattern></defs><rect width="100" height="100" fill="url(#od-dot-${seed % 999})"/></svg>`
         : "";
-  return `<div data-od-imgslot title="${escapeAttr(brief)}" style="${sizing};position:relative;overflow:hidden;border-radius:var(--od-radius-lg, var(--od-radius));background:${bgCss}">
+  return `<div data-od-imgslot${caption ? ` title="${escapeAttr(brief)}"` : ` aria-hidden="true"`} style="${sizing};position:relative;overflow:hidden;border-radius:var(--od-radius-lg, var(--od-radius));background:${bgCss}">
   ${mark}
   ${
-    bg
+    bg || !caption
       ? ""
       : `<span style="position:absolute;left:12px;bottom:12px;max-width:calc(100% - 24px);font-size:10px;line-height:1.35;color:#fff;background:color-mix(in srgb, var(--od-text) 48%, transparent);backdrop-filter:blur(3px);padding:3px 9px;border-radius:999px">${brf}</span>`
   }
 </div>`;
 }
 
-/** Replace `<div data-img-slot="brief" style="..."></div>` markers with real placeholders. */
-function fillImageSlots(html: string): string {
+/**
+ * Replace `<div data-img-slot="brief" style="..."></div>` markers with real placeholders. The brief
+ * is shown on the placeholder only in the studio — shoppers on the live store never see "hero-cup".
+ */
+function fillImageSlots(html: string, preview = true): string {
   const decode = (s: string) =>
     s.replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">");
   return html
@@ -943,13 +946,17 @@ function fillImageSlots(html: string): string {
     })
     .replace(/<div\s+data-img-slot="([^"]*)"([^>]*)>\s*<\/div>/gi, (_m, brief: string, attrs: string) => {
       const styleMatch = /style="([^"]*)"/i.exec(attrs);
-      const sizing = styleMatch ? styleMatch[1] : "width:100%;aspect-ratio:16/10";
+      let sizing = styleMatch ? styleMatch[1] : "width:100%;aspect-ratio:16/10";
+      // "height:100%" inside a parent with no set height collapses to nothing — the seller sees an
+      // empty card. Give such a slot a real size.
+      if (!/(^|;)\s*(aspect-ratio|min-height)\s*:|(^|;)\s*height\s*:\s*[\d.]+(px|rem|em|vh|svh)/i.test(sizing))
+        sizing = `${sizing.replace(/;\s*$/, "")};min-height:280px`;
       // A real image the seller supplied (Content panel / click-to-edit) — else the art-directed placeholder.
       const src = /data-(?:od-)?img-src="([^"]+)"/i.exec(attrs)?.[1];
       if (src) {
         return `<div data-od-imgslot title="${escapeAttr(decode(brief))}" style="${sizing};overflow:hidden;border-radius:var(--od-radius)"><img src="${escapeAttr(src)}" alt="${escapeAttr(decode(brief))}" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block"></div>`;
       }
-      return imgSlot(decode(brief), sizing, /\bdata-img-bg\b/i.test(attrs));
+      return imgSlot(decode(brief), sizing, /\bdata-img-bg\b/i.test(attrs), preview);
     });
 }
 
@@ -1147,6 +1154,14 @@ function substituteContent(html: string, doc: OrbitDesignDoc): string {
     html
       // A social link whose account isn't set would point nowhere — drop the whole link, icon and all.
       .replace(/<a\b[^>]*href="\s*\{\{\s*(social\.[a-z]+)\s*\}\}\s*"[^>]*>[\s\S]*?<\/a>/gi, (m, key: string) => (map[key] ? m : ""))
+      // A contact detail the seller hasn't filled in: drop its row (icon + blank value), or the
+      // mailto:/tel: link, or the bare line — never a lonely ✉ with nothing next to it.
+      .replace(
+        /<div\b[^>]*>\s*(?:<(span|div|i)\b[^>]*>(?:[^<]{0,6}|\s*<svg\b[\s\S]*?<\/svg>\s*)<\/\1>\s*|<svg\b[\s\S]*?<\/svg>\s*)?<(span|p|a|div|strong)\b[^>]*>\s*\{\{\s*(contact\.[a-z]+)\s*\}\}\s*<\/\2>\s*<\/div>/gi,
+        (m, _i: string, _t: string, key: string) => (map[key] ? m : ""),
+      )
+      .replace(/<a\b[^>]*href="\s*(?:mailto:|tel:)?\s*\{\{\s*(contact\.[a-z]+)\s*\}\}\s*"[^>]*>[\s\S]*?<\/a>/gi, (m, key: string) => (map[key] ? m : ""))
+      .replace(/<(p|li|span)\b[^>]*>\s*\{\{\s*(contact\.[a-z]+)\s*\}\}\s*<\/\1>/gi, (m, _t: string, key: string) => (map[key] ? m : ""))
       // …and a column left with only its heading ("FOLLOW US" over an empty row) goes too.
       .replace(/<div\b[^>]*>\s*<(div|h[1-6]|p|span|strong)\b[^>]*>[^<]{1,40}<\/\1>\s*<(div|ul|nav|p)\b[^>]*>\s*<\/\2>\s*<\/div>/gi, "")
       // "© 2026 {{store.name}}." for a name that already ends in a full stop ("Chai Wala Co.").
@@ -1761,7 +1776,10 @@ function legacyGridIntro(html: string): string {
  * and no size picker. Such a section is never rendered; the real widget section is.
  */
 export function fakesCoreWidget(html: string | undefined): boolean {
-  return !!html && /\{\{\s*(product|cart|account|auth|track|checkout)\.[a-z_]+\s*\}\}/i.test(html);
+  if (!html) return false;
+  // Made-up widget tokens, or a hand-drawn sign-in form: only the real {{auth}} / {{account}} widget
+  // ever asks for a password — a password box anywhere else is dead and would strand the shopper.
+  return /\{\{\s*(product|cart|account|auth|track|checkout)\.[a-z_]+\s*\}\}/i.test(html) || /<input\b[^>]*type\s*=\s*["']?password/i.test(html);
 }
 
 export function renderPageBody(doc: OrbitDesignDoc, opts: RenderOpts): { html: string; widgets: PageWidget[] } {
@@ -1771,7 +1789,7 @@ export function renderPageBody(doc: OrbitDesignDoc, opts: RenderOpts): { html: s
   const widgets: PageWidget[] = [];
   const block = (html: string) =>
     applySpec(
-      widgetMarkers(rewriteLinks(fillImageSlots(sanitizeBlock(fixInlineCss(substituteContent(html, doc)))), opts.businessId, preview, doc), preview, opts.currency),
+      widgetMarkers(rewriteLinks(fillImageSlots(sanitizeBlock(fixInlineCss(substituteContent(html, doc))), preview), opts.businessId, preview, doc), preview, opts.currency),
       page.slug,
       spec,
       preview,
@@ -2234,7 +2252,13 @@ el.appendChild(span);span.addEventListener('animationend',function(){span.remove
  * instead of N hand-rolled blobs. All token-driven, so the knobs + Tweaks still retune everything.
  */
 function designKitCss(scope: string): string {
-  return `${scope} .od-section{padding:var(--od-section-y) var(--od-gutter)}
+  // Form fields a section draws itself (a contact form, a newsletter box) — the site-wide reset
+  // strips their border, so they'd show as blank space under their label. Zero specificity: any
+  // class or inline style the design gives a field (and every widget's own fields) still wins.
+  return `:where(${scope}) :where(input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=hidden]),textarea,select){font:inherit;color:var(--od-text);background:var(--od-bg);border:1px solid var(--od-border);border-radius:var(--od-radius-md);padding:10px 12px;min-height:44px;box-sizing:border-box}
+:where(${scope}) :where(textarea){min-height:110px}
+:where(${scope}) :where([data-od-form] label){display:block;margin-bottom:6px;font-size:var(--od-text-sm);color:var(--od-muted)}
+${scope} .od-section{padding:var(--od-section-y) var(--od-gutter)}
 ${scope} .od-section-sm{padding:var(--od-s8) var(--od-gutter)}
 ${scope} .od-section:first-of-type{padding-top:var(--od-s7)}
 ${scope} .od-section--hero{padding-top:var(--od-s7);padding-bottom:var(--od-s8)}

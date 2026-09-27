@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cleanAnswers, FALLBACK_QUESTIONS, generateOnboardingQuestions, sellerAnswersBlock } from "@/lib/onboarding-questions";
+import { cleanAnswers, FALLBACK_QUESTIONS, generateOnboardingQuestions, sellerAnswersBlock, usableOptions } from "@/lib/onboarding-questions";
 
 describe("onboarding questions", () => {
   it("falls back to the fixed set without an AI key", async () => {
@@ -16,5 +16,16 @@ describe("onboarding questions", () => {
     expect(sellerAnswersBlock(JSON.stringify(a))).toContain("- Q1 → Eid");
     expect(sellerAnswersBlock(null)).toBe("");
     expect(sellerAnswersBlock("not json")).toBe("");
+  });
+});
+
+describe("usableOptions", () => {
+  it("drops catch-all options the seller could get by ticking several", () => {
+    expect(usableOptions(["Families at home", "Gift buyers", "A mix of different types", "All of the above", "Both", "Cafes"])).toEqual([
+      "Families at home",
+      "Gift buyers",
+      "Cafes",
+    ]);
+    expect(usableOptions(["Allama Iqbal Town", "Mixed tea blends"])).toEqual(["Allama Iqbal Town", "Mixed tea blends"]);
   });
 });

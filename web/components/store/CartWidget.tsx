@@ -105,9 +105,14 @@ export function CartWidget({
   const [options, setOptions] = useState<("cod" | "stripe")[]>(["cod"]);
   const [payment, setPayment] = useState<"cod" | "stripe">("cod");
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [errorState, setErrorState] = useState<{ msg: string; key: string } | null>(null);
   const [placed, setPlaced] = useState<null | { needsVerify: boolean }>(null);
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, string | boolean>>({});
+  // An error belongs to the form as it was when it happened — once the shopper edits a field it
+  // goes away instead of sitting there after they've fixed it.
+  const formKey = JSON.stringify([form, customFieldValues]);
+  const setError = (msg: string | null) => setErrorState(msg ? { msg, key: formKey } : null);
+  const error = errorState && errorState.key === formKey ? errorState.msg : null;
   const [showSuccess, setShowSuccess] = useState(false);
   const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
   const [addrChoice, setAddrChoice] = useState<string>(""); // "" = new address, else an address id

@@ -392,6 +392,7 @@ const PLAN_TOOL = {
     type: "object" as const,
     properties: {
       summary: { type: "string", description: "one or two sentences: the store you're about to build, in your words" },
+      intro: { type: "string", description: "one short friendly line to the seller, before the questions — e.g. 'A few things before I build — pick them on the right, or let me decide.' — in the seller's own language and script" },
       questions: {
         type: "array",
         description: "0 to 4 short questions whose answers would most change the design. Return an EMPTY array when the brief already specifies the pages, the visual direction (palette/fonts/mood) and the key content — a detailed brief needs no questions. Otherwise ask only what's genuinely missing.",
@@ -422,6 +423,7 @@ const PLAN_TOOL = {
 
 export interface DesignPlan {
   summary: string;
+  intro?: string;
   questions: { key: string; question: string; why?: string; type?: "select" | "toggle" | "multi" | "text"; suggestions: string[] }[];
   error?: string;
 }
@@ -445,14 +447,19 @@ export async function runDesignPlan(
     return { ...empty, error: "cap" };
   }
 
-  const business = await prisma.business.findUnique({ where: { id: businessId }, select: { name: true, niche: true } });
+  const [business, productCount] = await Promise.all([
+    prisma.business.findUnique({ where: { id: businessId }, select: { name: true, niche: true } }),
+    prisma.product.count({ where: { businessId } }),
+  ]);
   const hasUrl = /https?:\/\//.test(brief);
   const content: Anthropic.ContentBlockParam[] = [
     {
       type: "text",
       text: `THE SELLER'S BRIEF (this is the source of truth for what to build):\n${brief}${
         images.length ? `\n\nThey attached ${images.length} reference image(s) — shown below.` : ""
-      }${hasUrl ? `\n\nThey linked a site — it will be screenshotted and matched at build time.` : ""}\n\nFor context only, the name currently on their account is "${business?.name ?? "(unset)"}" (${business?.niche ?? "products"}) — but the brief above overrides this. If the brief clearly describes a different kind of brand, just ask what name/wordmark to put on the new storefront; don't dwell on the old one.`,
+      }${hasUrl ? `\n\nThey linked a site — it will be screenshotted and matched at build time.` : ""}\n\nFor context only, the name currently on their account is "${business?.name ?? "(unset)"}" (${business?.niche ?? "products"}) — but the brief above overrides this. If the brief clearly describes a different kind of brand, just ask what name/wordmark to put on the new storefront; don't dwell on the old one.${
+        productCount > 0 ? `\n\nThey already have ${productCount} product(s) in their catalogue — the store shows those, so don't ask how many products to show.` : ""
+      }`,
     },
     ...images.map((im): Anthropic.ContentBlockParam => ({ type: "image", source: { type: "base64", media_type: im.mediaType, data: im.data } })),
   ];
@@ -470,6 +477,8 @@ Make the questions feel like a sharp designer's intake form, not a quiz:
 - Use 'multi' for "what matters most for a first pass" (homepage, shop/filtering, product page, cart flow, about, mobile nav).
 - Use 'text' only for names/specifics (brand wordmark, exact colours).
 
+Write the summary, intro, questions, 'why' lines and options in the seller's own language and script — if they wrote Roman Urdu, write Roman Urdu; if English, English.
+
 Never lecture about the seller's previous/existing brand; the brief is what matters. At most 5 questions. Always give a one or two sentence plain summary of the store you're about to build. Call propose_plan.`,
       tools: [PLAN_TOOL],
       tool_choice: { type: "tool", name: "propose_plan" },
@@ -479,6 +488,7 @@ Never lecture about the seller's previous/existing brand; the brief is what matt
     if (!tool || tool.type !== "tool_use") return { ...empty, error: "no plan" };
     const input = tool.input as {
       summary?: string;
+      intro?: string;
       questions?: { key: string; question: string; why?: string; type?: string; suggestions?: string[] }[];
     };
     const questions = Array.isArray(input.questions)
@@ -494,7 +504,7 @@ Never lecture about the seller's previous/existing brand; the brief is what matt
             return { key: String(q.key), question: String(q.question), why: q.why ? String(q.why) : undefined, type, suggestions };
           })
       : [];
-    return { summary: String(input.summary ?? ""), questions };
+    return { summary: String(input.summary ?? ""), intro: input.intro ? String(input.intro).slice(0, 200) : undefined, questions };
   } catch (e) {
     return { ...empty, error: String(e).slice(0, 120) };
   }
@@ -1401,7 +1411,11 @@ Call report_store_audit with every real finding.`,
   return { summary: (out.summary || "").slice(0, 300), findings };
 }
 
-/** Apply only the findings the seller approved (by id) and save. Returns the updated doc. */
+/**
+ * Apply only the findings the seller approved (by id) and save. Findings that came with a ready
+ * patch are applied directly; the rest (the audit only sees screenshots, so it often can't write the
+ * section's html) go to the normal design editor as one list of fixes. Returns the updated doc.
+ */
 export async function applyAuditFindings(businessId: string, findings: AuditFinding[], approvedIds: string[]): Promise<OrbitDesignDoc> {
   const doc = await loadDoc(businessId);
   const approved = new Set(approvedIds);
@@ -1422,7 +1436,17 @@ export async function applyAuditFindings(businessId: string, findings: AuditFind
   }
   const saved = normalizeDoc(next, next.storeName, next.tagline);
   await saveDoc(businessId, saved);
-  return saved;
+
+  const byEditor = findings.filter((f) => approved.has(f.id) && !f.fix).slice(0, 12);
+  if (!byEditor.length) return saved;
+  const list = byEditor.map((f) => `- [${f.area}${f.page && f.page !== "global" ? ` — /${f.page}` : ""}] ${f.issue} Fix: ${f.fixSummary}`).join("\n");
+  const turn = await runDesignTurn(
+    businessId,
+    `Fix these problems a design check found on the store. Change only what each one needs and keep everything else exactly as it is — same copy, same sections, same look:\n${list}`,
+    {},
+    true,
+  );
+  return turn.doc;
 }
 
 // ---------------------------------------------------------------------------
@@ -1579,12 +1603,47 @@ export async function loadDoc(businessId: string): Promise<OrbitDesignDoc> {
   return defaultDoc(name, niche);
 }
 
-export async function saveDoc(businessId: string, doc: OrbitDesignDoc): Promise<void> {
+const SNAPSHOTS_KEPT = 15;
+
+/**
+ * Save the design. The version it replaces is kept as a snapshot first, so an AI edit that went
+ * wrong (a section removed, copy rewritten) can be undone — `undoDesign` walks back through them.
+ */
+export async function saveDoc(businessId: string, doc: OrbitDesignDoc, opts: { snapshot?: boolean } = {}): Promise<void> {
+  const next = JSON.stringify(doc);
+  if (opts.snapshot !== false) {
+    const prev = await prisma.storeDesign.findUnique({ where: { businessId }, select: { doc: true } });
+    if (prev?.doc && prev.doc !== next) {
+      await prisma.designSnapshot.create({ data: { businessId, doc: prev.doc } });
+      const old = await prisma.designSnapshot.findMany({
+        where: { businessId },
+        orderBy: { createdAt: "desc" },
+        skip: SNAPSHOTS_KEPT,
+        select: { id: true },
+      });
+      if (old.length) await prisma.designSnapshot.deleteMany({ where: { id: { in: old.map((o) => o.id) } } });
+    }
+  }
   await prisma.storeDesign.upsert({
     where: { businessId },
-    create: { businessId, doc: JSON.stringify(doc) },
-    update: { doc: JSON.stringify(doc) },
+    create: { businessId, doc: next },
+    update: { doc: next },
   });
+}
+
+/** Put back the design as it was before the last saved change. Null when there's nothing to undo. */
+export async function undoDesign(businessId: string): Promise<{ doc: OrbitDesignDoc; left: number } | null> {
+  const snap = await prisma.designSnapshot.findFirst({ where: { businessId }, orderBy: { createdAt: "desc" } });
+  if (!snap) return null;
+  const doc = JSON.parse(snap.doc) as OrbitDesignDoc;
+  await saveDoc(businessId, doc, { snapshot: false });
+  await prisma.designSnapshot.delete({ where: { id: snap.id } });
+  const left = await prisma.designSnapshot.count({ where: { businessId } });
+  return { doc, left };
+}
+
+export async function undoCount(businessId: string): Promise<number> {
+  return prisma.designSnapshot.count({ where: { businessId } });
 }
 
 // ---------------------------------------------------------------------------
