@@ -11,7 +11,8 @@ import { parseSummary, ORCHESTRATOR_TOOL, getDiscussedPlan, planContextBlock, sa
 import { draftGrowthPlan } from "@/lib/strategy-planner";
 import { describeStoreChanges, sanitizeStoreChanges, storeSettingsContext } from "@/lib/store-settings-ops";
 import { describeProductChanges, sanitizeProductChanges } from "@/lib/product-ops";
-import { OPEN_MEDIA_TOOL, attachmentBlocks, attachmentNote, mediaContext, parseList, resolveMediaRef } from "@/lib/media";
+import { OPEN_MEDIA_TOOL, attachmentBlocks, attachmentNote, parseList, resolveMediaRef } from "@/lib/media";
+import { LOOKUP_TOOL_NAMES, MAX_LOOKUPS, catalogSummary, lookupTools, mediaSummary, productsForMessage, runLookup } from "@/lib/orchestrator-tools";
 import { PLATFORM_MAP, storeStatusContext } from "@/lib/platform-map";
 import { describeDesignJobs, sanitizeDesignJobs, type DesignJob } from "@/lib/design-ops";
 import { describeStudioRequests, sanitizeStudioRequests, studioContext } from "@/lib/studio/ops";
@@ -102,8 +103,10 @@ export async function POST(req: Request) {
   try {
     const note = await attachmentNote(businessId, attachmentIds);
     // Specialists get the same live store status, so nobody claims the store is live when it isn't.
+    const cur = (await prisma.business.findUnique({ where: { id: businessId }, select: { storeCurrency: true } }))?.storeCurrency || "usd";
     const specialistContext = `${context}
-${storeStatus}`;
+${storeStatus}
+${await productsForMessage(businessId, message, cur)}`;
     const forSpecialists = note ? `${message.trim()} ${note}` : message.trim();
     const relevantIds = await classifyRelevantSpecialists(businessId, forSpecialists);
     let priorTurnsText = "";
@@ -134,7 +137,14 @@ Needs from you: ${result.needsUserText}` : result.content;
       }\n`
     : "";
 
-  const planBlock = [PLATFORM_MAP, storeStatus, await planContextBlock(businessId, plan), await storeSettingsContext(businessId), await mediaContext(businessId), await studioContext(businessId), await metaContext(businessId)].join("\n");
+  const currency = (await prisma.business.findUnique({ where: { id: businessId }, select: { storeCurrency: true } }))?.storeCurrency || "usd";
+  const planBlock = [PLATFORM_MAP, storeStatus, await planContextBlock(businessId, plan), await storeSettingsContext(businessId), await catalogSummary(businessId, currency), await mediaSummary(businessId), await studioContext(businessId), await metaContext(businessId)].join("\n");
+  // Look-ups (products / orders / media / older chat) fetch exact rows on demand instead of the whole set.
+  const oldestInHistory = orderedHistory.length >= 20 ? (orderedHistory[0]?.createdAt ?? null) : null;
+  const lookups = await lookupTools(businessId, oldestInHistory);
+  const lookupBlock = lookups.length
+    ? `\nLOOK-UP TOOLS: ${lookups.map((t) => t.name).join(", ")} fetch exact rows from the database. Use them whenever the answer depends on a specific product, order, file or earlier conversation that isn't already in front of you — never guess. At most ${MAX_LOOKUPS} look-ups per reply.`
+    : "";
   // Older turns carry a short note about their files; only THIS turn's files are sent in full.
   const historyNotes = new Map<string, string>();
   for (const m of orderedHistory) {
@@ -181,18 +191,22 @@ Needs from you: ${result.needsUserText}` : result.content;
   let searches = 0;
   let reads = 0;
   let opens = 0;
+  let lookupsUsed = 0;
   const MAX_OPENS = 2;
   // open_media lets the Orchestrator re-read a file sent earlier (e.g. the rest of a catalog PDF).
   const hasMedia = (await prisma.mediaAsset.count({ where: { businessId } })) > 0;
-  const extraTools = [...(canSearch ? [WEB_SEARCH_TOOL, READ_PAGE_TOOL] : []), ...(hasMedia ? [OPEN_MEDIA_TOOL] : [])];
+  const extraTools = [...lookups, ...(canSearch ? [WEB_SEARCH_TOOL, READ_PAGE_TOOL] : []), ...(hasMedia ? [OPEN_MEDIA_TOOL] : [])];
   let block: Anthropic.Messages.ToolUseBlock | undefined;
   try {
-    for (let step = 0; step < 8 && !block; step++) {
-      const mustAnswer = !extraTools.length || step >= 5 || ((!canSearch || (searches >= search.perTurn && reads >= 2)) && (!hasMedia || opens >= MAX_OPENS));
+    for (let step = 0; step < 9 && !block; step++) {
+      const mustAnswer =
+        !extraTools.length ||
+        step >= 6 ||
+        ((!canSearch || (searches >= search.perTurn && reads >= 2)) && (!hasMedia || opens >= MAX_OPENS) && (!lookups.length || lookupsUsed >= MAX_LOOKUPS));
       const msg = await anthropic.messages.create({
         model: MODEL,
         max_tokens: 16000,
-        system: SYSTEM_PROMPT_PREFIX + context + "\n" + planBlock + meetingBlock + searchBlock,
+        system: SYSTEM_PROMPT_PREFIX + context + "\n" + planBlock + lookupBlock + meetingBlock + searchBlock,
         tools: [...extraTools, ORCHESTRATOR_TOOL],
         tool_choice: mustAnswer ? { type: "tool", name: ORCHESTRATOR_TOOL.name } : { type: "any" },
         messages: convo,
@@ -216,6 +230,16 @@ Needs from you: ${result.needsUserText}` : result.content;
       for (const u of uses) {
         const input = (u.input ?? {}) as { query?: unknown; url?: unknown; ref?: unknown };
         let text: string;
+        if (LOOKUP_TOOL_NAMES.has(u.name)) {
+          let content: string;
+          if (lookupsUsed >= MAX_LOOKUPS) content = "No more look-ups for this reply — answer with what you have.";
+          else {
+            lookupsUsed++;
+            content = await runLookup(businessId, u.name, (u.input ?? {}) as Record<string, unknown>, { currency, oldestInHistory });
+          }
+          results.push({ type: "tool_result", tool_use_id: u.id, content });
+          continue;
+        }
         if (u.name === OPEN_MEDIA_TOOL.name) {
           const m = typeof input.ref === "string" ? await resolveMediaRef(businessId, input.ref) : null;
           let content: Anthropic.Messages.ToolResultBlockParam["content"];

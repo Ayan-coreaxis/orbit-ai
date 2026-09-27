@@ -84,3 +84,5 @@ export default async function CartPage({ params }: { params: Promise<{ businessI
     </>
   );
 }
+
+export const metadata = { title: "Cart" };

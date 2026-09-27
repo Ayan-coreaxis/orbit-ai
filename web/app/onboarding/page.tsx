@@ -423,13 +423,20 @@ export default function Onboarding() {
                           {q.why && <div className="mt-0.5 text-[12px] text-zinc-500">{q.why}</div>}
                           {q.type === "choice" && q.options?.length ? (
                             <div className="mt-2 flex flex-wrap gap-2">
+                              <div className="w-full text-[11px] text-zinc-600">Pick all that apply</div>
                               {q.options.map((o) => {
-                                const on = answers[q.id] === o;
+                                // multi-select: the answer is the picked options joined with "; " (in option order)
+                                const picked = (answers[q.id] ?? "").split("; ").filter(Boolean);
+                                const on = picked.includes(o);
+                                const next = on ? picked.filter((p) => p !== o) : [...picked, o];
                                 return (
                                   <button
                                     key={o}
                                     type="button"
-                                    onClick={() => setAnswers({ ...answers, [q.id]: on ? "" : o })}
+                                    aria-pressed={on}
+                                    onClick={() =>
+                                      setAnswers({ ...answers, [q.id]: q.options!.filter((x) => next.includes(x)).join("; ") })
+                                    }
                                     className={cn(
                                       "rounded-lg border px-3 py-1.5 text-[13px] transition-colors",
                                       on ? "border-fuchsia-500 bg-fuchsia-500/10 text-white" : "border-zinc-800 bg-zinc-900/60 text-zinc-400 hover:border-zinc-700",

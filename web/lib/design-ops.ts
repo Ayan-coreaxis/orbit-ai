@@ -92,7 +92,8 @@ export async function publishStore(businessId: string, publish: boolean): Promis
     await prisma.storeDesign.updateMany({ where: { businessId }, data: { published: false } });
     return { published: false, note: "" };
   }
-  const design = await prisma.storeDesign.findUnique({ where: { businessId }, select: { updatedAt: true, backendWiredAt: true } });
+  const design = await prisma.storeDesign.findUnique({ where: { businessId }, select: { updatedAt: true, backendWiredAt: true, doc: true } });
+  if (!design?.doc) return { published: false, note: "There's no store design yet — build the store in Orbit Design first, then publish." };
   // If the design has changed since Orbit Code last ran (or never ran), re-run it so the live
   // store's backend always matches the current pages — the seller never has to remember Handoff.
   const staleBackend = !design?.backendWiredAt || (design.updatedAt && design.updatedAt > design.backendWiredAt);

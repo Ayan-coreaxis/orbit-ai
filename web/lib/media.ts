@@ -235,8 +235,6 @@ export async function listMedia(businessId: string, opts: { kind?: MediaKind; ta
 
 // ---------- What agents see ----------
 
-const MEDIA_IN_PROMPT = 80;
-
 export const OPEN_MEDIA_TOOL: Anthropic.Messages.Tool = {
   name: "open_media",
   description:
@@ -244,34 +242,17 @@ export const OPEN_MEDIA_TOOL: Anthropic.Messages.Tool = {
   input_schema: { type: "object", properties: { ref: { type: "string", description: "Media ref, e.g. 'M4'." } }, required: ["ref"] },
 };
 
-/** Refs M1, M2… are the newest-first order of this list (the same list is used to resolve them). */
-export async function mediaRefs(businessId: string) {
-  return prisma.mediaAsset.findMany({ where: { businessId }, orderBy: { createdAt: "desc" }, take: MEDIA_IN_PROMPT });
-}
-
-function ago(d: Date) {
-  const m = Math.round((Date.now() - d.getTime()) / 60000);
-  return m < 60 ? `${m} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} days ago`;
-}
-
-/** MEDIA section of the Orchestrator prompt. */
-export async function mediaContext(businessId: string): Promise<string> {
-  const rows = await mediaRefs(businessId);
-  if (!rows.length) return "\nMEDIA LIBRARY: empty. If you or a specialist need photos, videos, voice notes or documents from the owner, ask them to attach it with the 📎 button in this chat.";
-  const lines = rows.map((m, i) => {
-    const extra = m.kind === "audio" ? (m.text ? ` — transcript: "${m.text.slice(0, 160)}${m.text.length > 160 ? "…" : ""}"` : ` — no transcript`) : m.kind === "video" ? ` — ${parseList(m.frames).length} still frames` : "";
-    return `M${i + 1} ${m.kind} "${m.name}" (${m.source}, ${ago(m.createdAt)})${extra}`;
-  });
-  return `
-MEDIA LIBRARY (files the owner gave you; newest first). A product photo can be set with product_changes image: "M3" (main image) or add_to_gallery: "M3" — only images. If you or a specialist need more files, ask the owner to attach them with the 📎 button in this chat.
-${lines.join("\n")}`;
+/** Every media id, oldest first — M1, M2… are positions in this list, so a ref never shifts when a new file arrives. */
+export async function mediaRefIds(businessId: string): Promise<string[]> {
+  const rows = await prisma.mediaAsset.findMany({ where: { businessId }, orderBy: [{ createdAt: "asc" }, { id: "asc" }], select: { id: true } });
+  return rows.map((r) => r.id);
 }
 
 export async function resolveMediaRef(businessId: string, ref: string) {
   const r = ref.trim().toUpperCase();
   if (/^M\d+$/.test(r)) {
-    const rows = await mediaRefs(businessId);
-    return rows[Number(r.slice(1)) - 1] ?? null;
+    const id = (await mediaRefIds(businessId))[Number(r.slice(1)) - 1];
+    return id ? prisma.mediaAsset.findUnique({ where: { id } }) : null;
   }
   return prisma.mediaAsset.findFirst({ where: { id: ref.trim(), businessId } });
 }
@@ -287,9 +268,9 @@ async function base64Of(url: string) {
 export async function attachmentBlocks(businessId: string, ids: string[]): Promise<Anthropic.Messages.ContentBlockParam[]> {
   if (!ids.length) return [];
   const rows = await prisma.mediaAsset.findMany({ where: { businessId, id: { in: ids.slice(0, 10) } } });
-  const refs = await mediaRefs(businessId);
+  const refs = await mediaRefIds(businessId);
   const refOf = (id: string) => {
-    const i = refs.findIndex((r) => r.id === id);
+    const i = refs.indexOf(id);
     return i >= 0 ? `M${i + 1}` : id;
   };
   const blocks: Anthropic.Messages.ContentBlockParam[] = [];
@@ -306,7 +287,8 @@ export async function attachmentBlocks(businessId: string, ids: string[]): Promi
         blocks.push({ type: "document", source: { type: "base64", media_type: "application/pdf", data: await base64Of(m.url) } });
         const photos = parseList(m.frames);
         if (photos.length) {
-          const kids = refs.map((r, i) => ({ r, ref: `M${i + 1}` })).filter(({ r }) => photos.includes(r.url));
+          const kidRows = await prisma.mediaAsset.findMany({ where: { businessId, url: { in: photos } }, select: { id: true, url: true, name: true } });
+          const kids = kidRows.map((r) => ({ r, ref: refOf(r.id) })).sort((a, b) => photos.indexOf(a.r.url) - photos.indexOf(b.r.url));
           blocks.push({ type: "text", text: `Product photos pulled out of this PDF (use these refs as each new product's image — match by page): ${kids.map(({ r, ref }) => `${ref} = ${r.name}`).join("; ") || "none in the current list"}` });
         }
       } else if (m.kind === "video") {

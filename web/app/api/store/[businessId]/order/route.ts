@@ -14,6 +14,8 @@ import { quoteCheckout, applyStockDelta, OutOfStockError } from "@/lib/checkout"
  */
 export async function POST(req: NextRequest, { params }: { params: Promise<{ businessId: string }> }) {
   const { businessId } = await params;
+  const live = await prisma.storeDesign.findUnique({ where: { businessId }, select: { published: true } });
+  if (!live?.published) return NextResponse.json({ error: "This store isn't live yet." }, { status: 403 });
 
   const b = (await req.json()) as {
     items?: { productId: string; variantId?: string | null; qty: number }[];
@@ -51,7 +53,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ bus
         total: quote.total,
         status: "pending",
         paymentProvider: "cod",
-        paymentStatus: "paid",
+        paymentStatus: "pending",
       },
     });
    });

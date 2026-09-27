@@ -386,7 +386,7 @@ const FINAL: ShipStatus[] = ["delivered", "returned", "cancelled"];
 export async function syncOrderCourier(orderId: string, f: typeof fetch = fetch): Promise<TrackResult> {
   const o = await prisma.order.findUnique({
     where: { id: orderId },
-    select: { id: true, status: true, courierName: true, trackingNumber: true, flagReason: true, business: { select: { courierApiKey: true, courierProvider: true } } },
+    select: { id: true, status: true, courierName: true, trackingNumber: true, flagReason: true, paymentProvider: true, business: { select: { courierApiKey: true, courierProvider: true } } },
   });
   if (!o?.trackingNumber) return { ok: false, error: "No tracking number." };
   const provider = providerFromName(o.courierName);
@@ -402,6 +402,7 @@ export async function syncOrderCourier(orderId: string, f: typeof fetch = fetch)
   if (r.status === "delivered" && o.status !== "fulfilled" && o.status !== "cancelled") {
     data.status = "fulfilled";
     data.fulfilledAt = now;
+    if (o.paymentProvider === "cod") data.paymentStatus = "paid"; // delivered = cash collected
   }
   if (r.status === "returned" && !(o.flagReason ?? "").includes("Returned by courier")) {
     data.flagged = true;

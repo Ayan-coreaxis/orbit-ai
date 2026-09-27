@@ -6,7 +6,7 @@ import { hashPassword, setSessionCookie } from "@/lib/auth";
 import { linkPendingInvites, getMemberBusinessIds } from "@/lib/team";
 
 export async function POST(req: NextRequest) {
-  const limited = await throttle(req, "signup", 5, 3600000);
+  const limited = await throttle(req, "signup", 20, 3600000);
   if (limited) return limited;
   const { email, password } = (await req.json()) as { email?: string; password?: string };
 

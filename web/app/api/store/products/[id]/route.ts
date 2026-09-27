@@ -30,10 +30,18 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (b.stock !== undefined && Number.isFinite(Number(b.stock))) data.stock = Math.max(0, Math.floor(Number(b.stock)));
   if (b.description !== undefined) data.description = String(b.description ?? "").slice(0, 4000) || null;
   if (b.imageUrl !== undefined) data.imageUrl = String(b.imageUrl ?? "").trim().slice(0, 500) || null;
-  if (b.costPrice !== undefined) data.costPrice = b.costPrice === null ? null : Number(b.costPrice);
+  if (b.costPrice !== undefined) {
+    const cost = b.costPrice === null || b.costPrice === "" ? null : Number(b.costPrice);
+    if (cost !== null && (!Number.isFinite(cost) || cost < 0))
+      return NextResponse.json({ error: "Cost price must be a positive number." }, { status: 400 });
+    data.costPrice = cost;
+  }
 
   if (b.optionTypes !== undefined || b.variants !== undefined) {
-    data.optionTypes = await saveProductVariants(id, b);
+    // Variants sent without their option types keep the product's current options — otherwise
+    // the empty option list would wipe every variant (and its stock).
+    const optionTypes = b.optionTypes !== undefined ? b.optionTypes : (await prisma.product.findUnique({ where: { id }, select: { optionTypes: true } }))?.optionTypes;
+    data.optionTypes = await saveProductVariants(id, { optionTypes, variants: b.variants });
   }
 
   const product = await prisma.product.update({

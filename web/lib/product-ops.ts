@@ -109,13 +109,11 @@ export const DELETE_PRODUCTS_SCHEMA = {
     "Refs of products to DELETE from the store (e.g. ['P4']). Only when the owner clearly asked to delete/remove them — if they might just want it hidden or out of stock, ask first. Past orders are kept. Shown as a proposal with Apply.",
 } as const;
 
-const MAX_LISTED = 80;
-
+/** Every product, oldest first — P1, P2… are positions in this list (the same everywhere refs are used). */
 export async function listProducts(businessId: string) {
   return prisma.product.findMany({
     where: { businessId },
-    orderBy: { createdAt: "asc" },
-    take: MAX_LISTED,
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
     select: {
       id: true,
       name: true,
@@ -128,25 +126,6 @@ export async function listProducts(businessId: string) {
       _count: { select: { bundleItems: true } },
     },
   });
-}
-
-/** The PRODUCTS section of the Orchestrator's prompt (refs P1, P2… map to this order). */
-export async function productsContext(businessId: string, currency: string): Promise<string> {
-  const products = await listProducts(businessId);
-  const rows = products.map((p, i) => {
-    const cost = p.costPrice != null ? `, cost ${money(p.costPrice, currency)}` : ", cost not set";
-    const axes = parseOptionTypes(p.optionTypes);
-    const stock = p.variants.length
-      ? `, options ${axes.map((a) => `${a.name}: ${a.values.join("/")}`).join("; ")} — variants: ${p.variants
-          .slice(0, 12)
-          .map((v) => `${v.label} ${v.price != null ? money(v.price, currency) : "base price"} stock ${v.stock}`)
-          .join(", ")}${p.variants.length > 12 ? ", …" : ""}`
-      : `, stock ${p.stock}`;
-    return `P${i + 1} ${p.name} — price ${money(p.price, currency)}${cost}${stock}${p.imageUrl ? "" : ", NO PHOTO"}${p._count.bundleItems ? ", part of a bundle" : ""}`;
-  });
-  return `
-PRODUCTS (you CAN propose: edits with product_changes — price, cost_price, stock, name, description, photos from the MEDIA LIBRARY, size/colour/flavour variants; new products with new_products; deletions with delete_products. The owner presses Apply for each proposal.)
-${rows.length ? rows.join("\n") : "none yet"}${products.length === MAX_LISTED ? `\n(only the first ${MAX_LISTED} are listed)` : ""}`;
 }
 
 const posNum = (v: unknown): number | undefined => (typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : undefined);

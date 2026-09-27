@@ -58,9 +58,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ bus
       storeCurrency: true,
       checkoutCustomFields: true,
       owner: { select: { email: true } },
+      storeDesign: { select: { published: true } },
     },
   });
   if (!business) return NextResponse.json({ error: "Store not found." }, { status: 404 });
+  // an unpublished store has no storefront — it can't take real orders either
+  if (!business.storeDesign?.published) return NextResponse.json({ error: "This store isn't live yet." }, { status: 403 });
 
   const b = (await req.json().catch(() => ({}))) as {
     items?: { productId?: string; variantId?: string | null; qty: number; bundleId?: string }[];
@@ -237,7 +240,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ bus
           status: autoConfirm ? "confirmed" : "pending",
           confirmedAt: autoConfirm ? new Date() : null,
           paymentProvider: "cod",
-          paymentStatus: "paid",
+          paymentStatus: "pending", // cash is collected on delivery — becomes "paid" when fulfilled
           verified: !needsVerify,
           verifyToken: needsVerify ? newVerifyToken() : null,
         },

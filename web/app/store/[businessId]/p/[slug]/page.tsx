@@ -43,10 +43,10 @@ function safeDoc(raw: string | null | undefined, name: string, niche: string): O
 export async function generateMetadata({ params }: { params: Promise<{ businessId: string; slug: string }> }): Promise<Metadata> {
   const { businessId, slug } = await params;
   const data = await load(businessId);
-  if (!data?.business.storeDesign?.published) return { title: "Store" };
+  if (!data?.business.storeDesign?.published) return {};
   const doc = safeDoc(data.business.storeDesign.doc, data.business.name, data.business.niche);
   const page = doc ? resolvePage(doc, slug) : null;
-  return { title: page ? `${doc!.storeName} — ${page.title}` : data.business.name };
+  return { title: page ? page.title : { absolute: data.business.name } };
 }
 
 export default async function StorefrontSubPage({ params }: { params: Promise<{ businessId: string; slug: string }> }) {

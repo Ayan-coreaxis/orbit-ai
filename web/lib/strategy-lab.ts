@@ -87,6 +87,8 @@ export function parseMetric(raw: string | null | undefined): StrategyMetric {
 export const ORBIT_CAN = [
   "Create coupon codes (percent or fixed; first-order-only, per-customer limit, free shipping, auto-apply, minimum cart, product-specific, expiry)",
   "Create product bundles",
+  "Add new products, edit prices / cost / stock / descriptions / photos / variants, or remove products (the owner presses Apply first)",
+  "Change store settings: delivery fee, city delivery zones, free-delivery threshold, tax, currency (owner presses Apply)",
   "Turn on a loyalty points program, a referral program, or gift cards",
   "Add extra checkout fields (e.g. date of birth, name to print, delivery day) — answers saved on each order",
   "Design / add store pages, landing pages and forms with Orbit Design",
@@ -96,14 +98,16 @@ export const ORBIT_CAN = [
   "Back-in-stock notifications",
   "Write captions, content ideas, product copy, messages for the seller to send",
   "Write SEO titles/descriptions for products and pages",
-  "Publish a post to the seller's Facebook Page (only if Facebook is connected)",
+  "Publish a post to the seller's Facebook Page or Instagram (only if connected)",
+  "Make product photos, posters and short product reels with Orbit Studio (Growth and Scale plans only)",
+  "Answer shoppers in the store chat bubble, Messenger and Instagram DMs (DMs need the Page connected)",
   "Create a Meta ad campaign in PAUSED state (only if the Ad Account is connected; seller turns spend on)",
   "A/B test the storefront hero text",
 ];
 
 export const ORBIT_CANNOT_YET = [
   "Send a WhatsApp/SMS/email broadcast to a custom customer segment (coming soon — for now Orbit writes it, the seller sends it)",
-  "Post to Instagram, send Instagram DMs, or read comments/mentions (waiting on Meta App Review)",
+  "Start Instagram DMs to people, or read / reply to comments and mentions",
   "Subscriptions / recurring orders",
   "JazzCash / EasyPaisa or any payment method besides COD and Stripe",
   "Contact influencers/creators or other businesses on the seller's behalf",

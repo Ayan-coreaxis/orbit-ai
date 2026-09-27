@@ -73,7 +73,7 @@ const QUESTIONS_TOOL = {
             question: { type: "string", description: "Plain, friendly, one sentence. Under 90 characters." },
             why: { type: "string", description: "One short line: how Orbit will use the answer." },
             type: { type: "string", enum: ["choice", "text"] },
-            options: { type: "array", items: { type: "string" }, description: "3–6 short options, only for type=choice" },
+            options: { type: "array", items: { type: "string" }, description: "3–6 short options, only for type=choice. The seller can pick SEVERAL, so don't add catch-alls like \"A mix of all\" or \"All of the above\"." },
             placeholder: { type: "string", description: "Example answer for type=text, specific to this business" },
           },
           required: ["id", "question", "why", "type"],

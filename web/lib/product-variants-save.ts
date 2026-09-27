@@ -41,10 +41,27 @@ export async function saveProductVariants(productId: string, body: Incoming): Pr
       }))
     : [];
 
+  const existing = await prisma.productVariant.findMany({
+    where: { productId },
+    select: { id: true, options: true, sku: true, price: true, stock: true, imageUrl: true },
+  });
+
+  // A variant the caller didn't send keeps what it has (price, stock…) — a partial list edits only
+  // the rows it names instead of zeroing the rest.
+  const sentKeys = new Set(incoming.map((v) => comboKey(v.options)));
+  for (const e of existing) {
+    try {
+      const options = JSON.parse(e.options) as Record<string, string>;
+      if (!sentKeys.has(comboKey(options)))
+        incoming.push({ id: e.id, label: "", options, sku: e.sku, price: e.price, stock: e.stock, imageUrl: e.imageUrl });
+    } catch {
+      /* ignore */
+    }
+  }
+
   const grid = reconcileVariants(rawTypes, incoming);
   const wantKeys = new Set(grid.map((g) => comboKey(g.options)));
 
-  const existing = await prisma.productVariant.findMany({ where: { productId }, select: { id: true, options: true } });
   const existingByKey = new Map<string, string>();
   for (const e of existing) {
     try {

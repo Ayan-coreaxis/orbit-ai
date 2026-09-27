@@ -32,6 +32,9 @@ export async function POST(req: NextRequest) {
   const price = Number(b.price);
   if (!name) return NextResponse.json({ error: "Product needs a name." }, { status: 400 });
   if (!Number.isFinite(price) || price < 0) return NextResponse.json({ error: "Price must be a positive number." }, { status: 400 });
+  const cost = b.costPrice === null || b.costPrice === undefined || (b.costPrice as unknown) === "" ? null : Number(b.costPrice);
+  if (cost !== null && (!Number.isFinite(cost) || cost < 0))
+    return NextResponse.json({ error: "Cost price must be a positive number." }, { status: 400 });
 
   const product = await prisma.product.create({
     data: {
@@ -41,7 +44,7 @@ export async function POST(req: NextRequest) {
       stock: Number.isFinite(Number(b.stock)) ? Math.max(0, Math.floor(Number(b.stock))) : 0,
       description: b.description?.slice(0, 4000) || null,
       imageUrl: b.imageUrl?.trim().slice(0, 500) || null,
-      costPrice: b.costPrice === null || b.costPrice === undefined ? null : Number(b.costPrice),
+      costPrice: cost,
     },
   });
 

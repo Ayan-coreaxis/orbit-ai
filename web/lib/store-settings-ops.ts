@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { createShippingZone, deleteShippingZone, listShippingZones, updateShippingZone } from "@/lib/shipping-zones";
 import { money } from "@/lib/money";
 import { STORE_CURRENCIES } from "@/lib/currencies";
-import { productsContext, sanitizeStoredProductChanges, type ProductChange } from "@/lib/product-ops";
+import { sanitizeStoredProductChanges, type ProductChange } from "@/lib/product-ops";
 
 export { STORE_CURRENCIES };
 
@@ -113,8 +113,7 @@ export async function storeSettingsContext(businessId: string): Promise<string> 
 STORE SETTINGS (you CAN propose changes to these with store_changes; the owner presses Apply)
 - Currency: ${cur.toUpperCase()} (options: ${CURRENCY_CODES.map((c) => c.toUpperCase()).join(", ")}). Changing it only changes the currency label — product price numbers stay the same, so after switching the owner must make sure prices are entered in the new currency.${b.paymentProvider !== "cod" ? " The store takes Stripe card payments, so the currency must match what their Stripe account settles in — warn them." : ""}
 - Delivery fee: ${money(b.shippingFee, cur)}${b.freeShippingOver != null ? `, free over ${money(b.freeShippingOver, cur)}` : ", never free"}${zones.length ? " (used for cities not in a zone below)" : ""}
-${!zones.length ? "- No city delivery zones yet — every city pays the fee above. If the owner says Lahore/Karachi etc. should cost differently, propose shipping_zone items.\n" : ""}${zones.length ? `- City delivery zones (propose adds / edits / removals with shipping_zone / remove_shipping_zone; the owner can also edit them in Settings > Delivery): ${zones.map((z) => `${z.name} [${z.cities.slice(0, 12).join(", ")}${z.cities.length > 12 ? "…" : ""}] ${money(z.fee, cur)}${z.freeOver != null ? `, free over ${money(z.freeOver, cur)}` : ""}`).join(" | ")}\n` : ""}- Tax: ${b.taxRatePercent != null ? `${b.taxRatePercent}%` : "not charged"}
-${await productsContext(businessId, cur)}`;
+${!zones.length ? "- No city delivery zones yet — every city pays the fee above. If the owner says Lahore/Karachi etc. should cost differently, propose shipping_zone items.\n" : ""}${zones.length ? `- City delivery zones (propose adds / edits / removals with shipping_zone / remove_shipping_zone; the owner can also edit them in Settings > Delivery): ${zones.map((z) => `${z.name} [${z.cities.slice(0, 12).join(", ")}${z.cities.length > 12 ? "…" : ""}] ${money(z.fee, cur)}${z.freeOver != null ? `, free over ${money(z.freeOver, cur)}` : ""}`).join(" | ")}\n` : ""}- Tax: ${b.taxRatePercent != null ? `${b.taxRatePercent}%` : "not charged"}`;
 }
 
 export async function describeStoreChanges(businessId: string, changes: StoreChange[]): Promise<string[]> {

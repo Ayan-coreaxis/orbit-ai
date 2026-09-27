@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getActiveBusinessId } from "@/lib/get-active-business-id";
 import { prisma } from "@/lib/prisma";
 import { notifyOrder, originFromRequest } from "@/lib/order-notify";
-import { applyStockDelta } from "@/lib/checkout";
+import { applyStockDelta, stockWasTaken } from "@/lib/checkout";
 import { bookShipment, syncOrderCourier } from "@/lib/courier";
 import { sendPurchaseEvent } from "@/lib/meta-capi";
 
@@ -111,9 +111,10 @@ export async function PATCH(
         notifyTemplate = "order_shipped";
       } else if (next === "fulfilled") {
         data.fulfilledAt = order.fulfilledAt ?? now;
+        if (order.paymentProvider === "cod") data.paymentStatus = "paid"; // delivered = cash collected
       } else if (next === "cancelled") {
         data.cancelledAt = now;
-        restock = order.status !== "cancelled";
+        restock = order.status !== "cancelled" && stockWasTaken(order);
       }
     }
   }

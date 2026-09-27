@@ -11,22 +11,21 @@ import { money } from "@/lib/money";
  * on purpose: this is sent on every chat turn, not once per week.
  */
 export async function buildOrchestratorContext(businessId: string): Promise<string> {
-  const business = await prisma.business.findUnique({
-    where: { id: businessId },
-    include: {
-      products: true,
-      orders: true,
-    },
-  });
+  // Counts and sums straight from the database — not every product and order row, which used to be
+  // loaded on every chat turn. The rows themselves are fetched on demand with the look-up tools.
+  const business = await prisma.business.findUnique({ where: { id: businessId } });
   if (!business) return "No business data available.";
 
   const { competitors } = await latestCompetitors(businessId);
 
-  const lowStock = business.products.filter((p) => p.stock <= 5);
-  const revenue = business.orders
-    .filter((o) => o.status !== "cancelled")
-    .reduce((sum, o) => sum + o.total, 0);
-  const pendingOrders = business.orders.filter((o) => o.status === "pending").length;
+  const [productCount, lowStock, orderCount, pendingOrders, revenueAgg] = await Promise.all([
+    prisma.product.count({ where: { businessId } }),
+    prisma.product.findMany({ where: { businessId, stock: { lte: 5 }, variants: { none: {} } }, select: { name: true }, take: 10 }),
+    prisma.order.count({ where: { businessId } }),
+    prisma.order.count({ where: { businessId, status: "pending" } }),
+    prisma.order.aggregate({ where: { businessId, status: { not: "cancelled" } }, _sum: { total: true } }),
+  ]);
+  const revenue = revenueAgg._sum.total ?? 0;
   const orderGrowth = await getOrderGrowth(businessId);
   const businessModelGuidance = businessModelGuidanceLine(business.businessModel);
 
@@ -40,14 +39,14 @@ Competitor notes on file (reference only — never the base of a plan): ${
 
 REAL BUSINESS DATA (actually in the database right now — never contradict this with a made-up figure):
 - Real existing website on file: ${business.website ?? "none given"}.
-- Products actually listed in Orbit's own store/catalog: ${business.products.length} total, ${lowStock.length} low on stock${
+- Products actually listed in Orbit's own store/catalog: ${productCount} total, ${lowStock.length}${lowStock.length === 10 ? "+" : ""} low on stock${
     lowStock.length ? ` (${lowStock.map((p) => p.name).join(", ")})` : ""
   }.${
-    business.products.length === 0 && business.website
+    productCount === 0 && business.website
       ? ` IMPORTANT: this business already has a real live website (${business.website}) — they are NOT starting from zero. Orbit's own catalog is just empty because nothing has been imported into it yet. Never tell them to "build a website" or "build a store from scratch," they already have one.`
       : ""
   }
-- Orders: ${business.orders.length} total, ${pendingOrders} still pending fulfillment.
+- Orders: ${orderCount} total, ${pendingOrders} still pending fulfillment.
 - Real revenue from actual orders placed: ${money(revenue, business.storeCurrency)} (this is the only real revenue figure — no other sales data exists in this system).
 - Real order growth, week over week: ${orderGrowth.thisWeekOrders} order(s) in the last 7 days vs ${orderGrowth.lastWeekOrders} the week before${
     orderGrowth.orderGrowthPct !== null

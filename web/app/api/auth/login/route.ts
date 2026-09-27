@@ -1,4 +1,5 @@
 import { throttle } from "@/lib/guard";
+import { overLimit, rateLimit } from "@/lib/rate-limit";
 import { secureCookie } from "@/lib/signed-token";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
@@ -6,7 +7,10 @@ import { verifyPassword, setSessionCookie } from "@/lib/auth";
 import { getMemberBusinessIds } from "@/lib/team";
 
 export async function POST(req: NextRequest) {
-  const limited = await throttle(req, "login", 10, 900000);
+  // Per IP: generous (a shop's staff often share one office IP). Per account: 10 WRONG passwords
+  // in 15 minutes locks that account's login for the rest of the window — successful logins
+  // don't count, so a seller who logs in often is never locked out.
+  const limited = await throttle(req, "login", 60, 900000);
   if (limited) return limited;
   const { email, password } = (await req.json()) as { email?: string; password?: string };
 
@@ -15,8 +19,12 @@ export async function POST(req: NextRequest) {
   }
 
   const normalizedEmail = email.trim().toLowerCase();
+  const failKey = `login-fail:${normalizedEmail.slice(0, 120)}`;
+  if (await overLimit(failKey, 10, 900000))
+    return NextResponse.json({ error: "Too many wrong passwords — wait 15 minutes or reset your password." }, { status: 429 });
   const user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
   if (!user || !(await verifyPassword(password, user.passwordHash))) {
+    await rateLimit(failKey, 10, 900000);
     return NextResponse.json({ error: "Incorrect email or password." }, { status: 401 });
   }
 

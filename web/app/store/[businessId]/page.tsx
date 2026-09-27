@@ -39,9 +39,9 @@ function safeDoc(raw: string | null | undefined, name: string, niche: string): O
 export async function generateMetadata({ params }: { params: Promise<{ businessId: string }> }): Promise<Metadata> {
   const { businessId } = await params;
   const data = await load(businessId);
-  if (!data?.business.storeDesign?.published) return { title: "Store" };
+  if (!data?.business.storeDesign?.published) return {};
   const doc = safeDoc(data.business.storeDesign.doc, data.business.name, data.business.niche);
-  return { title: doc?.storeName ?? data.business.name, description: doc?.tagline ?? data.business.niche };
+  return { title: { absolute: doc?.storeName ?? data.business.name }, description: doc?.tagline ?? data.business.niche };
 }
 
 export default async function StorefrontPage({ params }: { params: Promise<{ businessId: string }> }) {

@@ -175,3 +175,5 @@ export default async function OrderConfirmationPage({
     </>
   );
 }
+
+export const metadata = { title: "Your order", robots: { index: false } };

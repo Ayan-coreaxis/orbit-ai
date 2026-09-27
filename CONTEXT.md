@@ -3,7 +3,7 @@
 > **Every Claude session (local or cloud) reads this first and updates it before finishing.**
 > It is the single source of truth shared between sessions. See "How to update this file" at the bottom.
 
-_Last updated: 2026-09-26 by the cloud session (Postgres, WhatsApp templates, Pixel + Conversions API, Messenger/IG DMs, legal pages, billing fixes, AI onboarding questions)._
+_Last updated: 2026-09-27 by the local session (Orchestrator look-up tools, test pass + fixes). Before that: 2026-09-26 by the cloud session (Postgres, WhatsApp templates, Pixel + Conversions API, Messenger/IG DMs, legal pages, billing fixes, AI onboarding questions)._
 
 ---
 
@@ -80,7 +80,8 @@ npm run db:copy-sqlite prisma/dev.db
 - Past proposals carry `[SYSTEM: applied / dismissed / pending / failed]` notes in history so it never claims a dismissed change is coming.
 - Tools in its loop: `web_search` + `read_page` (Brave, within limits), `open_media` (re-open a library file). Max 3 searches, 2 page reads, 2 file opens per reply.
 - Attachments: images & PDFs go to Claude directly; videos as browser-captured frames; voice notes transcribed by the browser; catalog PDFs have their product photos extracted (embedded images or linked image URLs, SSRF-guarded) and referenced as `M1, M2…`.
-- It gets: business context, PLATFORM_MAP, live STORE STATUS (built? published? missing?), plan, store settings, PRODUCTS (P1…), MEDIA (M1…). Specialists get the store status too.
+- It gets a SMALL prompt: business context (counts/sums only), PLATFORM_MAP, live STORE STATUS, plan, store settings, a PRODUCTS summary (full rows only when ≤15 products) and a MEDIA summary (newest 8). Everything else it fetches with **look-up tools** (`lib/orchestrator-tools.ts`): `find_products`, `find_orders`, `find_media`, `search_chat_history` (older than the last 20 messages) — max 6 look-ups per reply. Specialists get the store status + the product rows matching the message (`productsForMessage`). Not RAG/embeddings: structured data is fetched by SQL on demand (owner decision 2026-09-27).
+- Refs are stable: P<n> = n-th product by creation date, M<n> = n-th media file by upload date (oldest first; a new upload never shifts refs).
 - Honest, not a yes-man; never invents numbers/stock/prices; UI chat uses light formatting (short paragraphs, `- ` bullets, `**bold**`) rendered by `components/orchestrator/ChatText.tsx`.
 
 ## 5. Product decisions (don't re-litigate)
@@ -115,6 +116,8 @@ npm run db:copy-sqlite prisma/dev.db
 - Detailed task history: `TASKS.md`.
 
 ## 7. Changelog (newest first — add one entry per session/batch of work)
+
+- **2026-09-27 · local** — **Orchestrator look-up tools** (`lib/orchestrator-tools.ts`): products / orders / media / older chat are fetched on demand instead of pasted into every prompt (was capped at 80 products, 80 files, 20 messages); `buildOrchestratorContext` uses counts instead of loading every product + order; stable P/M refs. **Test pass** (`TEST_PLAN.md`, local Postgres) with fixes: auto-apply coupon ignored its rules (min order, expiry, limits); invalid code gave no error; COD orders were marked "paid" at checkout (now pending → paid on fulfilled / courier delivered); cancelling an unpaid card order added phantom stock (`stockWasTaken`); partial variant PATCH wiped / zeroed other variants; text cost price silently became null; unpublished stores accepted orders via API; Publish with no design → 500; login lock was per IP incl. successful logins (now 10 wrong passwords per account), signup limit 5→20/h; store tab titles show the store name. Onboarding: questions are multi-select; website import reads the Shopify `/products.json` / WooCommerce Store API (real prices, photos, descriptions, variants — before: Rs 0 prices, no photos); planner ORBIT_CAN list updated (products, store settings, Instagram, Studio).
 
 - **2026-09-26 · cloud** — **Voice replies removed (owner decision).** The Orchestrator no longer speaks its replies. Removed: the Google TTS route (`app/api/orchestrator/tts`), the browser voice, the mute button, the orb's playback code, and the `GOOGLE_TTS_API_KEY` entries in admin keys, setup check, `.env.example` and `DEPLOY.md`. So there is no voice cost and no per-plan voice limit is needed. Kept: the mic (speak your question, the browser turns it into text) and voice notes. If voice replies come back later, they need per-plan limits and an Urdu voice.
 

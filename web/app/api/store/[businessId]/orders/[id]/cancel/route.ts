@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getStoreCustomer } from "@/lib/store-auth";
-import { applyStockDelta } from "@/lib/checkout";
+import { applyStockDelta, stockWasTaken } from "@/lib/checkout";
 
 interface Item {
   productId?: string;
@@ -28,7 +28,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ busine
   }
 
   await prisma.$transaction(async (tx) => {
-    await applyStockDelta(
+    if (stockWasTaken(order)) await applyStockDelta(
       tx,
       businessId,
       items.filter((it): it is Item & { productId: string; qty: number } => !!it.productId && !!it.qty),

@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { money } from "@/lib/money";
 import { resolvePurchasable } from "@/lib/variants";
 import { lookupGiftCard, giftCardRedeemAmount } from "@/lib/gift-cards";
 import { resolveBundleForCheckout } from "@/lib/bundles";
@@ -68,6 +69,16 @@ export function computeTotals(input: {
   const tax = rate > 0 ? round2((afterDiscount * rate) / 100) : 0;
   const total = round2(Math.max(0, afterDiscount + shipping + tax));
   return { discount, shipping, freeShipping, tax, total };
+}
+
+/**
+ * Did placing this order take stock? COD orders take it at checkout; a card order only when its
+ * payment went through (and not when it was paid after the stock had already run out). Cancelling
+ * must only put back what was taken — otherwise an unpaid card order would create phantom stock.
+ */
+export function stockWasTaken(order: { paymentProvider: string; paymentStatus: string; flagReason?: string | null }): boolean {
+  if (order.paymentProvider !== "stripe") return true;
+  return order.paymentStatus === "paid" && !(order.flagReason ?? "").includes("stock ran out");
 }
 
 type TxClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
@@ -238,24 +249,32 @@ export async function quoteCheckout(
     ? await prisma.coupon.findUnique({ where: { businessId_code: { businessId, code: explicit } } })
     : (await prisma.coupon.findFirst({ where: { businessId, active: true, autoApply: true } })) ?? null;
 
+  if (explicit && !candidate) return { ...base, error: "That code isn't valid." };
   if (candidate) {
     const c = candidate;
-    const fail = (msg: string) => (explicit ? { ...base, error: msg } : null); // silent for auto-apply
-    let stop: CheckoutQuote | null = null;
+    // First broken rule, if any. A typed code shows it to the shopper; an auto-apply code is
+    // silently skipped — but never applied when a rule fails (min order, expiry, limits…).
+    let broken: string | null = null;
 
-    if (!c.active) stop = fail("That code isn't valid.");
-    else if (c.expiresAt && c.expiresAt < new Date()) stop = fail("That code has expired.");
-    else if (c.usageLimit != null && c.usedCount >= c.usageLimit) stop = fail("That code has been fully used.");
+    if (!c.active) broken = "That code isn't valid.";
+    else if (c.expiresAt && c.expiresAt < new Date()) broken = "That code has expired.";
+    else if (c.usageLimit != null && c.usedCount >= c.usageLimit) broken = "That code has been fully used.";
     else if (c.minSubtotal != null && subtotal < c.minSubtotal)
-      stop = fail(`Add ${currency.toUpperCase()} ${round2(c.minSubtotal - subtotal)} more to use this code.`);
-    else if ((c.firstOrderOnly || c.perCustomerLimit != null) && phone) {
-      const prior = await prisma.order.count({ where: { businessId, customerPhone: phone, status: { not: "cancelled" } } });
-      if (c.firstOrderOnly && prior > 0) stop = fail("This code is for first orders only.");
-      const used = await prisma.order.count({ where: { businessId, customerPhone: phone, couponCode: c.code } });
-      if (!stop && c.perCustomerLimit != null && used >= c.perCustomerLimit) stop = fail("You've already used this code.");
+      broken = `Add ${money(round2(c.minSubtotal - subtotal), currency)} more to use this code.`;
+    else if (c.firstOrderOnly || c.perCustomerLimit != null) {
+      if (!phone) {
+        // can't check a per-customer rule without the shopper's phone (coupon preview) — only a
+        // typed code gets the benefit of the doubt; checkout re-checks with the phone
+        if (!explicit) broken = "Needs the shopper's phone.";
+      } else {
+        const prior = await prisma.order.count({ where: { businessId, customerPhone: phone, status: { not: "cancelled" } } });
+        if (c.firstOrderOnly && prior > 0) broken = "This code is for first orders only.";
+        const used = await prisma.order.count({ where: { businessId, customerPhone: phone, couponCode: c.code, status: { not: "cancelled" } } });
+        if (!broken && c.perCustomerLimit != null && used >= c.perCustomerLimit) broken = "You've already used this code.";
+      }
     }
-    if (stop) return stop;
-    if (explicit || !stop) {
+    if (broken && explicit) return { ...base, error: broken };
+    if (!broken) {
       // discount base — whole subtotal, or only the targeted products' line totals
       let discountBase = subtotal;
       if (c.productIds) {

@@ -25,6 +25,17 @@ export async function rateLimit(key: string, limit: number, windowMs: number): P
   }
 }
 
+/** Is `key` already over `limit` in its current window? Reads only — doesn't count a hit. */
+export async function overLimit(key: string, limit: number, windowMs: number): Promise<boolean> {
+  try {
+    const row = await prisma.rateLimit.findUnique({ where: { key } });
+    if (!row || Date.now() - row.windowStart.getTime() > windowMs) return false;
+    return row.count >= limit;
+  } catch {
+    return false;
+  }
+}
+
 /** Best-effort cleanup of stale windows — call occasionally from a cron. */
 export async function sweepRateLimits(olderThanMs = 24 * 60 * 60 * 1000): Promise<number> {
   const cutoff = new Date(Date.now() - olderThanMs);
