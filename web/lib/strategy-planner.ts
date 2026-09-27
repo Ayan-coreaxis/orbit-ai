@@ -4,6 +4,10 @@ import { anthropic, MODEL } from "@/lib/anthropic";
 import { prisma } from "@/lib/prisma";
 import { estimateCostUsd } from "@/lib/pricing";
 import { assertUnderUsageCap } from "@/lib/usage-limit";
+import { researchMarket } from "@/lib/growth-research";
+import { playbookFor } from "@/lib/growth-playbook";
+import { learnedOutcomesFor } from "@/lib/growth-learning";
+import { brainstormIdeas } from "@/lib/growth-ideas";
 import {
   METRIC_TYPES,
   ORBIT_CAN,
@@ -174,7 +178,14 @@ export function plannerPrinciples(): string {
 - A zero-sales business cannot use tactics that need existing traffic or customers (cart recovery, A/B tests, repeat offers). Match tactics to the stage the numbers show.
 - Protect profit. Never propose blanket heavy discounts. If a strategy gives a percentage discount, set discount_pct so real code can check it against margins.
 - Durations fit the idea (a 5-day drop, a 45-day loyalty loop, or ongoing). Repeating something that works is fine.
-- Every number you mention must come from the snapshot. Never invent sales figures, market sizes or conversion rates.
+- Every number you mention must come from the snapshot or the market research. Never invent sales figures, market sizes or conversion rates.
+- Use the MARKET RESEARCH (when given) for timing (upcoming festivals, seasons, paydays — plan around real dates), the channels buyers in this niche actually use, and the doubts that stop them buying. Use the PLAYBOOK as proven patterns to adapt, and ORBIT'S OWN RESULTS as real evidence of what works for similar stores.
+- Timing: at least one strategy must be built around a real upcoming moment in the next 60 days — from the research calendar, or a well-known season for this niche (e.g. winter cold-and-flu season for herbal remedies, wedding season, exams, a payday) — and say the dates.
+- Foundation + originals: the PLAYBOOK basics that this store is missing (trust page, COD confirmation, thank-you cards, bundle ladder, WhatsApp Status, community groups, free-delivery threshold…) go together into ONE strategy titled "Foundation: …" (kind operations) — its steps are those basics. EVERY other strategy must be an original idea invented for THIS store — built on its specific products, city, buyers, story and the research — the kind a customer would talk about. If an idea could be pasted into any other store unchanged, it's not good enough.
+- To invent the originals, think from angles like these (angles, not ideas to copy): the product's own story and origin; the buyer's daily or seasonal rituals; a local moment or place only this city has; an unusual partner whose customers overlap; a twist on the product itself (size, format, personalisation, a kit); a service wrapped around the product (advice, a routine, a follow-up); something the buyer can show or gift to others. Each original must use a real fact from the snapshot or the research.
+- Make the store fit the plan: at least one strategy must include an "orbit" step that shapes the storefront around it with Orbit Design (hero message, a trust / proof section, a landing page for the offer, a gift or bundle page) — the store should look like it was built for this plan.
+- Health, food and beauty: never plan cure or treatment claims, "guaranteed results" or fake reviews.
+- Never assume the seller has something they didn't tell you — a shop, a pickup point, an address, staff, a supplier, a certificate, a family recipe. A step that depends on one is owner "seller" with a note to confirm it first, and no "orbit" step may put it on the store or the checkout until they have.
 
 HONEST EXECUTION TAGS — for EVERY step:
 ORBIT CAN (owner "orbit"; if it needs a connection that is NOT connected, still use "orbit" but say in note to connect it first):
@@ -192,6 +203,14 @@ Write in clear, simple English. Be concrete.`;
 export async function draftGrowthPlan(businessId: string, sellerNote?: string): Promise<{ planId: string }> {
   await assertUnderUsageCap(businessId);
   const snapshot = await getBusinessSnapshot(businessId);
+  // Beyond the store's own numbers: fresh market research (web), proven playbook patterns for its
+  // stage + niche, and Orbit's own measured results on similar stores.
+  const pb = playbookFor(snapshot);
+  const [research, learned] = await Promise.all([
+    researchMarket(businessId, snapshot),
+    learnedOutcomesFor(businessId, pb.niches, pb.stage).catch(() => ""),
+  ]);
+  const ideas = await brainstormIdeas(businessId, snapshotText(snapshot), research?.brief ?? null);
 
   const system = `You are the Strategy Orchestrator of Orbit, an e-commerce growth OS — a senior growth operator who has grown many small brands from zero. You design growth plans for ONE specific business.
 
@@ -199,6 +218,13 @@ ${plannerPrinciples()}`;
 
   const userMsg = `${snapshotText(snapshot)}
 ${snapshot.competitorNotes.length ? `\nCOMPETITOR NOTES (reference only, do not build the plan on these):\n${snapshot.competitorNotes.map((c) => `- ${c}`).join("\n")}` : ""}
+${research ? `\nMARKET RESEARCH (searched on the web ${research.at.slice(0, 10)}):\n${research.brief}` : "\nMARKET RESEARCH: not available this time — rely on the playbook and general knowledge, and don't state market facts as certain."}
+
+${pb.text}
+${ideas ? `
+BRAINSTORMED ORIGINAL IDEAS for this store (made just now — at least 2 of the non-Foundation strategies MUST be built on ideas from this list — pick the strongest, sharpen or combine them; a plain seasonal bundle or discount is not enough on its own):
+${ideas}
+` : ""}${learned ? `\n${learned}` : ""}
 ${sellerNote?.trim() ? `\nTHE SELLER SAYS: ${sellerNote.trim().slice(0, 1500)}` : ""}
 
 Draft the plan now with the propose_growth_plan tool.`;
@@ -246,7 +272,7 @@ Draft the plan now with the propose_growth_plan tool.`;
       businessId,
       title: (input.title?.trim() || `Growth plan — ${new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`).slice(0, 120),
       diagnosis: diagnosis.slice(0, 1500),
-      snapshot: JSON.stringify(snapshot),
+      snapshot: JSON.stringify({ ...snapshot, research, stage: pb.stage, niches: pb.niches }),
       status: "draft",
       strategies: {
         create: strategies.map((s, i) => ({ businessId, position: i, ...strategyData(s, snapshot.products) })),

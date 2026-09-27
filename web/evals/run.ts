@@ -12,9 +12,11 @@ import { appendFileSync, mkdirSync, writeFileSync } from "fs";
 import { randomBytes } from "crypto";
 import { prisma } from "../lib/prisma";
 import { loadStoredKeys } from "../lib/env-file";
+import { MODEL, MODEL_FAST, refreshModelConfig } from "../lib/anthropic";
 import { getChatbotReply } from "../lib/chatbot";
 import { buildFixture, storeSnapshot, type Fixture } from "./fixture";
 import { CASES, type EvalCase } from "./cases";
+import { gradePlan } from "./plan-grade";
 
 const BASE = process.env.EVAL_BASE_URL || "http://localhost:3000";
 
@@ -46,7 +48,11 @@ async function runCase(c: EvalCase, f: Fixture, cookie: string): Promise<Result>
   const before = await storeSnapshot(f.businessId);
 
   try {
-    if (c.area === "orchestrator") {
+    if (c.area === "planner") {
+      const r = await gradePlan(f.businessId, c.turns[0]);
+      failures.push(...r.failures);
+      replies.push(...r.summary);
+    } else if (c.area === "orchestrator") {
       await prisma.orchestratorMessage.deleteMany({ where: { businessId: f.businessId } }); // each case starts a fresh chat
       let last: ChatMsg[] = [];
       for (const turn of c.turns) {
@@ -110,6 +116,8 @@ async function main() {
   await loadStoredKeys(true);
   if (!process.env.ANTHROPIC_API_KEY) throw new Error("No Anthropic key — save it in Super Admin > API Keys first.");
 
+  await refreshModelConfig();
+  console.log(`Models: ${MODEL} (Orchestrator), ${MODEL_FAST} (fast: specialists, store chat)`);
   const filters = process.argv.slice(2);
   const cases = filters.length ? CASES.filter((c) => filters.includes(c.id) || filters.includes(c.area)) : CASES;
   console.log(`Building the Shifa Herbals test store…`);
@@ -121,7 +129,7 @@ async function main() {
   for (const c of cases) {
     const r = await runCase(c, f, cookie);
     results.push(r);
-    console.log(`${r.pass ? "PASS" : "FAIL"}  ${c.id.padEnd(24)} ${(r.ms / 1000).toFixed(1)}s${r.pass ? "" : `\n      ${r.failures.join("\n      ")}\n      reply: ${r.replies.join(" | ").replace(/\s+/g, " ").slice(0, 300)}`}`);
+    console.log(`${r.pass ? "PASS" : "FAIL"}  ${c.id.padEnd(24)} ${(r.ms / 1000).toFixed(1)}s${c.area === "planner" ? `\n      ${r.replies.join("\n      ")}` : ""}${r.pass ? "" : `\n      ${r.failures.join("\n      ")}\n      reply: ${r.replies.join(" | ").replace(/\s+/g, " ").slice(0, 300)}`}`);
   }
 
   const cost = await prisma.agentUsage.aggregate({ where: { businessId: f.businessId, createdAt: { gte: since } }, _sum: { costUsd: true } });
@@ -140,14 +148,14 @@ async function main() {
 
   mkdirSync("evals/results", { recursive: true });
   const file = `evals/results/${new Date().toISOString().replace(/[:.]/g, "-")}.json`;
-  writeFileSync(file, JSON.stringify({ at: new Date().toISOString(), passed, total: results.length, costUsd: cost._sum.costUsd ?? 0, results }, null, 2));
+  writeFileSync(file, JSON.stringify({ at: new Date().toISOString(), model: MODEL, fastModel: MODEL_FAST, passed, total: results.length, costUsd: cost._sum.costUsd ?? 0, results }, null, 2));
   console.log(`Full replies: ${file}`);
 
   // CI: a readable summary on the GitHub run page, and a red run when the score drops.
   const pct = Math.round((passed / Math.max(1, results.length)) * 100);
   if (process.env.GITHUB_STEP_SUMMARY) {
     const md = [
-      `## AI evals — ${passed}/${results.length} (${pct}%) · $${(cost._sum.costUsd ?? 0).toFixed(2)}`,
+      `## AI evals — ${passed}/${results.length} (${pct}%) · $${(cost._sum.costUsd ?? 0).toFixed(2)} · ${MODEL}`,
       "",
       "| Skill | Passed |",
       "|---|---|",

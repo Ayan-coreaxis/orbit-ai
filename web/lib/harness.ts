@@ -9,6 +9,7 @@ import { publishFacebookPost } from "@/lib/meta-graph";
 import { parseMetric, parseSteps } from "@/lib/strategy-lab";
 import { staffPlan, retireIdleAgents, parseJsonList } from "@/lib/plan-agents";
 import { postOrbitWorkSummary } from "@/lib/strategy-review";
+import { describeDesignJobs, runDesignEdit } from "@/lib/design-ops";
 
 /**
  * Harness — the real tools Orbit uses to carry out the "Orbit" steps of an approved strategy.
@@ -54,7 +55,7 @@ const TOOLS: HarnessTool[] = [
         properties: {
           code: { type: "string", description: "UPPERCASE, no spaces — use the strategy's coupon code if it has one." },
           type: { type: "string", enum: ["percent", "fixed"] },
-          value: { type: "number", description: "Percent off (1-50) or fixed amount off." },
+          value: { type: "number", description: "Percent off (1-50) or fixed amount off. 0 = a tracking-only code (no discount) that just counts the orders this strategy brings." },
           first_order_only: { type: "boolean" },
           per_customer_limit: { type: "integer" },
           free_shipping: { type: "boolean" },
@@ -68,8 +69,9 @@ const TOOLS: HarnessTool[] = [
     async run(businessId, i) {
       const code = str(i.code, 30).toUpperCase().replace(/\s+/g, "");
       const type = i.type === "fixed" ? "fixed" : "percent";
-      const value = num(i.value);
-      if (!code || value == null || value <= 0) return { status: "failed", summary: "Coupon needs a code and a value above 0." };
+      // value 0 = a tracking code: no discount, it just counts the orders a strategy brings (e.g. referrals)
+      const value = num(i.value) ?? 0;
+      if (!code || value < 0) return { status: "failed", summary: "Coupon needs a code." };
       if (type === "percent" && value > 50) return { status: "skipped", summary: `Didn't create ${code}: ${value}% is above Orbit's 50% safety limit — set it by hand if you really want it.` };
       const existing = await prisma.coupon.findUnique({ where: { businessId_code: { businessId, code } } });
       if (existing) return { status: "skipped", summary: `Coupon ${code} already exists — kept as is.` };
@@ -93,7 +95,7 @@ const TOOLS: HarnessTool[] = [
           expiresAt: days && days > 0 ? new Date(Date.now() + days * 86400000) : null,
         },
       });
-      return { status: "done", summary: `Created coupon ${code} (${type === "percent" ? `${value}% off` : `${value} off`}${i.first_order_only === true ? ", first order only" : ""}${i.free_shipping === true ? ", free shipping" : ""}).` };
+      return { status: "done", summary: `Created coupon ${code} (${value === 0 ? "tracking only, no discount" : type === "percent" ? `${value}% off` : `${value} off`}${i.first_order_only === true ? ", first order only" : ""}${i.free_shipping === true ? ", free shipping" : ""}).` };
     },
   },
   {
@@ -226,7 +228,7 @@ const TOOLS: HarnessTool[] = [
     def: {
       name: "write_for_seller",
       description:
-        "Write something the seller will use by hand: a caption, a WhatsApp/email message, a script, product copy, a card text, an Orbit Design page brief. Write the FULL finished text in `text`.",
+        "Write something the seller will use by hand: a caption, a WhatsApp/email message, a script, product copy, a card text. (To build or change a store page, use design_store instead.) Write the FULL finished text in `text`.",
       input_schema: {
         type: "object",
         properties: {
@@ -243,6 +245,44 @@ const TOOLS: HarnessTool[] = [
       const title = str(i.title, 160) || "Written for you";
       const hint = i.kind === "page_brief" ? " — paste it into Orbit Design to build the page." : " — ready to copy.";
       return { status: "deliverable", summary: `${title}${hint}`, output: text };
+    },
+  },
+  {
+    def: {
+      name: "design_store",
+      description:
+        "Shape the seller's storefront around this strategy with Orbit Design: a landing page for the offer, a hero message, a trust / proof section, a gift or bundle page. Give a specific instruction (what to build, which products, the headline idea, the tone). If the store isn't live yet it's built straight into the draft; if it's live, it's sent to the owner as a proposal to Apply first.",
+      input_schema: {
+        type: "object",
+        properties: {
+          instruction: { type: "string", description: "Exactly what Orbit Design should build or change, and for which strategy. Specific products, headline idea, sections." },
+        },
+        required: ["instruction"],
+      },
+    },
+    async run(businessId, i) {
+      const instruction = str(i.instruction, 1500);
+      if (!instruction) return { status: "failed", summary: "No design instruction." };
+      const design = await prisma.storeDesign.findUnique({ where: { businessId }, select: { published: true } });
+      if (design?.published) {
+        // The store is live — changing it is the owner's call: an Apply card in the Orchestrator chat.
+        const job = { op: "design_request" as const, instruction };
+        await prisma.orchestratorMessage.create({
+          data: {
+            businessId,
+            role: "assistant",
+            speaker: "orchestrator",
+            content: "Your plan needs a change on the live store — press Apply and Orbit Design builds it (a minute or two). Nothing changes until you do.",
+            pendingOps: JSON.stringify([job]),
+            opsState: "pending",
+            opsSummary: JSON.stringify(describeDesignJobs([job])),
+          },
+        });
+        return { status: "deliverable", summary: "Store change proposed in your Orchestrator chat — press Apply to build it.", output: instruction };
+      }
+      const r = await runDesignEdit(businessId, instruction);
+      if ((r as { error?: string }).error) return { status: "failed", summary: `Orbit Design couldn't build it: ${(r as { error?: string }).error}`, output: instruction };
+      return { status: "done", summary: "Built into your store design (draft) in Orbit Design — review it, then publish when you're ready.", output: instruction };
     },
   },
   {

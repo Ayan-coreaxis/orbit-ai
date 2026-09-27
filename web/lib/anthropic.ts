@@ -6,6 +6,21 @@ export const anthropic = new Anthropic({
 });
 
 /**
+ * The Claude 5 models think before they answer, and that thinking counts against max_tokens — a
+ * call written for Sonnet 4.5 with a small limit (1,200–2,000) can come back EMPTY on Sonnet 5
+ * (the evals caught it). So for those models every call gets at least MIN_THINKING_BUDGET. It's only
+ * a ceiling: billing is for the tokens actually produced.
+ */
+const MIN_THINKING_BUDGET = 8000;
+const thinksFirst = (model: unknown) => typeof model === "string" && /^claude-(sonnet|opus|fable)-5/.test(model);
+const rawCreate = anthropic.messages.create.bind(anthropic.messages);
+anthropic.messages.create = ((body: Anthropic.Messages.MessageCreateParams, options?: Anthropic.RequestOptions) =>
+  rawCreate(
+    thinksFirst(body.model) && body.max_tokens < MIN_THINKING_BUDGET ? { ...body, max_tokens: MIN_THINKING_BUDGET } : body,
+    options,
+  )) as typeof anthropic.messages.create;
+
+/**
  * Real, curated catalog of Claude models the Super Admin can pick from at /admin/ai-model —
  * every model this platform is allowed to call. `tier` is just a display grouping, not a real
  * Anthropic concept. Keep in sync with the rates in lib/pricing.ts when adding a new one.
