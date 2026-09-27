@@ -2,15 +2,18 @@
 
 import { useEffect, useState } from "react";
 import { Topbar } from "@/components/Topbar";
-import { Card, SectionLabel, Pill, Button } from "@/components/ui";
-import { apiKeyConfigs } from "@/lib/admin-data";
-import { KeyRound, Eye, EyeOff, Check, RefreshCw } from "lucide-react";
+import { Card, Pill, Button } from "@/components/ui";
+import { apiKeyConfigs, apiKeyGroups } from "@/lib/admin-data";
+import { Eye, EyeOff, Check, RefreshCw } from "lucide-react";
+
+const byId = new Map(apiKeyConfigs.map((c) => [c.id, c]));
 
 export default function ApiKeysPage() {
   const [values, setValues] = useState<Record<string, string>>({});
   const [visible, setVisible] = useState<Record<string, boolean>>({});
   const [status, setStatus] = useState<Record<string, boolean>>({});
-  const [saving, setSaving] = useState<Record<string, boolean>>({});
+  const [saving, setSaving] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{ id: string; ok: boolean; text: string } | null>(null);
   const [loaded, setLoaded] = useState(false);
 
   async function loadStatus() {
@@ -36,90 +39,102 @@ export default function ApiKeysPage() {
   }, []);
 
   async function save(id: string) {
-    const value = values[id];
+    const value = values[id]?.trim();
     if (!value) return;
-    setSaving({ ...saving, [id]: true });
-    const res = await fetch("/api/admin/settings", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, value }),
-    });
-    setSaving({ ...saving, [id]: false });
-    if (res.ok) {
-      setValues({ ...values, [id]: "" });
+    setSaving(id);
+    setNotice(null);
+    try {
+      const res = await fetch("/api/admin/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, value }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Couldn't save.");
+      setValues((v) => ({ ...v, [id]: "" }));
+      setNotice({ id, ok: true, text: "Saved — in use now." });
       await loadStatus();
+    } catch (e) {
+      setNotice({ id, ok: false, text: e instanceof Error ? e.message : "Couldn't save." });
+    } finally {
+      setSaving(null);
     }
   }
 
   return (
     <div>
-      <Topbar
-        title="API Keys & Integrations"
-        subtitle="Saved directly to this server's .env.local — real, not a demo"
-      />
-      <div className="max-w-[900px] space-y-5 p-5 sm:p-8 lg:p-10">
-        {!loaded && <p className="text-[13.5px] text-text-faint">Loading current status…</p>}
+      <Topbar title="API keys" subtitle="Keys for the services Orbit uses — stored encrypted, used straight away" />
+      <div className="max-w-[1000px] space-y-6 p-5 sm:p-8 lg:p-10">
+        {/* jump links */}
+        <div className="flex flex-wrap gap-1.5">
+          {apiKeyGroups.map((g) => {
+            const set = g.keys.filter((k) => status[k]).length;
+            return (
+              <a key={g.id} href={`#${g.id}`} className="rounded-full bg-panel-2 px-3 py-1.5 text-[12.5px] font-medium text-text-dim hover:text-text">
+                {g.title.split(" — ")[0]} <span className={set === g.keys.length ? "text-good" : "opacity-60"}>{loaded ? `${set}/${g.keys.length}` : ""}</span>
+              </a>
+            );
+          })}
+        </div>
 
-        {apiKeyConfigs.map((cfg) => (
-          <Card key={cfg.id} className="p-6">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="flex min-w-0 flex-1 items-start gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-panel-2">
-                  <KeyRound className="h-[18px] w-[18px] text-text-dim" />
-                </div>
-                <div>
-                  <div className="text-[15px] font-medium">{cfg.name}</div>
-                  <p className="mt-1 max-w-md text-[13.5px] leading-relaxed text-text-dim">
-                    {cfg.description}
-                  </p>
-                </div>
-              </div>
-              <Pill tone={status[cfg.id] ? "good" : "neutral"}>
-                {status[cfg.id] ? "Connected" : "Not connected"}
-              </Pill>
+        {apiKeyGroups.map((g) => (
+          <section key={g.id} id={g.id} className="scroll-mt-6">
+            <div className="mb-2.5">
+              <h2 className="text-[15.5px] font-semibold">{g.title}</h2>
+              <p className="text-[13px] text-text-dim">{g.note}</p>
             </div>
-
-            <div className="mt-4 flex items-center gap-2.5">
-              <div className="flex flex-1 items-center gap-2 rounded-xl border border-border-strong bg-panel px-3.5 py-2.5">
-                <input
-                  type={visible[cfg.id] ? "text" : "password"}
-                  placeholder={status[cfg.id] ? "Already set — paste a new key to replace it" : `Paste your ${cfg.name} key…`}
-                  value={values[cfg.id] ?? ""}
-                  onChange={(e) => setValues({ ...values, [cfg.id]: e.target.value })}
-                  className="w-full bg-transparent text-[14px] outline-none placeholder:text-text-faint"
-                  name={`orbit-key-${cfg.id}`}
-                  autoComplete="new-password"
-                  data-1p-ignore
-                  data-lpignore="true"
-                />
-                <button
-                  onClick={() => setVisible({ ...visible, [cfg.id]: !visible[cfg.id] })}
-                  className="text-text-faint hover:text-text-dim"
-                >
-                  {visible[cfg.id] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
-              <Button variant="primary" onClick={() => save(cfg.id)} disabled={saving[cfg.id]}>
-                {saving[cfg.id] ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-                Save
-              </Button>
-            </div>
-          </Card>
+            <Card className="divide-y divide-border">
+              {g.keys.map((id) => {
+                const cfg = byId.get(id);
+                if (!cfg) return null;
+                return (
+                  <div key={id} className="p-5">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="text-[14px] font-medium">{cfg.name}</div>
+                        <p className="mt-0.5 max-w-2xl text-[12.5px] leading-relaxed text-text-faint">{cfg.description}</p>
+                      </div>
+                      <Pill tone={status[id] ? "good" : "neutral"}>{!loaded ? "…" : status[id] ? "Set" : "Not set"}</Pill>
+                    </div>
+                    <div className="mt-3 flex items-center gap-2.5">
+                      <div className="flex flex-1 items-center gap-2 rounded-xl border border-border-strong bg-panel px-3.5 py-2">
+                        <input
+                          type={visible[id] ? "text" : "password"}
+                          placeholder={status[id] ? "Saved — paste a new value to replace it" : `Paste ${cfg.name}…`}
+                          value={values[id] ?? ""}
+                          onChange={(e) => setValues({ ...values, [id]: e.target.value })}
+                          onKeyDown={(e) => e.key === "Enter" && save(id)}
+                          className="w-full bg-transparent text-[13.5px] outline-none placeholder:text-text-faint"
+                          name={`orbit-key-${id}`}
+                          autoComplete="new-password"
+                          data-1p-ignore
+                          data-lpignore="true"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setVisible({ ...visible, [id]: !visible[id] })}
+                          className="text-text-faint hover:text-text-dim"
+                          aria-label={visible[id] ? "Hide" : "Show"}
+                        >
+                          {visible[id] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
+                      <Button variant="primary" onClick={() => save(id)} disabled={saving === id || !values[id]?.trim()}>
+                        {saving === id ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                        Save
+                      </Button>
+                    </div>
+                    {notice?.id === id && <p className={`mt-2 text-[12.5px] ${notice.ok ? "text-good" : "text-bad"}`}>{notice.text}</p>}
+                  </div>
+                );
+              })}
+            </Card>
+          </section>
         ))}
 
-        <Card className="p-6">
-          <SectionLabel>Where these are used</SectionLabel>
-          <p className="mt-2 text-[13.5px] leading-relaxed text-text-dim">
-            Saving here writes straight to the server&apos;s <code>.env.local</code> file — the same
-            place the Competitor Intelligence and Strategy Orchestrator agents already read from.
-            Once Anthropic shows &quot;Connected&quot;, real onboarding reports start working
-            immediately, no restart needed. Stripe, Meta, and Twilio are stored the same way, ready
-            for when those integrations are built.
-          </p>
-          <p className="mt-3 text-[12px] text-text-faint">
-            This whole panel is password-gated — see <code>ADMIN_PASSWORD</code> in <code>.env.local</code>.
-          </p>
-        </Card>
+        <p className="text-[12px] text-text-faint">
+          Storage (Cloudflare R2, Whisper), web search (Brave) and Studio (Gemini, BytePlus) keys are on their own pages, next to their settings.
+        </p>
       </div>
     </div>
   );

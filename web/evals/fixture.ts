@@ -59,7 +59,7 @@ export async function buildFixture(): Promise<Fixture> {
       whatsapp: "+923001234567",
       storeCurrency: "pkr",
       plan: "growth",
-      monthlyUsageCapUsd: 100,
+      monthlyUsageCapUsd: 70, // below the $75 Growth price, like any real seller
       shippingFee: 250,
       freeShippingOver: 3000,
       chatWidgetEnabled: true,

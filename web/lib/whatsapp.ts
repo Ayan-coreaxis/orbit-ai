@@ -93,3 +93,8 @@ export function validTwilioSignature(url: string, params: Record<string, string>
   const b = Buffer.from(signature);
   return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
+
+/** "whatsapp:+1 415-523 8886" → "+14155238886" — the key stores' inbound numbers are matched on. */
+export function whatsAppNumberKey(raw: string): string {
+  return raw.replace(/^whatsapp:/, "").replace(/[^\d+]/g, "");
+}

@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getChatbotReply } from "@/lib/chatbot";
-import { sendWhatsAppMessage, validTwilioSignature } from "@/lib/whatsapp";
+import { whatsAppNumberKey, sendWhatsAppMessage, validTwilioSignature } from "@/lib/whatsapp";
 import { looksLikeYes, verifyLatestOrderForPhone } from "@/lib/order-verify";
 
-function normalizePhone(raw: string): string {
-  return raw.replace(/^whatsapp:/, "").replace(/[^\d+]/g, "");
-}
+const normalizePhone = whatsAppNumberKey;
 
 /**
  * Real inbound WhatsApp webhook. Twilio POSTs here whenever a real customer messages a business's

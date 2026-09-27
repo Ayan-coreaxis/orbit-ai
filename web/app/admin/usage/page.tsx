@@ -1,192 +1,123 @@
+import Link from "next/link";
 import { Topbar } from "@/components/Topbar";
 import { Card, SectionLabel } from "@/components/ui";
-import { prisma } from "@/lib/prisma";
+import { getUsage, type UsagePeriod, type UsageRow } from "@/lib/admin-stats";
 
-const AGENT_LABELS: Record<string, string> = {
-  competitor: "Competitor Intelligence",
-  orchestrator: "Strategy Orchestrator",
-  seo: "SEO Agent",
-  content: "Content Agent",
-  ads: "Ads Agent",
-  retention: "Retention Agent",
-  qa: "Manager / QA Agent",
-  "orchestrator-chat": "Orchestrator Chat",
-  "web-search": "Web Search (Brave)",
-};
+const PERIODS: { id: UsagePeriod; label: string }[] = [
+  { id: "today", label: "Today" },
+  { id: "month", label: "This month" },
+  { id: "30d", label: "Last 30 days" },
+  { id: "all", label: "All time" },
+];
 
-function fmtCost(n: number) {
-  return `$${n.toFixed(4)}`;
-}
+const usd = (n: number) => (n >= 1 ? `$${n.toFixed(2)}` : `$${n.toFixed(4)}`);
 
-export default async function UsagePage() {
-  const [usageRows, businesses] = await Promise.all([
-    prisma.agentUsage.findMany({
-      select: { businessId: true, agentId: true, model: true, inputTokens: true, outputTokens: true, costUsd: true, createdAt: true },
-    }),
-    prisma.business.findMany({ select: { id: true, name: true, niche: true } }),
-  ]);
-
-  const businessById = new Map(businesses.map((b) => [b.id, b]));
-
-  type BizTotals = {
-    id: string;
-    name: string;
-    niche: string;
-    calls: number;
-    inputTokens: number;
-    outputTokens: number;
-    costUsd: number;
-    lastActivity: Date | null;
-  };
-  const byBusiness = new Map<string, BizTotals>();
-  const byAgent = new Map<string, { calls: number; inputTokens: number; outputTokens: number; costUsd: number }>();
-
-  let totalCost = 0;
-  let totalInput = 0;
-  let totalOutput = 0;
-
-  for (const row of usageRows) {
-    totalCost += row.costUsd;
-    totalInput += row.inputTokens;
-    totalOutput += row.outputTokens;
-
-    const biz = businessById.get(row.businessId);
-    const key = row.businessId;
-    const existing = byBusiness.get(key) ?? {
-      id: key,
-      name: biz?.name ?? "(deleted business)",
-      niche: biz?.niche ?? "",
-      calls: 0,
-      inputTokens: 0,
-      outputTokens: 0,
-      costUsd: 0,
-      lastActivity: null,
-    };
-    existing.calls += 1;
-    existing.inputTokens += row.inputTokens;
-    existing.outputTokens += row.outputTokens;
-    existing.costUsd += row.costUsd;
-    if (!existing.lastActivity || row.createdAt > existing.lastActivity) existing.lastActivity = row.createdAt;
-    byBusiness.set(key, existing);
-
-    const agentExisting = byAgent.get(row.agentId) ?? { calls: 0, inputTokens: 0, outputTokens: 0, costUsd: 0 };
-    agentExisting.calls += 1;
-    agentExisting.inputTokens += row.inputTokens;
-    agentExisting.outputTokens += row.outputTokens;
-    agentExisting.costUsd += row.costUsd;
-    byAgent.set(row.agentId, agentExisting);
-  }
-
-  const businessRows = Array.from(byBusiness.values()).sort((a, b) => b.costUsd - a.costUsd);
-  const agentRows = Array.from(byAgent.entries())
-    .map(([agentId, v]) => ({ agentId, label: AGENT_LABELS[agentId] ?? agentId, ...v }))
-    .sort((a, b) => b.costUsd - a.costUsd);
+export default async function UsagePage({ searchParams }: { searchParams: Promise<{ period?: string }> }) {
+  const { period: raw } = await searchParams;
+  const period: UsagePeriod = PERIODS.some((p) => p.id === raw) ? (raw as UsagePeriod) : "month";
+  const { businesses, agents, models, total } = await getUsage(period);
 
   return (
     <div>
-      <Topbar
-        title="AI Usage & Cost"
-        subtitle="Real Anthropic API spend, per business — computed from actual token usage, not estimated"
-      />
+      <Topbar title="AI usage & cost" subtitle="Anthropic spend from actual token counts, by seller, agent and model" />
       <div className="max-w-[1300px] space-y-6 p-5 sm:p-8 lg:p-10">
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
-          <Card className="p-6">
-            <div className="text-[12.5px] font-medium text-text-faint">Total real spend (all time)</div>
-            <div className="mt-2 text-2xl font-semibold">{fmtCost(totalCost)}</div>
-          </Card>
-          <Card className="p-6">
-            <div className="text-[12.5px] font-medium text-text-faint">Total tokens used</div>
-            <div className="mt-2 text-2xl font-semibold">{(totalInput + totalOutput).toLocaleString()}</div>
-            <div className="mt-1 text-[12.5px] text-text-dim">
-              {totalInput.toLocaleString()} in · {totalOutput.toLocaleString()} out
-            </div>
-          </Card>
-          <Card className="p-6">
-            <div className="text-[12.5px] font-medium text-text-faint">Businesses with usage</div>
-            <div className="mt-2 text-2xl font-semibold">{businessRows.length}</div>
-          </Card>
+        <div className="flex flex-wrap gap-1.5">
+          {PERIODS.map((p) => (
+            <Link
+              key={p.id}
+              href={`/admin/usage?period=${p.id}`}
+              className={`rounded-full px-3.5 py-1.5 text-[13px] font-medium ${p.id === period ? "bg-accent text-white" : "bg-panel-2 text-text-dim hover:text-text"}`}
+            >
+              {p.label}
+            </Link>
+          ))}
         </div>
 
-        <SectionLabel>Spend by business — every real user, real cost</SectionLabel>
-        <Card className="overflow-hidden">
-          {businessRows.length === 0 ? (
-            <p className="p-6 text-[13.5px] text-text-faint">
-              No AI usage recorded yet — this fills in as real businesses use the Orchestrator chat and their growth plan.
-            </p>
-          ) : (
-            <div className="overflow-x-auto"><table className="w-full min-w-[640px] text-[14px]">
-              <thead>
-                <tr className="border-b border-border bg-panel-2/60 text-left text-[12.5px] font-medium text-text-faint">
-                  <th className="px-6 py-3.5 font-medium">Business</th>
-                  <th className="px-6 py-3.5 font-medium">Calls</th>
-                  <th className="px-6 py-3.5 font-medium">Input tokens</th>
-                  <th className="px-6 py-3.5 font-medium">Output tokens</th>
-                  <th className="px-6 py-3.5 font-medium">Real cost</th>
-                  <th className="px-6 py-3.5 font-medium">Last activity</th>
-                </tr>
-              </thead>
-              <tbody>
-                {businessRows.map((b) => (
-                  <tr key={b.id} className="border-b border-border last:border-0">
-                    <td className="px-6 py-4">
-                      <div className="font-medium">{b.name || "(unnamed)"}</div>
-                      <div className="text-[12px] text-text-faint">{b.niche}</div>
-                    </td>
-                    <td className="px-6 py-4 text-text-dim">{b.calls.toLocaleString()}</td>
-                    <td className="px-6 py-4 text-text-dim">{b.inputTokens.toLocaleString()}</td>
-                    <td className="px-6 py-4 text-text-dim">{b.outputTokens.toLocaleString()}</td>
-                    <td className="px-6 py-4 font-medium">{fmtCost(b.costUsd)}</td>
-                    <td className="px-6 py-4 text-text-dim">
-                      {b.lastActivity ? b.lastActivity.toLocaleString() : "—"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table></div>
-          )}
-        </Card>
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <Stat label="Spend" value={usd(total.cost)} />
+          <Stat label="AI calls" value={total.calls.toLocaleString()} />
+          <Stat label="Tokens" value={(total.input + total.output).toLocaleString()} sub={`${total.input.toLocaleString()} in · ${total.output.toLocaleString()} out`} />
+          <Stat label="Sellers using AI" value={String(businesses.length)} sub={businesses.length ? `avg ${usd(total.cost / businesses.length)} each` : undefined} />
+        </div>
 
-        <SectionLabel>Spend by agent — which agent costs the most, across every business</SectionLabel>
-        <Card className="overflow-hidden">
-          {agentRows.length === 0 ? (
-            <p className="p-6 text-[13.5px] text-text-faint">No agent calls logged yet.</p>
-          ) : (
-            <div className="overflow-x-auto"><table className="w-full min-w-[640px] text-[14px]">
-              <thead>
-                <tr className="border-b border-border bg-panel-2/60 text-left text-[12.5px] font-medium text-text-faint">
-                  <th className="px-6 py-3.5 font-medium">Agent</th>
-                  <th className="px-6 py-3.5 font-medium">Calls</th>
-                  <th className="px-6 py-3.5 font-medium">Total tokens</th>
-                  <th className="px-6 py-3.5 font-medium">Real cost</th>
-                  <th className="px-6 py-3.5 font-medium">Avg. cost / call</th>
-                </tr>
-              </thead>
-              <tbody>
-                {agentRows.map((a) => (
-                  <tr key={a.agentId} className="border-b border-border last:border-0">
-                    <td className="px-6 py-4 font-medium">{a.label}</td>
-                    <td className="px-6 py-4 text-text-dim">{a.calls.toLocaleString()}</td>
-                    <td className="px-6 py-4 text-text-dim">
-                      {(a.inputTokens + a.outputTokens).toLocaleString()}
-                    </td>
-                    <td className="px-6 py-4 font-medium">{fmtCost(a.costUsd)}</td>
-                    <td className="px-6 py-4 text-text-dim">{fmtCost(a.costUsd / a.calls)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table></div>
-          )}
-        </Card>
+        <UsageTable title="By seller" first="Seller" rows={businesses} empty="No AI usage in this period." />
+        <div id="agents">
+          <UsageTable title="By agent" first="Agent" rows={agents} empty="No agent calls in this period." />
+        </div>
 
-        <Card className="p-6">
-          <p className="text-[12.5px] leading-relaxed text-text-dim">
-            Every row here comes from the real <code>AgentUsage</code> table — logged on every actual
-            Anthropic API call (Orchestrator chat, growth plan, content and chatbot), with the real token
-            counts and cost computed from Anthropic&apos;s published per-model pricing. Nothing on this
-            page is estimated or seeded.
-          </p>
-        </Card>
+        {models.length > 0 && (
+          <Card className="p-6">
+            <SectionLabel>By model</SectionLabel>
+            <ul className="mt-3 divide-y divide-border text-[13.5px]">
+              {models.map((m) => (
+                <li key={m.model} className="flex items-center justify-between py-2.5">
+                  <span className="font-mono text-[12.5px]">{m.model}</span>
+                  <span className="text-text-dim">
+                    {m.calls.toLocaleString()} calls · <span className="font-medium text-text">{usd(m.costUsd)}</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        )}
       </div>
+    </div>
+  );
+}
+
+function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
+  return (
+    <Card className="p-5">
+      <div className="text-[12.5px] font-medium text-text-faint">{label}</div>
+      <div className="mt-2 text-2xl font-semibold tabular-nums">{value}</div>
+      {sub && <div className="mt-1 text-[12px] text-text-dim">{sub}</div>}
+    </Card>
+  );
+}
+
+function UsageTable({ title, first, rows, empty }: { title: string; first: string; rows: UsageRow[]; empty: string }) {
+  const max = rows[0]?.costUsd || 1;
+  return (
+    <div className="space-y-3">
+      <SectionLabel>{title}</SectionLabel>
+      <Card className="overflow-hidden">
+        {rows.length === 0 ? (
+          <p className="p-6 text-[13.5px] text-text-faint">{empty}</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[680px] text-[14px]">
+              <thead>
+                <tr className="border-b border-border bg-panel-2/60 text-left text-[12.5px] text-text-faint">
+                  <th className="px-6 py-3 font-medium">{first}</th>
+                  <th className="px-6 py-3 text-right font-medium">Calls</th>
+                  <th className="px-6 py-3 text-right font-medium">Tokens</th>
+                  <th className="px-6 py-3 text-right font-medium">Cost</th>
+                  <th className="px-6 py-3 text-right font-medium">Avg / call</th>
+                  <th className="px-6 py-3 font-medium">Last call</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r) => (
+                  <tr key={r.id} className="border-b border-border last:border-0">
+                    <td className="px-6 py-3">
+                      <div className="font-medium">{r.label}</div>
+                      {r.sub && <div className="text-[12px] text-text-faint">{r.sub}</div>}
+                      <div className="mt-1.5 h-1 w-full max-w-[220px] overflow-hidden rounded-full bg-panel-2">
+                        <div className="h-full rounded-full bg-accent" style={{ width: `${Math.max(2, (r.costUsd / max) * 100)}%` }} />
+                      </div>
+                    </td>
+                    <td className="px-6 py-3 text-right tabular-nums text-text-dim">{r.calls.toLocaleString()}</td>
+                    <td className="px-6 py-3 text-right tabular-nums text-text-dim">{(r.inputTokens + r.outputTokens).toLocaleString()}</td>
+                    <td className="px-6 py-3 text-right font-medium tabular-nums">{usd(r.costUsd)}</td>
+                    <td className="px-6 py-3 text-right tabular-nums text-text-dim">{usd(r.costUsd / r.calls)}</td>
+                    <td className="px-6 py-3 text-[13px] text-text-dim">{r.lastAt ? r.lastAt.toLocaleString() : "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
     </div>
   );
 }

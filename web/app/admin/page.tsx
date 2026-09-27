@@ -1,90 +1,114 @@
 import Link from "next/link";
 import { Topbar } from "@/components/Topbar";
 import { Card, SectionLabel, Pill } from "@/components/ui";
-import { getRealPlatformStats, getRealBusinessRows } from "@/lib/admin-stats";
+import { getPlatformStats, getBusinessRows } from "@/lib/admin-stats";
 import { getUsageStatus, type UsageWindowId } from "@/lib/usage-limit";
-import { MessageCircle, CircleDollarSign } from "lucide-react";
 import { setupChecklist } from "@/lib/setup-check";
 import { SetupChecklist } from "@/components/admin/SetupChecklist";
 
 const BLOCKED_LABEL: Record<UsageWindowId, string> = {
-  session: "At 5-hour cap — blocked",
-  weekly: "At weekly cap — blocked",
-  monthly: "At monthly cap — blocked",
+  session: "5-hour AI limit reached",
+  weekly: "Weekly AI limit reached",
+  monthly: "Monthly AI cap reached",
 };
 
 export default async function AdminOverview() {
-  const [stats, businesses, setup] = await Promise.all([getRealPlatformStats(), getRealBusinessRows(), setupChecklist()]);
+  const [stats, businesses, setup] = await Promise.all([getPlatformStats(), getBusinessRows(), setupChecklist()]);
 
-  // Real blocking status per business — checks the same rolling session/weekly/monthly windows
-  // that actually gate a new AI cycle, not just the monthly headline number.
-  const blockedWindows = new Map(
-    (await Promise.all(businesses.map(async (b) => [b.id, (await getUsageStatus(b.id)).blockedWindow] as const))),
-  );
+  // Only sellers who spent something this month can be blocked, so only they need the window check.
+  const spenders = businesses.filter((b) => b.aiCostThisMonth > 0);
+  const blocked = new Map(await Promise.all(spenders.map(async (b) => [b.id, (await getUsageStatus(b.id)).blockedWindow] as const)));
 
-  const flagged = businesses.filter((b) => b.wantsToDiscuss || b.whatsappError || blockedWindows.get(b.id));
+  const flagged = businesses.filter((b) => b.wantsToDiscuss || b.whatsappError || blocked.get(b.id) || b.subscriptionStatus === "past_due");
+  const newest = businesses.slice(0, 5);
 
   const tiles = [
-    { label: "Real businesses on the platform", value: stats.businessCount.toLocaleString() },
-    { label: "Agent runs today", value: stats.agentRunsToday.toLocaleString() },
-    { label: "AI cost today", value: `$${stats.costToday.toFixed(4)}` },
-    { label: "AI cost this month", value: `$${stats.costThisMonth.toFixed(4)}` },
+    { label: "Sellers", value: stats.businessCount.toLocaleString(), sub: `+${stats.newThisWeek} this week · ${stats.published} stores live`, href: "/admin/sellers" },
+    { label: "Orders this month", value: stats.ordersThisMonth.toLocaleString(), sub: `Rs ${Math.round(stats.gmvThisMonth).toLocaleString()} across all stores` },
+    { label: "AI cost today", value: `$${stats.costToday.toFixed(2)}`, sub: `${stats.agentRunsToday.toLocaleString()} AI calls`, href: "/admin/usage?period=today" },
+    { label: "AI cost this month", value: `$${stats.costThisMonth.toFixed(2)}`, sub: `${stats.agentRunsThisMonth.toLocaleString()} AI calls`, href: "/admin/usage" },
   ];
 
   return (
     <div>
-      <Topbar title="Platform Overview" subtitle="Real numbers only — nothing here is seeded or estimated" />
-      <div className="max-w-[1300px] space-y-8 p-5 sm:p-8 lg:p-10">
-        <SetupChecklist items={setup} />
+      <Topbar title="Overview" subtitle="How the platform is doing, and what needs you" />
+      <div className="max-w-[1300px] space-y-6 p-5 sm:p-8 lg:p-10">
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          {tiles.map((t) => (
-            <Card key={t.label} className="p-5">
-              <div className="text-[12.5px] font-medium text-text-faint">{t.label}</div>
-              <div className="mt-2.5 text-2xl font-semibold">{t.value}</div>
-            </Card>
-          ))}
+          {tiles.map((t) => {
+            const body = (
+              <Card className="h-full p-5 transition-colors hover:border-border-strong">
+                <div className="text-[12.5px] font-medium text-text-faint">{t.label}</div>
+                <div className="mt-2 text-2xl font-semibold tabular-nums">{t.value}</div>
+                <div className="mt-1 text-[12px] text-text-dim">{t.sub}</div>
+              </Card>
+            );
+            return t.href ? (
+              <Link key={t.label} href={t.href}>
+                {body}
+              </Link>
+            ) : (
+              <div key={t.label}>{body}</div>
+            );
+          })}
         </div>
 
+        <div className="grid gap-6 lg:grid-cols-2">
+          <Card className="p-6">
+            <div className="flex items-center justify-between">
+              <SectionLabel>Needs attention</SectionLabel>
+              {flagged.length > 0 && (
+                <Link href="/admin/sellers?filter=flagged" className="text-[12.5px] font-medium text-accent-strong hover:underline">
+                  All →
+                </Link>
+              )}
+            </div>
+            <div className="mt-3 divide-y divide-border">
+              {flagged.slice(0, 8).map((b) => (
+                <div key={b.id} className="flex flex-wrap items-center justify-between gap-2 py-3">
+                  <div>
+                    <div className="text-[14px] font-medium">{b.name || "(unnamed)"}</div>
+                    <div className="text-[12.5px] text-text-faint">{b.niche}</div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {blocked.get(b.id) && <Pill tone="bad">{BLOCKED_LABEL[blocked.get(b.id)!]}</Pill>}
+                    {b.subscriptionStatus === "past_due" && <Pill tone="bad">Payment past due</Pill>}
+                    {b.wantsToDiscuss && <Pill tone="accent">Orchestrator wants to talk</Pill>}
+                    {b.whatsappError && <Pill tone="warn">WhatsApp send failed</Pill>}
+                  </div>
+                </div>
+              ))}
+              {flagged.length === 0 && <p className="py-3 text-[13.5px] text-text-faint">Nothing needs you right now.</p>}
+            </div>
+          </Card>
 
-        <Card className="p-6">
-          <div className="flex items-center gap-2">
-            <MessageCircle className="h-4 w-4 text-warn" />
-            <SectionLabel>Businesses with a real signal worth checking</SectionLabel>
-          </div>
-          <p className="mt-2 text-[13px] text-text-faint">
-            Flagged when the Orchestrator itself decided something is worth discussing, a real
-            WhatsApp send failed, or a business hit its usage cap mid-month and is blocked until you
-            raise it — all real, checkable events, not estimates.
-          </p>
-          <div className="mt-4 divide-y divide-border">
-            {flagged.map((b) => (
-              <div key={b.id} className="flex items-center justify-between py-3">
-                <div>
-                  <div className="text-[14px] font-medium">{b.name || "(unnamed)"}</div>
-                  <div className="text-[12.5px] text-text-faint">{b.niche}</div>
+          <Card className="p-6">
+            <div className="flex items-center justify-between">
+              <SectionLabel>Newest sellers</SectionLabel>
+              <Link href="/admin/sellers" className="text-[12.5px] font-medium text-accent-strong hover:underline">
+                All →
+              </Link>
+            </div>
+            <div className="mt-3 divide-y divide-border">
+              {newest.map((b) => (
+                <div key={b.id} className="flex items-center justify-between gap-2 py-3">
+                  <div className="min-w-0">
+                    <div className="truncate text-[14px] font-medium">{b.name || "(unnamed)"}</div>
+                    <div className="truncate text-[12.5px] text-text-faint">
+                      {b.niche} · {b.createdAt.toLocaleDateString()}
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1.5 text-[12.5px] text-text-dim">
+                    {b.productCount} products · {b.orderCount} orders
+                    <Pill tone={b.published ? "good" : "neutral"}>{b.published ? "Live" : "Draft"}</Pill>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  {blockedWindows.get(b.id) && (
-                    <>
-                      <Pill tone="bad">
-                        <CircleDollarSign className="mr-1 inline h-3 w-3" />
-                        {BLOCKED_LABEL[blockedWindows.get(b.id)!]}
-                      </Pill>
-                      <Link href="/admin/sellers" className="text-[12px] font-medium text-accent-strong hover:underline">
-                        Raise cap →
-                      </Link>
-                    </>
-                  )}
-                  {b.wantsToDiscuss && <Pill tone="accent">Orchestrator wants to talk</Pill>}
-                  {b.whatsappError && <Pill tone="warn">WhatsApp send failed</Pill>}
-                </div>
-              </div>
-            ))}
-            {flagged.length === 0 && (
-              <p className="py-4 text-[13.5px] text-text-faint">Nothing flagged right now.</p>
-            )}
-          </div>
-        </Card>
+              ))}
+              {newest.length === 0 && <p className="py-3 text-[13.5px] text-text-faint">No sellers yet.</p>}
+            </div>
+          </Card>
+        </div>
+
+        <SetupChecklist items={setup} />
       </div>
     </div>
   );

@@ -31,3 +31,19 @@ export const apiKeyConfigs: ApiKeyConfig[] = [
   { id: "store_domain_ip", name: "Store domains — A record IP", description: "What sellers point a bare domain (mybrand.com) at. On Vercel leave empty (76.76.21.21). On a VPS: your server's public IP.", status: "not_connected" },
   { id: "apify_token", name: "Apify API Token", description: "Paid, usage-based scraping service (apify.com) — lets Competitor Intelligence actually read Instagram and TikTok profiles, which block plain automated browsers. Without this, those two sources stay honestly marked as blocked.", status: "not_connected" },
 ];
+
+/** API Keys page sections, in order. `id` doubles as the page anchor (/admin/api-keys#stripe). */
+export const apiKeyGroups: { id: string; title: string; note: string; keys: string[] }[] = [
+  { id: "ai", title: "Claude (AI)", note: "Required — every agent runs on this.", keys: ["anthropic"] },
+  {
+    id: "stripe",
+    title: "Stripe — seller subscriptions",
+    note: "How sellers pay Orbit for their plan. Required to take money.",
+    keys: ["stripe", "stripe_price_starter", "stripe_price_growth", "stripe_price_scale", "stripe_webhook_secret"],
+  },
+  { id: "email", title: "Email", note: "Order emails, login codes, and the contact on Privacy / Terms.", keys: ["resend", "email_from", "legal_contact_email"] },
+  { id: "whatsapp", title: "WhatsApp (Twilio)", note: "Templates, test sends and seller numbers are on the WhatsApp page.", keys: ["twilio_sid", "twilio", "twilio_whatsapp", "twilio_webhook_url"] },
+  { id: "meta", title: "Meta — Facebook & Instagram", note: "Sellers connect their Page / Instagram, DMs reach the chatbot, and Competitor Intelligence reads the Ad Library.", keys: ["meta_app_id", "meta_app_secret", "meta_login_config_id", "meta_webhook_verify_token"] },
+  { id: "domains", title: "Custom store domains", note: "Lets sellers use their own domain.", keys: ["vercel_token", "vercel_project_id", "vercel_team_id", "store_domain_cname", "store_domain_ip"] },
+  { id: "scraping", title: "Competitor scraping", note: "Optional — reads Instagram and TikTok profiles.", keys: ["apify_token"] },
+];

@@ -5,7 +5,6 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   Users,
-  Activity,
   KeyRound,
   CreditCard,
   ShieldCheck,
@@ -20,19 +19,37 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const nav = [
-  { href: "/admin", label: "Overview", icon: LayoutDashboard },
-  { href: "/admin/sellers", label: "Sellers", icon: Users },
-  { href: "/admin/usage", label: "AI Usage & Cost", icon: Gauge },
-  { href: "/admin/agents", label: "Agent Health", icon: Activity },
-  { href: "/admin/ai-model", label: "AI Model", icon: Cpu },
-  { href: "/admin/api-keys", label: "API Keys", icon: KeyRound },
-  { href: "/admin/storage", label: "Storage", icon: Cloud },
-  { href: "/admin/web-search", label: "Web Search", icon: Search },
-  { href: "/admin/studio", label: "Studio", icon: Clapperboard },
-  { href: "/admin/whatsapp", label: "WhatsApp", icon: MessageCircle },
-  { href: "/admin/billing", label: "Billing & MRR", icon: CreditCard },
+type NavItem = { href: string; label: string; icon: typeof Users };
+
+/** Grouped by what the owner is doing: watching the business, tuning the AI, or wiring up services. */
+const sections: { title: string | null; items: NavItem[] }[] = [
+  { title: null, items: [{ href: "/admin", label: "Overview", icon: LayoutDashboard }] },
+  {
+    title: "Business",
+    items: [
+      { href: "/admin/sellers", label: "Sellers", icon: Users },
+      { href: "/admin/billing", label: "Billing", icon: CreditCard },
+      { href: "/admin/usage", label: "AI usage & cost", icon: Gauge },
+    ],
+  },
+  {
+    title: "AI",
+    items: [
+      { href: "/admin/ai-model", label: "AI model", icon: Cpu },
+      { href: "/admin/web-search", label: "Web search", icon: Search },
+      { href: "/admin/studio", label: "Studio (images & reels)", icon: Clapperboard },
+    ],
+  },
+  {
+    title: "Setup",
+    items: [
+      { href: "/admin/api-keys", label: "API keys", icon: KeyRound },
+      { href: "/admin/storage", label: "Storage", icon: Cloud },
+      { href: "/admin/whatsapp", label: "WhatsApp", icon: MessageCircle },
+    ],
+  },
 ];
+const nav = sections.flatMap((s) => s.items);
 
 export function AdminSidebar() {
   const pathname = usePathname();
@@ -58,7 +75,7 @@ export function AdminSidebar() {
       })}
     </nav>
     <aside className="hidden h-screen w-64 shrink-0 flex-col border-r border-border bg-panel lg:flex">
-      <div className="flex items-center gap-2.5 px-6 py-6">
+      <div className="flex items-center gap-2.5 px-6 py-5">
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-900">
           <ShieldCheck className="h-4.5 w-4.5 text-white" strokeWidth={2.5} />
         </div>
@@ -68,26 +85,33 @@ export function AdminSidebar() {
         </div>
       </div>
 
-      <nav className="flex-1 space-y-1 px-4">
-        {nav.map((item) => {
-          const active = item.href === "/admin" ? pathname === "/admin" : pathname.startsWith(item.href);
-          const Icon = item.icon;
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                "flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-[14.5px] transition-colors",
-                active
-                  ? "bg-slate-900 font-medium text-white"
-                  : "text-text-dim hover:bg-panel-2 hover:text-text",
-              )}
-            >
-              <Icon className="h-[18px] w-[18px]" strokeWidth={2} />
-              {item.label}
-            </Link>
-          );
-        })}
+      <nav className="scrollbar-thin flex-1 space-y-5 overflow-y-auto px-4 pb-4">
+        {sections.map((section) => (
+          <div key={section.title ?? "top"}>
+            {section.title && (
+              <div className="mb-1.5 px-3.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-text-faint">{section.title}</div>
+            )}
+            <div className="space-y-0.5">
+              {section.items.map((item) => {
+                const active = item.href === "/admin" ? pathname === "/admin" : pathname.startsWith(item.href);
+                const Icon = item.icon;
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={cn(
+                      "flex items-center gap-3 rounded-xl px-3.5 py-2 text-[14px] transition-colors",
+                      active ? "bg-accent font-medium text-white" : "text-text-dim hover:bg-panel-2 hover:text-text",
+                    )}
+                  >
+                    <Icon className="h-[17px] w-[17px]" strokeWidth={2} />
+                    {item.label}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </nav>
 
       <div className="border-t border-border p-4">
