@@ -497,6 +497,24 @@ function cleanTokens(t: Record<string, unknown> | undefined): Partial<DesignToke
 const usableHeader = (s: unknown): s is string => typeof s === "string" && /<header[\s>]/i.test(s);
 const usableFooter = (s: unknown): s is string => typeof s === "string" && /<footer[\s>]/i.test(s);
 
+/**
+ * The model sometimes returns an object/array field of the edit tool as a JSON *string*
+ * ("rebuild": "{\"pages\": …}") — applyOps would then silently skip it. Parse those back.
+ */
+export function coerceToolInput(input: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...input };
+  for (const key of ["rebuild", "tokens", "components", "pages", "sections", "block_edits", "widgetSettings"]) {
+    const v = out[key];
+    if (typeof v !== "string") continue;
+    try {
+      const parsed = JSON.parse(v);
+      if (parsed && typeof parsed === "object") out[key] = parsed;
+    } catch {
+      /* not JSON — applyOps ignores what it can't use */
+    }
+  }
+  return out;
+}
 function applyOps(prev: OrbitDesignDoc, input: Record<string, unknown>, storeName: string, niche: string): OrbitDesignDoc {
   // Full rebuild
   const rb = input.rebuild as { components?: Record<string, string>; pages?: DesignPage[] } | undefined;
@@ -2826,9 +2844,8 @@ export async function runDesignTurn(
     ),
   ];
 
-  let msg;
-  try {
-    msg = await anthropic.messages.create({
+  const callModel = () =>
+    anthropic.messages.create({
       model: MODEL,
       max_tokens: 16000,
       system:
@@ -2842,38 +2859,59 @@ export async function runDesignTurn(
       tool_choice: { type: "tool", name: "edit_storefront" },
       messages: [...history, { role: "user", content: userBlocks }],
     });
-  } catch (e) {
-    return { reply: "The design engine hit an error — try rephrasing, or try again in a moment.", doc, error: String(e).slice(0, 200) };
-  }
 
-  try {
-    await prisma.agentUsage.create({
-      data: {
-        businessId,
-        agentId: "orbit-design",
-        model: MODEL,
-        inputTokens: msg.usage.input_tokens,
-        outputTokens: msg.usage.output_tokens,
-        costUsd: estimateCostUsd(MODEL, msg.usage.input_tokens, msg.usage.output_tokens),
-      },
-    });
-  } catch {
-    /* best effort */
-  }
+  // If the model's answer changes nothing (its tool input came back in a shape we can't use), ask
+  // once more before giving up — and then say so, never a "Done" on a storefront that didn't change.
+  let input: Record<string, unknown> = {};
+  let nextDoc = doc;
+  for (let attempt = 1; ; attempt++) {
+    let msg;
+    try {
+      msg = await callModel();
+    } catch (e) {
+      return { reply: "The design engine hit an error — try rephrasing, or try again in a moment.", doc, error: String(e).slice(0, 200) };
+    }
 
-  const tool = msg.content.find((b) => b.type === "tool_use");
-  if (!tool || tool.type !== "tool_use") {
+    try {
+      await prisma.agentUsage.create({
+        data: {
+          businessId,
+          agentId: "orbit-design",
+          model: MODEL,
+          inputTokens: msg.usage.input_tokens,
+          outputTokens: msg.usage.output_tokens,
+          costUsd: estimateCostUsd(MODEL, msg.usage.input_tokens, msg.usage.output_tokens),
+        },
+      });
+    } catch {
+      /* best effort */
+    }
+
+    const tool = msg.content.find((b) => b.type === "tool_use");
+    if (!tool || tool.type !== "tool_use") {
+      if (msg.stop_reason === "max_tokens")
+        return { reply: "That was a lot to design in one go — try asking for it in two steps (e.g. the pages first, then the polish).", doc, error: "max_tokens" };
+      const t = msg.content.find((b) => b.type === "text");
+      return { reply: t && t.type === "text" ? t.text : "I couldn't apply that change.", doc, error: "no tool_use" };
+    }
     if (msg.stop_reason === "max_tokens")
-      return { reply: "That was a lot to design in one go — try asking for it in two steps (e.g. the pages first, then the polish).", doc, error: "max_tokens" };
-    const t = msg.content.find((b) => b.type === "text");
-    return { reply: t && t.type === "text" ? t.text : "I couldn't apply that change.", doc, error: "no tool_use" };
-  }
-  if (msg.stop_reason === "max_tokens")
-    // the tool call was truncated mid-JSON — applyOps would drop the tail; bail cleanly
-    return { reply: "That storefront was too big to build in one pass — ask for the core pages first, then add sections.", doc, error: "max_tokens" };
+      // the tool call was truncated mid-JSON — applyOps would drop the tail; bail cleanly
+      return { reply: "That storefront was too big to build in one pass — ask for the core pages first, then add sections.", doc, error: "max_tokens" };
 
-  const input = tool.input as Record<string, unknown>;
-  let nextDoc = applyOps(doc, input, business.name, business.niche);
+    input = coerceToolInput(tool.input as Record<string, unknown>);
+    nextDoc = applyOps(doc, input, business.name, business.niche);
+    // Only design edits that came back unusable count as a failure — a reply-only answer (a question,
+    // "that's already how it is") or a wording/motion-only change legitimately leaves the doc as it was.
+    const sentEdits = ["rebuild", "tokens", "components", "pages", "sections", "block_edits"].some((k) => input[k] !== undefined);
+    if (!sentEdits || input.widgetSettings || JSON.stringify(nextDoc) !== JSON.stringify(doc)) break;
+    console.warn("[orbit-design] model answer changed nothing", {
+      attempt,
+      fields: Object.fromEntries(Object.entries(input).map(([k, v]) => [k, Array.isArray(v) ? `array(${v.length})` : typeof v])),
+    });
+    if (attempt >= 2) {
+      return { reply: "I couldn't turn that into changes this time — please send it again, or ask for one part at a time.", doc, error: "no change" };
+    }
+  }
   const reply = typeof input.reply === "string" && input.reply.trim() ? input.reply.trim() : "Done — updated your storefront.";
 
   const ws = input.widgetSettings as { motion?: string; copy?: Record<string, string> } | undefined;

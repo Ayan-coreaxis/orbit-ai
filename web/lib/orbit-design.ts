@@ -1532,7 +1532,11 @@ function prepareHeader(doc: OrbitDesignDoc, businessId: string, preview: boolean
     const storeNameNoSpace = storeName.replace(/\s+/g, "");
     if (/<(img|svg)\b|data-img-slot/i.test(inner) || (!!storeNameNoSpace && textNoSpace === storeNameNoSpace)) return false;
     const m = /^(?:#page:|#|.*\/p\/)([a-z0-9-]+)$/i.exec(href.trim());
-    if (m && (navSlugs.has(m[1]) || m[1] === "home" || m[1] === "cart")) return true;
+    // A home link is only a duplicate when it reads "Home" (or a nav title) or is empty. Any other
+    // text is the brand wordmark — often a shortened name ("Shifa" for "Shifa Herbals") that the
+    // exact-name check above misses — and stripping it leaves the header with no store name at all.
+    if (m && m[1] === "home") return !text || text === "home" || titleToNav.has(text);
+    if (m && (navSlugs.has(m[1]) || m[1] === "cart")) return true;
     if (/\/p\//i.test(href) && navSlugs.has(href.split("/p/")[1]?.split(/[/?#]/)[0] ?? "")) return true;
     return !!text && titleToNav.has(text) && !/background:/i.test(attrs); // keep styled CTA buttons
   };

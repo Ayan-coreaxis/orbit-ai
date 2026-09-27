@@ -1,8 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
-import { Sparkles, Braces, SlidersHorizontal, Type, Download, ClipboardCopy, Send, Globe, Loader2, Check, ArrowLeft, ArrowUp, ChevronRight, MousePointerClick, MessageSquare, Trash2, Files, ScanEye } from "lucide-react";
+import { Sparkles, Braces, SlidersHorizontal, Type, Download, ClipboardCopy, Send, Globe, Loader2, Check, ArrowUp, Menu, ChevronRight, MousePointerClick, MessageSquare, Trash2, Files, ScanEye } from "lucide-react";
 import { renderPageDocument, type DesignContent, type DesignTokens, type OrbitDesignDoc, type StorefrontProduct } from "@/lib/orbit-design";
 import type { AuditFinding } from "@/lib/orbit-design-generate";
 import { AuditOverlay } from "./AuditOverlay";
@@ -542,14 +541,15 @@ export function Studio({
       {/* top bar */}
       <div className="flex items-center justify-between gap-3 border-b border-border px-6 py-3.5">
         <div className="flex items-center gap-2.5">
-          <Link
-            href="/dashboard"
-            className="flex h-7 w-7 items-center justify-center rounded-lg text-text-faint hover:bg-panel-2 hover:text-text"
-            aria-label="Back to dashboard"
-            title="Back to dashboard"
+          <button
+            type="button"
+            onClick={() => window.dispatchEvent(new Event("orbit:open-nav"))}
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-text-dim hover:bg-panel-2 hover:text-text"
+            aria-label="Open menu"
+            title="Menu"
           >
-            <ArrowLeft className="h-4 w-4" />
-          </Link>
+            <Menu className="h-[18px] w-[18px]" />
+          </button>
           <StudioIdentity wired={wiredOnce} initialWired={initialWired} storeName={doc.storeName} accent={doc.tokens.accent} />
         </div>
 
@@ -1416,7 +1416,16 @@ function LaunchScreen({
   const attach = useImageAttachments();
   const fire = () => onSend(value, attach.items.map((a) => a.dataUrl));
   return (
-    <div className="flex min-h-full flex-col items-center justify-center px-6 py-16">
+    <div className="relative flex min-h-full flex-col items-center justify-center px-6 py-16">
+      <button
+        type="button"
+        onClick={() => window.dispatchEvent(new Event("orbit:open-nav"))}
+        className="absolute left-4 top-4 flex h-9 w-9 items-center justify-center rounded-lg text-text-dim hover:bg-panel-2 hover:text-text"
+        aria-label="Open menu"
+        title="Menu"
+      >
+        <Menu className="h-5 w-5" />
+      </button>
       <div className="w-full max-w-xl">
         <div className="mb-8 flex items-center gap-2.5">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg gradient-fill">

@@ -187,7 +187,9 @@ body {
 }
 @keyframes orbit-spin-slow { to { transform: rotate(360deg); } }
 
-.orbit-fade-up { animation: orbit-fade-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) both; }
+/* `backwards`, not `both`: a transform left on after the animation would trap position:fixed children
+   (Orbit Design's full-screen studio) inside the page instead of the viewport. */
+.orbit-fade-up { animation: orbit-fade-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
 .orbit-fade { animation: orbit-fade 0.4s ease-out both; }
 .orbit-scale-in { animation: orbit-scale-in 0.35s cubic-bezier(0.22, 1, 0.36, 1) both; }
 .orbit-float { animation: orbit-float 5s ease-in-out infinite; }

@@ -103,6 +103,8 @@ export function Sidebar(props: Props) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [palette, setPalette] = useState(false);
+  // Full-screen tools (Orbit Design) hide the sidebar; their own menu button opens it as a drawer.
+  const focus = pathname.startsWith("/dashboard/orbit-design");
 
   // Close the drawer whenever the page changes.
   const [lastPath, setLastPath] = useState(pathname);
@@ -119,11 +121,14 @@ export function Sidebar(props: Props) {
       }
     };
     const onOpen = () => setPalette(true);
+    const onOpenNav = () => setOpen(true);
     window.addEventListener("keydown", onKey);
     window.addEventListener("orbit:open-palette", onOpen);
+    window.addEventListener("orbit:open-nav", onOpenNav);
     return () => {
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("orbit:open-palette", onOpen);
+      window.removeEventListener("orbit:open-nav", onOpenNav);
     };
   }, []);
 
@@ -141,6 +146,7 @@ export function Sidebar(props: Props) {
   return (
     <>
       {/* desktop */}
+      {!focus && (
       <aside className="sticky top-0 hidden h-screen max-h-screen w-64 shrink-0 flex-col overflow-hidden border-r border-border bg-panel lg:flex">
         <div className="shrink-0 px-6 py-5">
           <Brand />
@@ -149,8 +155,11 @@ export function Sidebar(props: Props) {
         <NavList talkBadge={props.talkBadge} />
         <Account {...props} />
       </aside>
+      )}
 
       {/* phone / tablet top bar */}
+      {!focus && (
+      <>
       <div className="fixed inset-x-0 top-0 z-40 flex h-14 items-center justify-between border-b border-border bg-panel/90 px-4 backdrop-blur-xl lg:hidden">
         <Brand />
         <div className="flex items-center gap-1">
@@ -164,9 +173,11 @@ export function Sidebar(props: Props) {
         </div>
       </div>
       <div className="h-14 shrink-0 lg:hidden" />
+      </>
+      )}
 
       {open && (
-        <div className="fixed inset-0 z-50 lg:hidden">
+        <div className={focus ? "fixed inset-0 z-[60]" : "fixed inset-0 z-50 lg:hidden"}>
           <button className="orbit-fade absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setOpen(false)} aria-label="Close menu" />
           <aside className="orbit-slide-in absolute inset-y-0 left-0 flex w-[82%] max-w-[300px] flex-col border-r border-border bg-panel shadow-2xl">
             <div className="flex shrink-0 items-center justify-between px-5 py-4">
