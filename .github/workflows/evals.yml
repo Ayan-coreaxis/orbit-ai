@@ -1,0 +1,106 @@
+# AI evals — grades the Orchestrator and the store chat on 37 real seller / shopper questions
+# against a fixed test store (web/evals). Costs ~$1.80 of Anthropic credit per run, so it runs
+# only when code reaches main, weekly, or by hand — not on every push.
+#
+# Needs one repository secret: ANTHROPIC_API_KEY (Settings → Secrets and variables → Actions).
+name: AI evals
+
+on:
+  push:
+    branches: [main]
+    paths: ["web/**", ".github/workflows/evals.yml"]
+  pull_request:
+    branches: [main]
+    paths: ["web/**", ".github/workflows/evals.yml"]
+  schedule:
+    - cron: "0 4 * * 1" # Mondays 04:00 UTC (09:00 PKT)
+  workflow_dispatch:
+
+concurrency:
+  group: evals-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  evals:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: web
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: orbit
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      HAS_KEY: ${{ secrets.ANTHROPIC_API_KEY != '' }}
+    steps:
+      - name: Skip when the Anthropic key secret isn't set
+        if: env.HAS_KEY != 'true'
+        working-directory: .
+        run: echo "::warning::ANTHROPIC_API_KEY secret is not set — AI evals skipped."
+
+      - uses: actions/checkout@v4
+        if: env.HAS_KEY == 'true'
+
+      - uses: actions/setup-node@v4
+        if: env.HAS_KEY == 'true'
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Write .env.local (throwaway CI values + the key)
+        if: env.HAS_KEY == 'true'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          {
+            echo "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/orbit"
+            echo "DIRECT_URL=postgresql://postgres:postgres@localhost:5432/orbit"
+            echo "AUTH_SECRET=$(openssl rand -hex 32)"
+            echo "ADMIN_PASSWORD=$(openssl rand -hex 16)"
+            echo "CRON_SECRET=$(openssl rand -hex 24)"
+            echo "NEXT_PUBLIC_APP_URL=http://localhost:3000"
+            echo "ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY"
+          } > .env.local
+          cp .env.local .env
+
+      - name: Install
+        if: env.HAS_KEY == 'true'
+        run: npm ci
+
+      - name: Database
+        if: env.HAS_KEY == 'true'
+        run: npx prisma migrate deploy
+
+      - name: Build and start Orbit
+        if: env.HAS_KEY == 'true'
+        run: |
+          npm run build
+          nohup npm run start > server.log 2>&1 &
+          for i in $(seq 1 60); do
+            curl -sf http://localhost:3000/api/health && exit 0
+            sleep 2
+          done
+          cat server.log; exit 1
+
+      - name: Run evals (fails under 90%)
+        if: env.HAS_KEY == 'true'
+        env:
+          EVAL_MIN_PASS_PCT: "90"
+        run: npm run eval
+
+      - name: Save full replies
+        if: always() && env.HAS_KEY == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-results
+          path: |
+            web/evals/results/
+            web/server.log
+          retention-days: 30

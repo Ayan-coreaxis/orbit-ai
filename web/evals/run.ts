@@ -8,7 +8,7 @@
  *
  * Each run spends real AI credit (roughly $0.02–0.10 per case).
  */
-import { mkdirSync, writeFileSync } from "fs";
+import { appendFileSync, mkdirSync, writeFileSync } from "fs";
 import { randomBytes } from "crypto";
 import { prisma } from "../lib/prisma";
 import { loadStoredKeys } from "../lib/env-file";
@@ -142,7 +142,27 @@ async function main() {
   const file = `evals/results/${new Date().toISOString().replace(/[:.]/g, "-")}.json`;
   writeFileSync(file, JSON.stringify({ at: new Date().toISOString(), passed, total: results.length, costUsd: cost._sum.costUsd ?? 0, results }, null, 2));
   console.log(`Full replies: ${file}`);
+
+  // CI: a readable summary on the GitHub run page, and a red run when the score drops.
+  const pct = Math.round((passed / Math.max(1, results.length)) * 100);
+  if (process.env.GITHUB_STEP_SUMMARY) {
+    const md = [
+      `## AI evals — ${passed}/${results.length} (${pct}%) · $${(cost._sum.costUsd ?? 0).toFixed(2)}`,
+      "",
+      "| Skill | Passed |",
+      "|---|---|",
+      ...[...byArea].sort().map(([k, v]) => `| ${k} | ${v.pass}/${v.total} |`),
+      "",
+      ...results.filter((r) => !r.pass).map((r) => `- ❌ **${r.id}** — ${r.failures.join("; ")}\n  > ${r.replies.join(" | ").replace(/\s+/g, " ").slice(0, 300)}`),
+    ].join("\n");
+    appendFileSync(process.env.GITHUB_STEP_SUMMARY, md + "\n");
+  }
   await prisma.$disconnect();
+  const min = Number(process.env.EVAL_MIN_PASS_PCT ?? 0);
+  if (min && pct < min) {
+    console.error(`Score ${pct}% is below the required ${min}%.`);
+    process.exit(1);
+  }
 }
 
 main().catch(async (e) => {
