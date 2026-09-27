@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { prisma } from "@/lib/prisma";
-import { applySubscription, businessForStripe, getPlatformStripe } from "@/lib/platform-stripe";
+import { applySubscription, businessForStripe, getPlatformStripe, recordChargeRefund, recordInvoicePayment } from "@/lib/platform-stripe";
 import { PLAN_DEFAULT_CAP_USD } from "@/lib/usage-limit";
 
 /**
@@ -57,6 +57,21 @@ export async function POST(req: NextRequest) {
       const businessId = await businessForStripe(sub.metadata?.businessId, sub.customer);
       if (!businessId) break;
       await applySubscription(businessId, sub);
+      break;
+    }
+
+    // Revenue ledger (Super Admin > Revenue & cost): what was actually paid, and refunds.
+    case "invoice.paid": {
+      const invoice = event.data.object as Stripe.Invoice;
+      const businessId = await businessForStripe(invoice.parent?.subscription_details?.metadata?.businessId ?? undefined, invoice.customer);
+      if (businessId) await recordInvoicePayment(stripe, businessId, invoice);
+      break;
+    }
+
+    case "charge.refunded": {
+      const charge = event.data.object as Stripe.Charge;
+      const businessId = await businessForStripe(charge.metadata?.businessId, charge.customer);
+      if (businessId) await recordChargeRefund(businessId, charge);
       break;
     }
 

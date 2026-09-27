@@ -170,6 +170,7 @@ model Business {
   mediaAssets MediaAsset[]
   studioJobs  StudioJob[]
   socialPosts SocialPost[]
+  platformPayments PlatformPayment[]
 }
 
 /** A staff account with dashboard access to a business it doesn't own — invited by email. If the
@@ -1143,6 +1144,34 @@ model AgentUsage {
   outputTokens Int
   costUsd      Float
   createdAt    DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([businessId, createdAt])
+}
+
+/**
+ * What a seller actually paid Orbit for their plan — the revenue side of Super Admin > Revenue & cost.
+ * Stripe invoices and refunds are written by the billing webhook (externalId keeps them idempotent);
+ * payments taken outside Stripe (bank transfer, JazzCash…) are recorded by hand in Super Admin.
+ * A refund is a negative amount.
+ */
+model PlatformPayment {
+  id           String   @id @default(cuid())
+  businessId   String
+  business     Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  amountUsd    Float
+  feeUsd       Float    @default(0) // processor fee (Stripe); 0 for manual payments
+  feeEstimated Boolean  @default(false) // true when Stripe's real fee couldn't be read and 2.9% + $0.30 was used
+  source       String // stripe | manual
+  method       String? // card | bank_transfer | jazzcash | easypaisa | cash | other
+  plan         String?
+  externalId   String?  @unique // Stripe invoice id, or "refund:<charge id>"
+  note         String?
+  paidAt       DateTime
+  createdAt    DateTime @default(now())
+
+  @@index([paidAt])
+  @@index([businessId, paidAt])
 }
 
 /**

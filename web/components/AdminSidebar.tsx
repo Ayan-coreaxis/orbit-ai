@@ -28,7 +28,7 @@ const sections: { title: string | null; items: NavItem[] }[] = [
     title: "Business",
     items: [
       { href: "/admin/sellers", label: "Sellers", icon: Users },
-      { href: "/admin/billing", label: "Billing", icon: CreditCard },
+      { href: "/admin/billing", label: "Revenue & cost", icon: CreditCard },
       { href: "/admin/usage", label: "AI usage & cost", icon: Gauge },
     ],
   },

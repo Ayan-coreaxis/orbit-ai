@@ -84,3 +84,69 @@ export async function applySubscription(businessId: string, sub: Pick<Stripe.Sub
     },
   });
 }
+
+/** Stripe's real processing fee for a paid invoice, in USD — null when it can't be read (then the caller estimates). */
+async function invoiceFeeUsd(stripe: Stripe, invoiceId: string): Promise<number | null> {
+  try {
+    const payments = await stripe.invoicePayments.list({ invoice: invoiceId, limit: 5 });
+    let fee = 0;
+    let found = false;
+    for (const p of payments.data) {
+      if (p.status !== "paid") continue;
+      let chargeId = typeof p.payment.charge === "string" ? p.payment.charge : p.payment.charge?.id;
+      const pi = p.payment.payment_intent;
+      if (!chargeId && pi) {
+        const intent = await stripe.paymentIntents.retrieve(typeof pi === "string" ? pi : pi.id);
+        chargeId = typeof intent.latest_charge === "string" ? intent.latest_charge : intent.latest_charge?.id;
+      }
+      if (!chargeId) continue;
+      const charge = await stripe.charges.retrieve(chargeId, { expand: ["balance_transaction"] });
+      const bt = charge.balance_transaction;
+      if (!bt || typeof bt === "string" || bt.currency !== "usd") return null; // settled in another currency: estimate instead
+      fee += bt.fee / 100;
+      found = true;
+    }
+    return found ? fee : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Write a paid Stripe invoice into the revenue ledger (idempotent on the invoice id). */
+export async function recordInvoicePayment(stripe: Stripe, businessId: string, invoice: Stripe.Invoice) {
+  if (!invoice.id || invoice.amount_paid <= 0) return;
+  const { estimatedStripeFee } = await import("@/lib/admin-finance");
+  const usd = invoice.currency === "usd";
+  const amountUsd = invoice.amount_paid / 100;
+  const realFee = usd ? await invoiceFeeUsd(stripe, invoice.id) : null;
+  const plan = (await prisma.business.findUnique({ where: { id: businessId }, select: { plan: true } }))?.plan ?? null;
+  const paidAt = invoice.status_transitions?.paid_at ? new Date(invoice.status_transitions.paid_at * 1000) : new Date();
+  const data = {
+    businessId,
+    amountUsd,
+    feeUsd: realFee ?? estimatedStripeFee(amountUsd),
+    feeEstimated: realFee === null,
+    source: "stripe",
+    method: "card",
+    plan,
+    note: usd ? null : `Charged in ${invoice.currency.toUpperCase()} — amount shown as-is`,
+    paidAt,
+  };
+  await prisma.platformPayment.upsert({ where: { externalId: invoice.id }, create: { ...data, externalId: invoice.id }, update: data });
+}
+
+/** A refund on a platform charge becomes a negative ledger row (kept at the charge's total refunded). */
+export async function recordChargeRefund(businessId: string, charge: Stripe.Charge) {
+  if (charge.amount_refunded <= 0) return;
+  const externalId = `refund:${charge.id}`;
+  const data = {
+    businessId,
+    amountUsd: -charge.amount_refunded / 100,
+    feeUsd: 0,
+    source: "stripe",
+    method: "card",
+    note: charge.currency === "usd" ? "Refund" : `Refund in ${charge.currency.toUpperCase()}`,
+    paidAt: new Date(),
+  };
+  await prisma.platformPayment.upsert({ where: { externalId }, create: { ...data, externalId }, update: { amountUsd: data.amountUsd } });
+}
