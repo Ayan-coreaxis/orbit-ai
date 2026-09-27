@@ -1,3 +1,4 @@
+import { keepScript } from "@/lib/script-guard";
 import { prisma } from "@/lib/prisma";
 import { anthropic, MODEL_FAST } from "@/lib/anthropic";
 import { estimateCostUsd } from "@/lib/pricing";
@@ -5,7 +6,8 @@ import { assertUnderUsageCap, UsageCapExceededError } from "@/lib/usage-limit";
 import { safeSlice } from "@/lib/utils";
 import { money } from "@/lib/money";
 
-const SYSTEM_PREFIX = `You are the customer support chat assistant for this real online store. Answer only from the real business/product data given below — never invent a price, stock level, shipping policy, or promise you can't back up from this data. If you genuinely don't know something (like exact delivery time or a policy not listed here), say so honestly and suggest the customer contact the seller directly, rather than guessing. Keep replies short and conversational — 1-3 sentences unless the question genuinely needs more. Never discuss anything unrelated to this store.`;
+const SYSTEM_PREFIX = `You are the customer support chat assistant for this real online store. Answer only from the real business/product data given below — never invent a price, stock level, shipping policy, or promise you can't back up from this data. If you genuinely don't know something (like exact delivery time or a policy not listed here), say so honestly and suggest the customer contact the seller directly, rather than guessing. Keep replies short and conversational — 1-3 sentences unless the question genuinely needs more. Reply in the customer's own language AND script: Roman Urdu (Urdu in English letters) gets Roman Urdu in English letters, never Urdu script; Urdu script gets Urdu script; English gets English. Never discuss anything unrelated to this store.
+Health, food and beauty products: never claim a product cures, treats or prevents a disease, never promise results, and never give medical advice or dosages beyond what the product description says — say what the product is, and tell the customer to ask their doctor about any health condition.`;
 
 export interface ChatHistoryItem {
   role: "user" | "assistant";
@@ -59,10 +61,13 @@ export async function getChatbotReply(
 
   const productBlock = business.products
     .map((p) => {
+      // A product with options is in stock when ANY option is — its own stock field isn't used then.
+      const inStock = p.variants.length ? p.variants.some((v) => v.stock > 0) : p.stock > 0;
       const variantText = p.variants.length
-        ? ` Options: ${p.variants.map((v) => `${v.label} (${v.stock > 0 ? "in stock" : "out of stock"})`).join(", ")}.`
+        ? ` Options: ${p.variants.map((v) => `${v.label} ${money(v.price ?? p.price, business.storeCurrency)} (${v.stock > 0 ? "in stock" : "out of stock"})`).join(", ")}.`
         : "";
-      return `- ${p.name}: ${money(p.price, business.storeCurrency)}, ${p.stock > 0 ? `${p.stock} in stock` : "out of stock"}.${variantText}${p.description ? ` ${safeSlice(p.description.replace(/<[^>]+>/g, " "), 200)}` : ""}`;
+      const stockText = p.variants.length ? (inStock ? "available" : "out of stock") : p.stock > 0 ? `${p.stock} in stock` : "out of stock";
+      return `- ${p.name}: ${p.variants.length ? "from " : ""}${money(p.variants.length ? Math.min(...p.variants.map((v) => v.price ?? p.price)) : p.price, business.storeCurrency)}, ${stockText}.${variantText}${p.description ? ` ${safeSlice(p.description.replace(/<[^>]+>/g, " "), 200)}` : ""}`;
     })
     .join("\n");
   const pagesBlock = business.pages.map((pg) => `- ${pg.title}: ${safeSlice(pg.content.replace(/<[^>]+>/g, " "), 300)}`).join("\n");
@@ -112,7 +117,7 @@ ${pagesBlock ? `\nReal store pages (policies, about, etc.):\n${pagesBlock}` : ""
     },
   });
 
-  const reply = msg.content[0].type === "text" ? msg.content[0].text.trim() : "Sorry, I had trouble responding — try again?";
+  const reply = await keepScript(message, msg.content[0].type === "text" ? msg.content[0].text.trim() : "", businessId, "chatbot") || "Sorry, I had trouble responding — try again?";
 
   if (conversation) {
     await logMessage(businessId, conversation.channel, conversation.customerRef, "user", message.trim());

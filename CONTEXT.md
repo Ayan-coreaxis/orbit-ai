@@ -3,7 +3,7 @@
 > **Every Claude session (local or cloud) reads this first and updates it before finishing.**
 > It is the single source of truth shared between sessions. See "How to update this file" at the bottom.
 
-_Last updated: 2026-09-27 by the local session (Orchestrator look-up tools, test pass + fixes). Before that: 2026-09-26 by the cloud session (Postgres, WhatsApp templates, Pixel + Conversions API, Messenger/IG DMs, legal pages, billing fixes, AI onboarding questions)._
+_Last updated: 2026-09-27 by the local session (Orchestrator look-up tools, AI evals, test pass + fixes). Before that: 2026-09-26 by the cloud session (Postgres, WhatsApp templates, Pixel + Conversions API, Messenger/IG DMs, legal pages, billing fixes, AI onboarding questions)._
 
 ---
 
@@ -34,7 +34,7 @@ npm run db:copy-sqlite prisma/dev.db
 
 - Windows note: stop the dev server before `prisma generate`/`migrate dev` (DLL lock). Schema change: `npx prisma migrate dev --name <name> --create-only` against a Postgres, then `npx prisma migrate deploy`. ⚠ The Postgres baseline is `20260926200000_init_postgres` — a new migration's folder name must sort AFTER the last one (rename the timestamp if Prisma's clock gives an earlier one).
 - Local uploads are served by `app/uploads/[...path]/route.ts` (works after a build too). On Vercel/Lambda/Netlify, file uploads need Cloudflare R2 — without it `putFile` refuses with a clear message instead of losing files.
-- Checks: `npx tsc --noEmit -p .` and `npx eslint .` are both at **0 errors / 0 warnings**, `npm test` all green — keep them there. Next 16 uses `proxy.ts` (not middleware.ts) for host routing.
+- Checks: `npx tsc --noEmit -p .` and `npx eslint .` are both at **0 errors / 0 warnings**, `npm test` all green — keep them there. AI quality: `npm run eval` (32/32 on 2026-09-27) — rerun after prompt / model / context changes. Next 16 uses `proxy.ts` (not middleware.ts) for host routing.
 - Super Admin: `/admin` (password = `ADMIN_PASSWORD`). Keys, storage, web search, AI model, usage are configured there.
 
 ## 3. Map of the product (where things live)
@@ -116,6 +116,8 @@ npm run db:copy-sqlite prisma/dev.db
 - Detailed task history: `TASKS.md`.
 
 ## 7. Changelog (newest first — add one entry per session/batch of work)
+
+- **2026-09-27 · local** — **AI evals** (`web/evals/`, `npm run eval`, dev server must be running; ~$1.40 a run): rebuilds a fixed test store "Shifa Herbals" (22 products, orders, zones, coupon) and grades 32 real seller / shopper questions for the Orchestrator and the store chat (exact numbers, no invented data, Apply cards, nothing changes without Apply, language). Full replies saved to `evals/results/` (git-ignored). Score went 81% → **100%** after fixes: specialists no longer pause the meeting for optional details (cost / photo) and the router skips meetings for direct instructions; the owner's direct instruction is always proposed (was refused / swapped); replies stay in the owner's script — `lib/script-guard.ts` rewrites Urdu-script drift into Roman Urdu (chatbot, specialists, Orchestrator); "kar diya" on a pending change is rewritten to "proposal tayyar hai" (`asProposed`, tested); no-op change requests say "pehle se hi isi value par hai"; store chat now sees variant prices and treats a product as available when any option is in stock, plus a no-medical-claims rule. **Run `npm run eval` after any prompt / model / context change.**
 
 - **2026-09-27 · local** — **Orchestrator look-up tools** (`lib/orchestrator-tools.ts`): products / orders / media / older chat are fetched on demand instead of pasted into every prompt (was capped at 80 products, 80 files, 20 messages); `buildOrchestratorContext` uses counts instead of loading every product + order; stable P/M refs. **Test pass** (`TEST_PLAN.md`, local Postgres) with fixes: auto-apply coupon ignored its rules (min order, expiry, limits); invalid code gave no error; COD orders were marked "paid" at checkout (now pending → paid on fulfilled / courier delivered); cancelling an unpaid card order added phantom stock (`stockWasTaken`); partial variant PATCH wiped / zeroed other variants; text cost price silently became null; unpublished stores accepted orders via API; Publish with no design → 500; login lock was per IP incl. successful logins (now 10 wrong passwords per account), signup limit 5→20/h; store tab titles show the store name. Onboarding: questions are multi-select; website import reads the Shopify `/products.json` / WooCommerce Store API (real prices, photos, descriptions, variants — before: Rs 0 prices, no photos); planner ORBIT_CAN list updated (products, store settings, Instagram, Studio).
 

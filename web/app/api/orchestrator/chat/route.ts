@@ -1,3 +1,4 @@
+import { keepScript } from "@/lib/script-guard";
 import { NextResponse } from "next/server";
 import { anthropic, MODEL } from "@/lib/anthropic";
 import { prisma } from "@/lib/prisma";
@@ -7,7 +8,7 @@ import { estimateCostUsd } from "@/lib/pricing";
 import { assertUnderUsageCap, UsageCapExceededError } from "@/lib/usage-limit";
 import { classifyRelevantSpecialists, consultSpecialist, CONSULTABLE_SPECIALISTS } from "@/lib/specialist-consult";
 import type Anthropic from "@anthropic-ai/sdk";
-import { parseSummary, ORCHESTRATOR_TOOL, getDiscussedPlan, planContextBlock, sanitizeOps, describeOps, applyPlanOps, filterOpsForPlan } from "@/lib/strategy-chat";
+import { asProposed, parseSummary, ORCHESTRATOR_TOOL, getDiscussedPlan, planContextBlock, sanitizeOps, describeOps, applyPlanOps, filterOpsForPlan } from "@/lib/strategy-chat";
 import { draftGrowthPlan } from "@/lib/strategy-planner";
 import { describeStoreChanges, sanitizeStoreChanges, storeSettingsContext } from "@/lib/store-settings-ops";
 import { describeProductChanges, sanitizeProductChanges } from "@/lib/product-ops";
@@ -24,6 +25,9 @@ export const maxDuration = 180;
 const SYSTEM_PROMPT_PREFIX = `You are the Strategy Orchestrator for this e-commerce AI platform — the same senior business-growth and sales expert who sets the weekly plan and watches every specialist agent's work. The owner is now talking to you directly, by voice or text, to brainstorm, ask questions, or discuss changes.
 
 Ground rules:
+- Reply in the owner's own language AND script: if they wrote Roman Urdu (Urdu in English letters), reply in Roman Urdu in English letters — never switch to Urdu script or to English unless they did.
+- A proposal is NOT done yet. Talk about it as proposed: "Proposal bana diya hai — neeche Apply dabayein" / "I've set it up — press Apply below". Never write "kar diya", "ho gaya", "done" or "updated" about a change that's still waiting for Apply.
+- The owner decides. When they give a direct instruction to change something (a price, stock, a product, a delivery fee, a setting), make exactly that proposal. If you see a real risk, add ONE short line about it — but never refuse, swap it for a different change, or hold it back to ask for optional details (cost price, photo, description): those can come later.
 - Talk like a sharp, direct human advisor texting the owner back — not a report generator. Short, conversational replies: 2-5 sentences for normal questions, and even for a "give me a full plan" question, stay under ~120 words total.
 - Conversational, never a report. Keep it easy to scan: short paragraphs (1-3 sentences) separated by a blank line; when giving 3+ steps or options use "- " bullet lines; **bold** only a key number or the one key action. No headers, tables or code.
 - If the owner is asking for a real step-by-step plan, give the 3-4 highest-leverage steps only, as short bullets — not an exhaustive report. They can always ask "what's next" for more.
@@ -132,7 +136,7 @@ Needs from you: ${result.needsUserText}` : result.content;
   const meetingBlock = meetingSummary
     ? `\nSPECIALISTS JUST WEIGHED IN ON THIS, IN FRONT OF THE OWNER (do not repeat their exact words — react to them like the CEO who just heard the same meeting):\n${meetingSummary}${
         pausedOnUser
-          ? "\nOne of them needs something only the owner can supply. Your reply must plainly ask the owner for exactly that (in your own words), and nothing else — the meeting is paused until they answer."
+          ? "\nOne of them asked the owner for something. If the owner's request can be done without it (a cost price, photo or description can always be added later), still do it — make the proposal — and ask for that detail in one line. Only when the request truly can't be done without it, ask the owner for exactly that and nothing else."
           : "\nSynthesize their input into your real reply — resolve any conflict between them yourself, don't ask the owner to referee."
       }\n`
     : "";
@@ -284,7 +288,7 @@ Needs from you: ${result.needsUserText}` : result.content;
     .filter((u): u is string => typeof u === "string" && seen.has(u))
     .slice(0, 5);
   const sourcesText = cited.length ? `\n\nSources:\n${cited.map((u) => `- ${seen.get(u)} — ${u}`).join("\n")}` : "";
-  const reply = stripMarkdown(typeof out.reply === "string" && out.reply.trim() ? out.reply : "Sorry, I had trouble responding.") + sourcesText;
+  let reply = stripMarkdown(await keepScript(message, typeof out.reply === "string" && out.reply.trim() ? out.reply : "Sorry, I had trouble responding.", businessId, "orchestrator-chat")) + sourcesText;
 
   // --- Growth plan actions (draft a new plan / apply or propose edits) ---
   let opsState: string | null = null;
@@ -358,6 +362,13 @@ Needs from you: ${result.needsUserText}` : result.content;
       opsSummary = storeSummary;
     }
   }
+  // Safety net (the evals caught it): a change still waiting for Apply must never read as done.
+  if (opsState === "pending") reply = asProposed(reply);
+  // The model asked for store / product changes but every one matched what's already there, so no
+  // Apply card was made — say so instead of leaving "press Apply" hanging with nothing to press.
+  const askedForChanges = [out.store_changes, out.product_changes, out.new_products, out.delete_products].some((x) => Array.isArray(x) && x.length > 0);
+  if (askedForChanges && !storeChanges.length && opsState !== "pending")
+    reply = `${reply.replace(/[^.!?\n]*\b(apply|proposal)\b[^.!?\n]*[.!?]?/gi, "").trim()}\n\nYeh pehle se hi isi value par hai — koi tabdeeli ki zaroorat nahi, isliye Apply card nahi bana.`.trim();
   const askApproval = plan?.status === "draft" && out.ask_approval === true && out.draft_new_plan !== true;
 
   const savedReply = await prisma.orchestratorMessage.create({

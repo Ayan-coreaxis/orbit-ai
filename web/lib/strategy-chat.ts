@@ -36,7 +36,7 @@ export const ORCHESTRATOR_TOOL: Anthropic.Messages.Tool = {
       reply: {
         type: "string",
         description:
-          "What you say to the owner. Conversational, 2-6 short sentences. Keep it easy to scan: short paragraphs (1-3 sentences) separated by a blank line; when giving 3+ steps or options use \"- \" bullet lines; **bold** only a key number or the one key action. No headers, tables or code. Same language the owner writes in (Roman Urdu if they write Roman Urdu).",
+          "What you say to the owner. Conversational, 2-6 short sentences. Keep it easy to scan: short paragraphs (1-3 sentences) separated by a blank line; when giving 3+ steps or options use \"- \" bullet lines; **bold** only a key number or the one key action. No headers, tables or code. Same language the owner writes in (Roman Urdu if they write Roman Urdu). If this reply comes with a proposal (store_changes, product_changes, new_products, delete_products, store_design, create_content, social_posts, meta_ads), describe it as PROPOSED, not done — e.g. \"Moringa ki price Rs 900 karne ka proposal tayyar hai — neeche **Apply** dabayein.\" Never \"kar di hai\" / \"kar diya\" / \"done\" for it.",
       },
       ops: {
         type: "array",
@@ -327,4 +327,13 @@ export function parseSummary(raw: string | null | undefined): string[] | null {
   } catch {
     return null;
   }
+}
+
+/** "stock 60 kar diya hai" → "stock 60 karne ka proposal tayyar hai" — for replies whose change still waits for Apply. */
+export function asProposed(text: string): string {
+  return text
+    .replace(/\b(kar|set kar|update kar|change kar)\s+(diya|di|diye|dia)(\s+hai|\s+hain|\s+he)?\b/gi, "karne ka proposal tayyar hai")
+    .replace(/\b(ho|hogaya|ho)\s+(gaya|gayi|gai)(\s+hai|\s+he)?\b/gi, "ka proposal tayyar hai")
+    .replace(/\bI(?:'ve| have) (updated|changed|set|added|removed)\b/g, (_m, v: string) => `I've proposed ${({ updated: "updating", changed: "changing", set: "setting", added: "adding", removed: "removing" } as Record<string, string>)[v]}`)
+    .replace(/proposal tayyar hai(\s+hai)+/g, "proposal tayyar hai");
 }
