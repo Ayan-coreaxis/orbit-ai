@@ -261,7 +261,7 @@ async function searchHistory(businessId: string, input: Record<string, unknown>,
     .join("\n");
 }
 
-export const LOOKUP_TOOL_NAMES = new Set([FIND_PRODUCTS_TOOL.name, FIND_ORDERS_TOOL.name, FIND_MEDIA_TOOL.name, SEARCH_HISTORY_TOOL.name]);
+export const LOOKUP_TOOL_NAMES = new Set([FIND_PRODUCTS_TOOL.name, FIND_ORDERS_TOOL.name, "sales_report", FIND_MEDIA_TOOL.name, SEARCH_HISTORY_TOOL.name]);
 
 /** Which look-up tools make sense for this store right now (no point offering an empty order book). */
 export async function lookupTools(businessId: string, oldestInHistory: Date | null): Promise<Anthropic.Messages.Tool[]> {
@@ -273,7 +273,7 @@ export async function lookupTools(businessId: string, oldestInHistory: Date | nu
   ]);
   return [
     ...(products > INLINE_PRODUCTS ? [FIND_PRODUCTS_TOOL] : []),
-    ...(orders ? [FIND_ORDERS_TOOL] : []),
+    ...(orders ? [FIND_ORDERS_TOOL, SALES_REPORT_TOOL] : []),
     ...(media > INLINE_MEDIA ? [FIND_MEDIA_TOOL] : []),
     ...(older ? [SEARCH_HISTORY_TOOL] : []),
   ];
@@ -289,6 +289,7 @@ export async function runLookup(
   try {
     if (name === FIND_PRODUCTS_TOOL.name) return await findProducts(businessId, input, ctx.currency);
     if (name === FIND_ORDERS_TOOL.name) return await findOrders(businessId, input, ctx.currency);
+    if (name === SALES_REPORT_TOOL.name) return await salesReport(businessId, input, ctx.currency);
     if (name === FIND_MEDIA_TOOL.name) return await findMedia(businessId, input);
     if (name === SEARCH_HISTORY_TOOL.name) return await searchHistory(businessId, input, ctx.oldestInHistory);
   } catch (e) {
@@ -308,4 +309,161 @@ export async function productsForMessage(businessId: string, text: string, curre
   if (count <= INLINE_PRODUCTS) return summary;
   const hits = await findProducts(businessId, { query: text, limit: 6 }, currency);
   return `${summary}\nProducts matching this message:\n${hits}`;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Sales report — the database does the adding up, never the model.
+// ---------------------------------------------------------------------------------------------
+
+export const SALES_REPORT_TOOL: Anthropic.Messages.Tool = {
+  name: "sales_report",
+  description:
+    "Real sales totals computed from the order book: revenue, orders, units, average order value, estimated profit, and a breakdown by product, city, day, week, month, coupon or status — plus the change vs the previous period of the same length. Use it for ANY question about how much sold, best / worst sellers, which city buys most, trends or growth. Never add up orders yourself.",
+  input_schema: {
+    type: "object",
+    properties: {
+      period: { type: "string", enum: ["today", "7d", "30d", "90d", "this_month", "last_month", "this_year", "all"], description: "Default: 30d" },
+      group_by: { type: "string", enum: ["product", "city", "day", "week", "month", "coupon", "status"], description: "Default: product" },
+      sort_by: { type: "string", enum: ["revenue", "orders", "units"], description: "Default: revenue" },
+      limit: { type: "number", description: "Max rows, 1–30 (default 10)" },
+    },
+  },
+};
+
+type Period = { from: Date | null; to: Date; label: string; prevFrom: Date | null };
+
+export function periodOf(raw: unknown, now = new Date()): Period {
+  const day = 86400000;
+  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const p = typeof raw === "string" ? raw : "30d";
+  const back = (d: number): Period => ({ from: new Date(now.getTime() - d * day), to: now, label: `last ${d} days`, prevFrom: new Date(now.getTime() - 2 * d * day) });
+  if (p === "today") return { from: startOfDay, to: now, label: "today", prevFrom: new Date(startOfDay.getTime() - day) };
+  if (p === "7d") return back(7);
+  if (p === "90d") return back(90);
+  if (p === "this_month") return { from: new Date(now.getFullYear(), now.getMonth(), 1), to: now, label: "this month so far", prevFrom: new Date(now.getFullYear(), now.getMonth() - 1, 1) };
+  if (p === "last_month")
+    return { from: new Date(now.getFullYear(), now.getMonth() - 1, 1), to: new Date(now.getFullYear(), now.getMonth(), 1), label: "last month", prevFrom: new Date(now.getFullYear(), now.getMonth() - 2, 1) };
+  if (p === "this_year") return { from: new Date(now.getFullYear(), 0, 1), to: now, label: "this year so far", prevFrom: new Date(now.getFullYear() - 1, 0, 1) };
+  if (p === "all") return { from: null, to: now, label: "all time", prevFrom: null };
+  return back(30);
+}
+
+type Line = { productId?: string; name?: string; variantLabel?: string | null; qty?: number; price?: number };
+type OrderRow = { id: string; items: string; total: number; status: string; couponCode: string | null; shippingAddress: string | null; createdAt: Date };
+
+function parseLines(items: string): Line[] {
+  try {
+    const v = JSON.parse(items);
+    return Array.isArray(v) ? (v as Line[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function cityOf(o: OrderRow): string {
+  try {
+    const c = o.shippingAddress ? (JSON.parse(o.shippingAddress) as { city?: string }).city : "";
+    return (c ?? "").trim() || "(no city)";
+  } catch {
+    return "(no city)";
+  }
+}
+
+const pctChange = (now: number, before: number) => (before > 0 ? `${now >= before ? "+" : ""}${Math.round(((now - before) / before) * 100)}%` : now > 0 ? "new (nothing the period before)" : "no change");
+
+async function salesReport(businessId: string, input: Record<string, unknown>, currency: string): Promise<string> {
+  const period = periodOf(input.period);
+  const groupBy = typeof input.group_by === "string" ? input.group_by : "product";
+  const sortBy: "revenue" | "orders" | "units" = input.sort_by === "orders" || input.sort_by === "units" ? input.sort_by : "revenue";
+  const limit = clampLimit(input.limit, 30);
+  const select = { id: true, items: true, total: true, status: true, couponCode: true, shippingAddress: true, createdAt: true } as const;
+  const inPeriod = period.from ? { createdAt: { gte: period.from, lt: period.to } } : {};
+
+  // Sales = every order that wasn't cancelled (a pending COD order is a real order being fulfilled).
+  const orders: OrderRow[] = await prisma.order.findMany({
+    where: { businessId, ...(groupBy === "status" ? {} : { status: { not: "cancelled" } }), ...inPeriod },
+    select,
+    orderBy: { createdAt: "asc" },
+    take: 50000,
+  });
+  const prev: OrderRow[] =
+    period.prevFrom && period.from
+      ? await prisma.order.findMany({ where: { businessId, status: { not: "cancelled" }, createdAt: { gte: period.prevFrom, lt: period.from } }, select, take: 50000 })
+      : [];
+
+  const live = orders.filter((o) => o.status !== "cancelled");
+  const revenue = live.reduce((s, o) => s + o.total, 0);
+  const units = live.reduce((s, o) => s + parseLines(o.items).reduce((u, l) => u + (Number(l.qty) || 0), 0), 0);
+  const prevRevenue = prev.reduce((s, o) => s + o.total, 0);
+
+  // estimated profit from TODAY's cost prices (the history of costs isn't kept)
+  const products = await prisma.product.findMany({ where: { businessId }, select: { id: true, name: true, costPrice: true } });
+  const costById = new Map(products.map((p) => [p.id, p.costPrice] as const));
+  const costByName = new Map(products.map((p) => [p.name.toLowerCase(), p.costPrice] as const));
+  let goods = 0;
+  let cost = 0;
+  let linesWithoutCost = 0;
+  for (const o of live)
+    for (const l of parseLines(o.items)) {
+      const q = Number(l.qty) || 0;
+      goods += q * (Number(l.price) || 0);
+      const c = (l.productId ? costById.get(l.productId) : undefined) ?? costByName.get(String(l.name ?? "").toLowerCase()) ?? null;
+      if (c == null) linesWithoutCost++;
+      else cost += q * c;
+    }
+
+  const head = [
+    `SALES — ${period.label}${period.from ? ` (${period.from.toISOString().slice(0, 10)} to ${period.to.toISOString().slice(0, 10)})` : ""}, cancelled orders excluded:`,
+    `Revenue ${money(revenue, currency)} (order totals incl. delivery; products alone ${money(goods, currency)}) · ${live.length} order${live.length === 1 ? "" : "s"} · ${units} unit${units === 1 ? "" : "s"} · average order ${live.length ? money(revenue / live.length, currency) : "n/a"}`,
+    period.prevFrom ? `The period before (same length): ${money(prevRevenue, currency)} from ${prev.length} orders → revenue ${pctChange(revenue, prevRevenue)}, orders ${pctChange(live.length, prev.length)}` : "",
+    goods > 0
+      ? `Estimated gross profit on products: ${money(goods - cost, currency)}${linesWithoutCost ? ` — ${linesWithoutCost} sold line(s) have no cost price and are counted as pure profit, so the real profit is lower` : ""} (uses today's cost prices)`
+      : "",
+  ].filter(Boolean);
+  if (!orders.length) return `${head[0]}\nNo orders in this period.`;
+
+  // ---- breakdown ----
+  type Row = { key: string; revenue: number; orders: number; units: number };
+  const rows = new Map<string, Row>();
+  const add = (key: string, rev: number, ord: number, u: number) => {
+    const r = rows.get(key) ?? { key, revenue: 0, orders: 0, units: 0 };
+    r.revenue += rev;
+    r.orders += ord;
+    r.units += u;
+    rows.set(key, r);
+  };
+  const dayKey = (d: Date) => d.toISOString().slice(0, 10);
+  const weekKey = (d: Date) => {
+    const x = new Date(d);
+    x.setUTCDate(x.getUTCDate() - ((x.getUTCDay() + 6) % 7));
+    return `week of ${dayKey(x)}`;
+  };
+
+  for (const o of groupBy === "status" ? orders : live) {
+    const lines = parseLines(o.items);
+    const u = lines.reduce((s, l) => s + (Number(l.qty) || 0), 0);
+    if (groupBy === "product") {
+      const seen = new Set<string>();
+      for (const l of lines) {
+        const k = String(l.name ?? "?");
+        add(k, (Number(l.qty) || 0) * (Number(l.price) || 0), seen.has(k) ? 0 : 1, Number(l.qty) || 0);
+        seen.add(k);
+      }
+    } else if (groupBy === "city") add(cityOf(o), o.total, 1, u);
+    else if (groupBy === "day") add(dayKey(o.createdAt), o.total, 1, u);
+    else if (groupBy === "week") add(weekKey(o.createdAt), o.total, 1, u);
+    else if (groupBy === "month") add(o.createdAt.toISOString().slice(0, 7), o.total, 1, u);
+    else if (groupBy === "coupon") add(o.couponCode ?? "(no code)", o.total, 1, u);
+    else add(o.status, o.total, 1, u);
+  }
+  const chronological = groupBy === "day" || groupBy === "week" || groupBy === "month";
+  const sorted = [...rows.values()].sort((a, b) => (chronological ? a.key.localeCompare(b.key) : b[sortBy] - a[sortBy] || b.revenue - a.revenue));
+  const shown = sorted.slice(0, limit);
+  const what = groupBy === "product" ? "product revenue" : "revenue";
+  return `${head.join("\n")}
+
+By ${groupBy}${chronological ? "" : `, sorted by ${sortBy}`} (${rows.size} in total${rows.size > shown.length ? `, top ${shown.length} shown` : ""}):
+${shown.map((r, i) => `${chronological ? "" : `${i + 1}. `}${r.key} — ${what} ${money(r.revenue, currency)} · ${r.orders} order${r.orders === 1 ? "" : "s"} · ${r.units} unit${r.units === 1 ? "" : "s"}`).join("\n")}${
+    groupBy === "product" ? "\nProducts that sold nothing in this period aren't listed — use find_products for the full catalogue." : ""
+  }${groupBy === "status" ? "\n(This breakdown includes cancelled orders; the totals above don't.)" : ""}`;
 }

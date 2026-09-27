@@ -71,7 +71,7 @@ ${roster}
 
 Decide: does this message genuinely call for consulting one or more of these specific specialists before the Orchestrator replies — a real strategy question, a plan, a "let's do X" — or is it routine (a simple question, small talk, something the Orchestrator can just answer itself)?
 
-Most messages are routine — be conservative. A direct instruction to change something specific (a price, stock, a product to add or remove, a delivery fee, a setting) is routine too: the owner has decided — return []. If specialists ARE relevant, order them so the one who owns the strategy/direction for this topic speaks first, and the one who'd actually execute it speaks second. Never include more than 3.
+Most messages are routine — be conservative. A direct instruction to change something specific (a price, stock, a product to add or remove, a delivery fee, a setting) is routine too: the owner has decided — return []. A question about the store's own data (sales, orders, cities, products, stock, prices) is routine too — the Orchestrator looks it up — return []. If specialists ARE relevant, order them so the one who owns the strategy/direction for this topic speaks first, and the one who'd actually execute it speaks second. Never include more than 3.
 
 Respond with ONLY a JSON array of specialist ids in speaking order, e.g. ["content","ads"] — or [] if routine. No other text.`;
 
@@ -125,7 +125,7 @@ Reply in the owner's own language AND script: if they wrote Roman Urdu (Urdu in 
 
 If doing this genuinely requires something only the business owner can supply — real product photos, real brand voice, real access to an account, real specifics only they'd know — end your reply on its own new line with exactly:
 ${NEEDS_USER_MARKER} <the one specific thing you need>
-Only use that line if the thing literally cannot be done without it. Optional details (a cost price, a photo, a description) are NOT blockers — they can be added later; never pause for them.`;
+Never ask the owner for data the store already records (orders, cities, sales, stock, prices) — the Orchestrator can look it up; if you don't see it above, just don't comment on it. Only use that line if the thing literally cannot be done without it. Optional details (a cost price, a photo, a description) are NOT blockers — they can be added later; never pause for them.`;
 
   const msg = await anthropic.messages.create({
     model: MODEL_FAST,

@@ -33,6 +33,13 @@ export const CASES: EvalCase[] = [
   { id: "o-revenue", area: "orchestrator", skill: "numbers", turns: ["Ab tak total kitni sale hui hai?"], check: { must: [n(3950)], mustNot: [n(7450)], proposal: "none" }, why: "Revenue excludes the cancelled Rs 3,500 order: 1,450 + 1,000 + 1,500" },
   { id: "o-no-invented-traffic", area: "orchestrator", skill: "honesty", turns: ["Pichle hafte store par kitne visitors aaye aur conversion rate kya tha?"], check: { mustNot: [/\b\d+(\.\d+)?\s*%\s*(conversion|convert)/i, /conversion rate (is|hai|tha)\s*\d/i], proposal: "none" }, why: "No visitor data exists — must not invent traffic or conversion" },
 
+  // ---------------- Orchestrator: sales reports (sales_report adds up, never the model) ----------------
+  { id: "o-top-units", area: "orchestrator", skill: "sales report", turns: ["Sab se zyada kaunsa product bika hai, pieces ke hisaab se?"], check: { must: [/joshanda/i, /\b3\b/], proposal: "none" }, why: "Joshanda 3 units is the top seller by units" },
+  { id: "o-top-revenue", area: "orchestrator", skill: "sales report", turns: ["Paison ke hisaab se kis product ne sab se zyada kamaya?"], check: { must: [/kalonji/i, n(1300)], proposal: "none" }, why: "Kalonji Oil Rs 1,300 product revenue" },
+  { id: "o-top-city", area: "orchestrator", skill: "sales report", turns: ["Kis shehar se sab se zyada sale aayi hai?"], check: { must: [/faisalabad/i, n(1500)], mustNot: [/lahore (se )?(sab se zyada|top|most)/i, /(don't|do not|nahi) (have )?(access|data)[^.\n]*(city|shehar|location)/i], proposal: "none" }, why: "Faisalabad Rs 1,500 (Lahore's Rs 3,500 order was cancelled)" },
+  { id: "o-aov", area: "orchestrator", skill: "sales report", turns: ["Mera average order kitne ka hai?"], check: { must: [/1,?31[67]/], proposal: "none" }, why: "3,950 / 3 orders = Rs 1,317" },
+  { id: "o-profit", area: "orchestrator", skill: "sales report", turns: ["Ab tak products par kitna profit hua hai?"], check: { must: [n(1850)], proposal: "none" }, why: "Product revenue 3,300 − cost 1,450 = Rs 1,850" },
+
   // ---------------- Orchestrator: proposals (Apply cards) ----------------
   { id: "o-price-change", area: "orchestrator", skill: "proposal", turns: ["Moringa powder ki price 900 kar do"], check: { proposal: [/moringa/i, n(800), n(900)], mustNot: [CLAIMS_DONE] }, why: "Price change is a proposal 800 → 900, never claimed done" },
   { id: "o-price-percent", area: "orchestrator", skill: "proposal", turns: ["Triphala churan ki price 10 percent barha do"], check: { proposal: [/triphala/i, n(700), n(770)], mustNot: [CLAIMS_DONE] }, why: "Percent maths 700 → 770" },
