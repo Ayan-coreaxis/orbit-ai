@@ -20,9 +20,18 @@ const ALL_ACCOUNT_TABS: { v: string; label: string }[] = [
   { v: "profile", label: "Profile" },
 ];
 
+export type WidgetPart = "motion" | "tabs" | "fields" | "copy";
+
+/** Checkout / cart / account screens. Each settings page shows only its `parts`; Save sends only those. */
 export function WidgetCustomizationCard({
   initial,
+  parts,
+  title,
+  description,
 }: {
+  parts: WidgetPart[];
+  title: string;
+  description?: string;
   initial: {
     widgetMotion: string;
     widgetCopy: Partial<Record<WidgetCopyKey, string>>;
@@ -37,6 +46,7 @@ export function WidgetCustomizationCard({
   const [openGroup, setOpenGroup] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
+  const has = (p: WidgetPart) => parts.includes(p);
 
   function addField() {
     setFields((cur) => [...cur, { key: `field_${cur.length + 1}_${Date.now().toString(36)}`, label: "", type: "text", required: false }]);
@@ -69,10 +79,10 @@ export function WidgetCustomizationCard({
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        widgetMotion: motion,
-        widgetCopy: copy,
-        accountTabs: tabs,
-        checkoutCustomFields: fields.filter((f) => f.label.trim()),
+        ...(has("motion") ? { widgetMotion: motion } : {}),
+        ...(has("copy") ? { widgetCopy: copy } : {}),
+        ...(has("tabs") ? { accountTabs: tabs } : {}),
+        ...(has("fields") ? { checkoutCustomFields: fields.filter((f) => f.label.trim()) } : {}),
       }),
     });
     setBusy(false);
@@ -82,14 +92,11 @@ export function WidgetCustomizationCard({
   const input = "w-full rounded-lg border border-border bg-panel px-3 py-2 text-[13px] outline-none focus:border-accent-strong/40";
 
   return (
-    <Card className="p-7">
-      <SectionLabel>Checkout, cart & account wording + motion</SectionLabel>
-      <p className="mt-1.5 text-[13px] text-text-dim">
-        These screens (checkout, cart, sign-in, account, order tracking) aren&apos;t part of your page design — they run on shared
-        logic so every store gets a working checkout. This is where you make them yours: every button/label/message below, and how
-        the &quot;order placed&quot; moment feels.
-      </p>
+    <Card className="p-6 sm:p-7">
+      <SectionLabel>{title}</SectionLabel>
+      {description && <p className="mt-1.5 text-[13px] text-text-dim">{description}</p>}
 
+      {has("motion") && (
       <div className="mt-5">
         <span className="text-[12px] font-medium text-text-dim">Motion</span>
         <div className="mt-2 grid gap-2 sm:grid-cols-2">
@@ -108,6 +115,9 @@ export function WidgetCustomizationCard({
         </div>
       </div>
 
+      )}
+
+      {has("tabs") && (
       <div className="mt-5">
         <span className="text-[12px] font-medium text-text-dim">Account page tabs — show/hide and order</span>
         <div className="mt-2 grid gap-1.5">
@@ -138,6 +148,9 @@ export function WidgetCustomizationCard({
         </div>
       </div>
 
+      )}
+
+      {has("fields") && (
       <div className="mt-5">
         <span className="text-[12px] font-medium text-text-dim">
           Extra checkout fields — on top of name/phone/email/address, which always stay (real delivery needs them)
@@ -175,7 +188,11 @@ export function WidgetCustomizationCard({
         </div>
       </div>
 
+      )}
+
+      {has("copy") && (
       <div className="mt-5 space-y-2">
+        <span className="text-[12px] font-medium text-text-dim">Wording — leave a line blank to keep the default</span>
         {WIDGET_COPY_GROUPS.map((g) => (
           <div key={g.label} className="rounded-lg border border-border">
             <button
@@ -205,16 +222,13 @@ export function WidgetCustomizationCard({
         ))}
       </div>
 
-      <div className="mt-5 flex items-center gap-3">
-        <button
-          onClick={save}
-          disabled={busy}
-          className="rounded-lg bg-accent-soft px-4 py-2 text-[13px] font-semibold text-accent-strong hover:opacity-90 disabled:opacity-50"
-        >
+      )}
+
+      <div className="mt-6 flex items-center gap-3 border-t border-border pt-4">
+        <button onClick={save} disabled={busy} className="rounded-lg bg-accent px-4 py-2 text-[13px] font-semibold text-white hover:opacity-90 disabled:opacity-50">
           {busy ? "Saving…" : "Save"}
         </button>
         {saved && <span className="text-[12.5px] text-good">Saved</span>}
-        <span className="text-[11.5px] text-text-dim">Leave a field blank to keep the default text.</span>
       </div>
     </Card>
   );

@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
   const b = await prisma.business.findUnique({ where: { id: businessId }, select: { stripeCustomerId: true } });
   if (!b?.stripeCustomerId) return NextResponse.json({ error: "You don't have a subscription yet — pick a plan first." }, { status: 400 });
   try {
-    const session = await stripe.billingPortal.sessions.create({ customer: b.stripeCustomerId, return_url: `${req.nextUrl.origin}/dashboard/settings` });
+    const session = await stripe.billingPortal.sessions.create({ customer: b.stripeCustomerId, return_url: `${req.nextUrl.origin}/dashboard/settings/plan` });
     return NextResponse.json({ url: session.url });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "";

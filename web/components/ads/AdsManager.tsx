@@ -139,7 +139,7 @@ export function AdsManager() {
           </Button>
         </div>
         <ul className="mt-5 grid gap-2 sm:grid-cols-2">
-          <Check1 ok={!!r.page} label={r.page ? `Facebook Page: ${r.page}` : "Facebook Page not connected"} fix="/dashboard/settings" />
+          <Check1 ok={!!r.page} label={r.page ? `Facebook Page: ${r.page}` : "Facebook Page not connected"} fix="/dashboard/settings/channels" />
           <Check1
             ok={r.adAccount && r.userToken && !!data.account?.ok}
             label={
@@ -153,9 +153,9 @@ export function AdsManager() {
                       ? `Ad account: ${data.account.name} · ${data.account.currency} · ${data.account.status}`
                       : "Ad account"
             }
-            fix="/dashboard/settings"
+            fix="/dashboard/settings/channels"
           />
-          <Check1 ok={!!r.store} label={r.store ? `Ads send people to ${r.store.replace(/^https:\/\//, "")}` : (r.storeReason ?? "Store isn't public yet")} fix="/dashboard/settings#domain" />
+          <Check1 ok={!!r.store} label={r.store ? `Ads send people to ${r.store.replace(/^https:\/\//, "")}` : (r.storeReason ?? "Store isn't public yet")} fix="/dashboard/settings/domain" />
           <Check1 ok={data.media.length > 0} label={data.media.length ? `${data.media.length} photos & videos ready to use` : "No photos or videos yet — make some in Content > Orbit Studio"} fix="/dashboard/content" />
         </ul>
       </Card>

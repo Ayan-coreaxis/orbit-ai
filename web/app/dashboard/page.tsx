@@ -115,10 +115,10 @@ export default async function DashboardPage() {
   if (unconfirmed) todos.push({ href: "/dashboard/store", icon: MessageSquare, title: `${unconfirmed} COD order${unconfirmed === 1 ? "" : "s"} waiting for the customer`, body: "They were asked to confirm on WhatsApp.", tone: "warn" });
   if (lowStock.length) todos.push({ href: "/dashboard/store", icon: PackageX, title: `${lowStock.length} product${lowStock.length === 1 ? "" : "s"} running low`, body: lowStock.map((p) => `${p.name} (${p.stock})`).join(", "), tone: "warn" });
   if (!storeDesign?.published) todos.push({ href: "/dashboard/orbit-design", icon: Store, title: "Publish your storefront", body: productCount ? `${productCount} products are ready — design the store and publish it.` : "Tell Orbit Design what you want and it builds it live.", tone: "accent" });
-  if (!business?.courierProvider || business.courierProvider === "manual") todos.push({ href: "/dashboard/settings", icon: Truck, title: "Connect your courier", body: "Book PostEx, Leopards or TCS from an order and track deliveries automatically.", tone: "neutral" });
-  if (!business?.metaPageId) todos.push({ href: "/dashboard/settings", icon: Megaphone, title: "Connect Facebook & Instagram", body: "Post reels and run ads straight from Orbit.", tone: "neutral" });
-  if (!business?.metaPixelId) todos.push({ href: "/dashboard/settings", icon: Eye, title: "Add your Meta Pixel", body: "So ads can optimise for real sales.", tone: "neutral" });
-  if (business?.customDomainStatus !== "verified") todos.push({ href: "/dashboard/settings", icon: Globe, title: "Use your own domain", body: "Put the store on yourbrand.com.", tone: "neutral" });
+  if (!business?.courierProvider || business.courierProvider === "manual") todos.push({ href: "/dashboard/settings/delivery", icon: Truck, title: "Connect your courier", body: "Book PostEx, Leopards or TCS from an order and track deliveries automatically.", tone: "neutral" });
+  if (!business?.metaPageId) todos.push({ href: "/dashboard/settings/channels", icon: Megaphone, title: "Connect Facebook & Instagram", body: "Post reels and run ads straight from Orbit.", tone: "neutral" });
+  if (!business?.metaPixelId) todos.push({ href: "/dashboard/settings/tracking", icon: Eye, title: "Add your Meta Pixel", body: "So ads can optimise for real sales.", tone: "neutral" });
+  if (business?.customDomainStatus !== "verified") todos.push({ href: "/dashboard/settings/domain", icon: Globe, title: "Use your own domain", body: "Put the store on yourbrand.com.", tone: "neutral" });
 
   // agent activity (meeting calls count for the specialist too)
   for (const [agentId, a] of Object.entries(activityMap)) {

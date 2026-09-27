@@ -6,7 +6,7 @@ import { verifyState, exchangeCodeForToken, exchangeForLongLived, getManagedPage
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 
 function redirect(status: string) {
-  return NextResponse.redirect(new URL(`/dashboard/settings?meta=${status}`, APP_URL));
+  return NextResponse.redirect(new URL(`/dashboard/settings/channels?meta=${status}`, APP_URL));
 }
 
 export async function GET(req: NextRequest) {

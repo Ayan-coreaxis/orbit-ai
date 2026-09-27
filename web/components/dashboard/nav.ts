@@ -61,7 +61,7 @@ export const NAV_GROUPS: NavGroup[] = [
     title: "Setup",
     items: [
       { href: "/dashboard/settings/connections", label: "Connections", icon: Plug, keywords: "mcp skills plugins tools" },
-      { href: "/dashboard/settings", label: "Settings & Billing", icon: Settings, keywords: "plan billing domain courier whatsapp meta pixel delivery" },
+      { href: "/dashboard/settings", label: "Settings", icon: Settings, keywords: "plan billing domain courier whatsapp meta pixel delivery" },
     ],
   },
 ];
@@ -70,6 +70,7 @@ export const NAV_ITEMS = NAV_GROUPS.flatMap((g) => g.items);
 
 export function isActive(pathname: string, href: string): boolean {
   if (href === "/dashboard") return pathname === "/dashboard";
-  if (href === "/dashboard/settings") return pathname === "/dashboard/settings";
+  // Connections has its own menu item; every other settings page highlights "Settings".
+  if (href === "/dashboard/settings") return pathname.startsWith("/dashboard/settings") && !pathname.startsWith("/dashboard/settings/connections");
   return pathname === href || pathname.startsWith(`${href}/`);
 }

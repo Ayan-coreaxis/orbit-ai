@@ -111,7 +111,7 @@ export function Studio() {
             <Lock className="mt-0.5 h-4 w-4 shrink-0 text-text-faint" />
             <div className="text-[13px] leading-relaxed text-text-dim">
               Orbit Studio comes with the <b>Growth ($75)</b> plan — 50 images + 5 reels a month — and the <b>Scale ($150)</b> plan — 100 images + 12 reels. You can
-              look around below; upgrade in <a href="/dashboard/settings" className="text-accent hover:underline">Settings &amp; Billing</a> to start making.
+              look around below; upgrade in <a href="/dashboard/settings/plan" className="text-accent hover:underline">Plan &amp; billing</a> to start making.
             </div>
           </div>
         ) : !s.enabled ? (
