@@ -952,9 +952,14 @@ function fillImageSlots(html: string, preview = true): string {
       if (!/(^|;)\s*(aspect-ratio|min-height)\s*:|(^|;)\s*height\s*:\s*[\d.]+(px|rem|em|vh|svh)/i.test(sizing))
         sizing = `${sizing.replace(/;\s*$/, "")};min-height:280px`;
       // A real image the seller supplied (Content panel / click-to-edit) — else the art-directed placeholder.
-      const src = /data-(?:od-)?img-src="([^"]+)"/i.exec(attrs)?.[1];
+      // The model sometimes puts a seller's photo on the slot as a CSS background instead of
+      // data-img-src — the slot would still render as a placeholder, so treat that URL as the photo.
+      const bgUrl = /background(?:-image)?\s*:[^;"]*?url\(\s*(?:&#39;|&quot;|['"])?(https?:\/\/[^'")\s]+?)(?:&#39;|&quot;|['"])?\s*\)/i.exec(sizing)?.[1];
+      if (bgUrl) sizing = sizing.replace(/background-image\s*:[^;]*;?/gi, "").replace(/background-(size|position|repeat)\s*:[^;]*;?/gi, "");
+      const src = /data-(?:od-)?img-src="([^"]+)"/i.exec(attrs)?.[1] || bgUrl;
       if (src) {
-        return `<div data-od-imgslot title="${escapeAttr(decode(brief))}" style="${sizing};overflow:hidden;border-radius:var(--od-radius)"><img src="${escapeAttr(src)}" alt="${escapeAttr(decode(brief))}" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block"></div>`;
+        const radius = /position\s*:\s*absolute/i.test(sizing) ? "" : ";border-radius:var(--od-radius)";
+        return `<div data-od-imgslot title="${escapeAttr(decode(brief))}" style="${sizing};overflow:hidden${radius}"><img src="${escapeAttr(src)}" alt="${escapeAttr(decode(brief))}" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block"></div>`;
       }
       return imgSlot(decode(brief), sizing, /\bdata-img-bg\b/i.test(attrs), preview);
     });
@@ -1037,6 +1042,29 @@ function rewriteLinks(html: string, businessId: string, preview: boolean, doc?: 
  * Strip scripts / handlers / dangerous embeds, but keep the wiring hooks the Phase-2 agent adds:
  * `data-od-*` attributes and `<form data-od-form="newsletter|contact|checkout">` (with its action/method removed).
  */
+/** Phone-only styling without a <style> tag: data-od-sm="decls" applies those declarations at
+ *  ≤700px. The declarations are checked (no url(), @-rules, braces or escapes) and emitted as one
+ *  platform-written rule per distinct value. */
+export function phoneStyles(html: string): string {
+  const rules = new Map<string, string>();
+  const out = html.replace(/\sdata-od-sm="([^"]*)"/gi, (_m, raw: string) => {
+    const decls = raw.replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, "&").trim();
+    if (!decls || /url\s*\(|expression|@|[{}<>\\]|javascript:/i.test(decls)) return "";
+    let h = 0;
+    for (let i = 0; i < decls.length; i++) h = (h * 31 + decls.charCodeAt(i)) | 0;
+    const id = (h >>> 0).toString(36);
+    const important = decls
+      .split(";")
+      .map((d) => d.trim())
+      .filter((d) => /^[a-z-]+\s*:/i.test(d))
+      .map((d) => (/!important\s*$/i.test(d) ? d : `${d} !important`))
+      .join(";");
+    if (important) rules.set(id, `[data-od-sm-id="${id}"]{${important}}`);
+    return important ? ` data-od-sm-id="${id}"` : "";
+  });
+  return rules.size ? `<style>@media (max-width:700px){${[...rules.values()].join("")}}</style>${out}` : out;
+}
+
 function sanitizeBlock(html: string): string {
   let h = sanitizeHtml(html); // drops <script>, <style>, on* handlers, javascript: urls
   h = h.replace(/<(iframe|object|embed)\b/gi, "<div data-blocked-$1");
@@ -1111,13 +1139,13 @@ function navAccountHtml(doc: OrbitDesignDoc, businessId: string, preview: boolea
   if (preview || accountTarget.navShow !== "afterLogin" || loggedIn) {
     return `<a ${hrefFor(accountTarget.slug)} data-od-account aria-label="${escapeAttr(accountTarget.title || "Account")}" style="display:inline-flex;align-items:center;color:var(--od-text);text-decoration:none;flex-shrink:0">${personIcon}</a>`;
   }
-  return `<a ${hrefFor(LOGIN_PAGE)} data-od-account style="color:var(--od-muted);text-decoration:none;flex-shrink:0">Sign in</a>`;
+  return `<a ${hrefFor(LOGIN_PAGE)} data-od-account aria-label="Sign in" style="display:inline-flex;align-items:center;color:var(--od-muted);text-decoration:none;flex-shrink:0"><span class="od-nav-icon">${personIcon}</span><span class="od-nav-word">Sign in</span></a>`;
 }
 
 /** The cart link — the live-store runtime hangs a count badge off `a[href$="/cart"]`. */
 function navCartHtml(doc: OrbitDesignDoc, businessId: string, preview: boolean): string {
   const cartLink = navHrefFor(doc, businessId, preview)(CART_PAGE);
-  return `<a ${cartLink} aria-label="Cart" style="display:inline-flex;align-items:center;gap:6px;color:var(--od-text);text-decoration:none;flex-shrink:0"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>Cart</a>`;
+  return `<a ${cartLink} aria-label="Cart" style="display:inline-flex;align-items:center;gap:6px;color:var(--od-text);text-decoration:none;flex-shrink:0"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg><span class="od-nav-word">Cart</span></a>`;
 }
 
 /** The full nav bundle (links + account + cart) — used where the header has only the single <!--OD_NAV--> marker. */
@@ -1163,7 +1191,7 @@ function substituteContent(html: string, doc: OrbitDesignDoc): string {
       .replace(/<a\b[^>]*href="\s*(?:mailto:|tel:)?\s*\{\{\s*(contact\.[a-z]+)\s*\}\}\s*"[^>]*>[\s\S]*?<\/a>/gi, (m, key: string) => (map[key] ? m : ""))
       .replace(/<(p|li|span)\b[^>]*>\s*\{\{\s*(contact\.[a-z]+)\s*\}\}\s*<\/\1>/gi, (m, _t: string, key: string) => (map[key] ? m : ""))
       // …and a column left with only its heading ("FOLLOW US" over an empty row) goes too.
-      .replace(/<div\b[^>]*>\s*<(div|h[1-6]|p|span|strong)\b[^>]*>[^<]{1,40}<\/\1>\s*<(div|ul|nav|p)\b[^>]*>\s*<\/\2>\s*<\/div>/gi, "")
+      .replace(/<div\b[^>]*>\s*<(div|h[1-6]|p|span|strong)\b[^>]*>[^<]{1,40}<\/\1>\s*<(div|ul|nav|p)\b[^>]*>(?:\s*<div\b[^>]*>\s*<\/div>)*\s*<\/\2>\s*<\/div>/gi, "")
       // "© 2026 {{store.name}}." for a name that already ends in a full stop ("Chai Wala Co.").
       .replace(/\{\{\s*store\.name\s*\}\}\./gi, (m) => (doc.storeName.trim().endsWith(".") ? "{{store.name}}" : m))
       .replace(/\{\{\s*([a-z.]+)\s*\}\}/gi, (m, key: string) => (key in map ? map[key] : m))
@@ -1501,6 +1529,21 @@ function announcementBar(doc: OrbitDesignDoc): string {
  * links the model hand-wrote into the header (a common mistake that duplicates the nav), then
  * put the real nav where <!--OD_NAV--> is — or before </nav>/</header> if the marker is gone.
  */
+/** An edit sometimes copies the platform's RENDERED nav (the link list, burger toggle, account and
+ *  cart links) back into the header source. The real nav is injected again at the marker, so the
+ *  copy renders twice and overlaps on phones — drop the copy, keeping (or restoring) the marker. */
+export function stripBakedNav(header: string): string {
+  let baked = false;
+  const h = header
+    .replace(/<input\b[^>]*class="[^"]*\bod-nav-toggle\b[^"]*"[^>]*>/gi, () => ((baked = true), ""))
+    .replace(/<div\b[^>]*class="[^"]*\bod-nav-links\b[^"]*"[^>]*>[\s\S]*?<\/div>/gi, () => ((baked = true), ""))
+    .replace(/<label\b[^>]*class="[^"]*\bod-nav-burger\b[^"]*"[^>]*>[\s\S]*?<\/label>/gi, () => ((baked = true), ""))
+    .replace(/<a\b[^>]*\bdata-od-account\b[^>]*>[\s\S]*?<\/a>/gi, () => ((baked = true), ""))
+    .replace(/<a\b[^>]*href="\/store\/[^"/]+\/(cart|account\/login|account)"[^>]*>[\s\S]*?<\/a>/gi, () => ((baked = true), ""));
+  if (!baked) return header;
+  return /OD_NAV|OD_CART|OD_ACCOUNT/.test(h) ? h : h.replace(/<\/nav>/i, "<!--OD_NAV--></nav>");
+}
+
 function prepareHeader(doc: OrbitDesignDoc, businessId: string, preview: boolean, loggedIn: boolean): string {
   // Targets the auto nav already covers (page slugs + their titles slugified) — a hand-written
   // header link to any of these is the "duplicate nav" mistake and gets removed. CTAs pointing at
@@ -1529,6 +1572,7 @@ function prepareHeader(doc: OrbitDesignDoc, businessId: string, preview: boolean
   // exist — remap the common ones to their --od-* equivalents so the header styling actually lands.
   rawHeader = rawHeader.replace(/var\(--(border|text|bg|surface|accent|muted|accent-text)\b/g, "var(--od-$1");
   if (!/<header[\s>]/i.test(rawHeader)) rawHeader = defaultComponents(doc.storeName, "").header;
+  rawHeader = stripBakedNav(rawHeader);
   // The model keeps baking a promo/announcement strip ("Free delivery over Rs 5,000") into the
   // header. The platform renders that itself from the seller's Content panel — a hand-written one
   // just stacks a second identical bar. Strip any element whose text is exactly the announcement.
@@ -1789,7 +1833,7 @@ export function renderPageBody(doc: OrbitDesignDoc, opts: RenderOpts): { html: s
   const widgets: PageWidget[] = [];
   const block = (html: string) =>
     applySpec(
-      widgetMarkers(rewriteLinks(fillImageSlots(sanitizeBlock(fixInlineCss(substituteContent(html, doc))), preview), opts.businessId, preview, doc), preview, opts.currency),
+      widgetMarkers(rewriteLinks(fillImageSlots(phoneStyles(sanitizeBlock(fixInlineCss(substituteContent(html, doc)))), preview), opts.businessId, preview, doc), preview, opts.currency),
       page.slug,
       spec,
       preview,
@@ -2230,7 +2274,7 @@ if('IntersectionObserver' in window){var dio=new IntersectionObserver(function(e
 setTimeout(function(){dr.forEach(go)},2500);})();
 // parallax — [data-od-parallax] (opt "0.15".."0.6" strength) drifts as it scrolls through the viewport
 var px=[].slice.call(document.querySelectorAll('[data-od-parallax]'));
-if(px.length&&!RM){px.forEach(function(el){el.style.willChange='transform'});var pt=false;var ppump=function(){pt=false;var vh=window.innerHeight||800;if((window.innerWidth||1024)<768){px.forEach(function(el){el.style.transform=''});return}px.forEach(function(el){var r=el.getBoundingClientRect();var mid=r.top+r.height/2;var prog=(mid-vh/2)/(vh);var str=parseFloat(el.getAttribute('data-od-parallax'))||0.22;el.style.transform='translate3d(0,'+(-prog*str*vh).toFixed(1)+'px,0)'})};var pon=function(){if(!pt){pt=true;requestAnimationFrame(ppump)}};ppump();window.addEventListener('scroll',pon,{passive:true});window.addEventListener('resize',pon)}
+if(px.length&&!RM){px.forEach(function(el){el.style.willChange='transform'});var pt=false;var ppump=function(){pt=false;var vh=window.innerHeight||800;if((window.innerWidth||1024)<768){px.forEach(function(el){el.style.transform=''});return}px.forEach(function(el){var r=el.getBoundingClientRect();var mid=r.top-(el._odTy||0)+r.height/2;var prog=(mid-vh/2)/(vh);var str=parseFloat(el.getAttribute('data-od-parallax'))||0.22;var ty=-prog*str*vh;if(el._odCover===undefined){var cs=getComputedStyle(el);el._odCover=cs.position==='absolute'&&parseFloat(cs.top)<=0&&parseFloat(cs.bottom)<=0}var sc=el._odCover?' scale('+(1+Math.min(0.6,2*Math.abs(ty)/Math.max(1,r.height))+0.02).toFixed(3)+')':'';el._odTy=ty;el.style.transform='translate3d(0,'+ty.toFixed(1)+'px,0)'+sc})};var pon=function(){if(!pt){pt=true;requestAnimationFrame(ppump)}};ppump();window.addEventListener('scroll',pon,{passive:true});window.addEventListener('resize',pon)}
 // Material-style ripple — one shared handler for every .od-btn/.odw-btn so clickable surfaces
 // give real tactile feedback, colour-matched to the element's own text colour (currentColor).
 document.addEventListener('pointerdown',function(ev){
@@ -2381,6 +2425,14 @@ ${scope} .od-nav-burger{display:none;align-items:center;justify-content:center;c
 ${scope} .od-nav-links{display:flex;gap:22px;align-items:center;flex-wrap:wrap}
 ${scope} .od-nav-links a{transition:padding-left .2s ease,color .2s ease}
 ${scope} .od-nav-links a:hover{padding-left:5px;color:var(--od-accent)}
+${scope} .od-nav-icon{display:none}
+/* Phones: the account and cart links drop their words for icons, and the nav never shrinks
+   under its own content (it would slide over the logo). */
+@media (max-width:560px){
+${scope} .od-nav-word{display:none}
+${scope} .od-nav-icon{display:inline-flex}
+${scope} header nav:has(.od-nav-burger){min-width:max-content!important;flex:0 0 auto!important}
+}
 @media (max-width:900px){
 ${scope} header{position:relative}
 ${scope} .od-nav-burger{display:inline-flex}

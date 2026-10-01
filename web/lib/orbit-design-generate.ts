@@ -169,7 +169,7 @@ EDITING THE RIGHT THING (comments / small asks often target auto-generated parts
 - If the request targets something you cannot change from here, SAY SO plainly in \`reply\` and make no edit. Never return an edit that does nothing, and never say "I've updated / moved / changed …" for a change you did not actually make. Only claim success for changes you actually made in this tool call.
 
 SECTION & COMPONENT HTML — hard rules:
-- Inline styles only. NO <style>, <script>, <link>, <iframe>, and no inline event handlers. No external CSS/JS.
+- Inline styles only. NO <style>, <script>, <link>, <iframe>, and no inline event handlers. No external CSS/JS. For phone-only styling (≤700px) put the declarations in data-od-sm="…" on the element, e.g. data-od-sm="padding:24px;font-size:34px;background:rgba(0,0,0,.6)" — no url().
 - THE DESIGN KIT IS OPTIONAL CONVENIENCE, NOT A UNIFORM. The storefront ships one shared set of CSS custom properties (spacing/shadow/radius/colour scale) and a few pre-built classes (od-section, od-container, od-grid, od-h1-3, od-btn, od-card…). Use whichever of these genuinely serve the concept — reach for var(--od-s1..s10) spacing, var(--od-shadow-*), var(--od-radius-*) and the var(--od-accent|bg|surface|text|muted|border) colours often, since that's what makes the seller's theme knobs and dark/light mode actually work. But you are never required to use the od-section/od-h1/od-btn CLASSES themselves — hand-set heading sizes, invent your own button shape/treatment, build a layout the kit has no class for, whatever the brief calls for. Two different Orbit-built stores should be able to look nothing alike. The only real constraint is TOKENS for colour (so theming/dark-mode keep working) — never a fixed class for layout, type, or buttons.
 - Whatever spacing/sizing approach you pick, keep it CONSISTENT down the page (a coherent scale, even if it's your own, not the kit's) and keep colour on TOKENS (var(--od-accent|bg|surface|text|muted|border)) rather than raw hex, so the seller's theme controls and dark/light mode still work on top of your design.
 - Alternate section backgrounds: fill roughly every other od-section with style="background:var(--od-surface)" so the page reads in bands.
@@ -185,6 +185,7 @@ SECTION & COMPONENT HTML — hard rules:
      <div data-img-slot="short brief of the exact photo that goes here" style="SIZING STYLES"></div>
      The studio turns this into a labelled placeholder the seller can replace with a real photo later — that's expected and fine, don't avoid a section just because you can't fill its photo yet, and don't try to fake it with a stretched product shot.
   When in doubt about which case a slot is, default to case 2 (placeholder) — a clean placeholder beats a broken-looking stretched product photo.
+  A PHOTO URL THE SELLER GAVE YOU in their message goes on the slot as data-img-src="THAT URL" (any slot, full-bleed included) — never as a CSS background-image, which the slot doesn't read.
   3. THIRD OPTION, and often the better one for a hero/decorative visual with no real photo available: DRAW YOUR OWN GRAPHIC instead of leaving a placeholder — an inline <svg> illustration (shapes, blobs, an abstract composition, a simple icon scene), or a pure CSS gradient/pattern composition, in the store's own token colours. This is real, finished visual design, not a stand-in — use it confidently wherever an illustrated/abstract treatment fits the brand better than a photo would anyway.
 - LINKS between pages: href="#page:home", href="#page:<slug>". Link to the cart with href="#cart". A specific product: href="#product:<id>". Never hard-code /store/... URLs.
 - THE HEADER: a single <header>…</header> with the logo/store name on the LEFT and the literal marker <!--OD_NAV--> where the nav belongs — OR own the whole layout with the granular markers <!--OD_NAV_LINKS--> <!--OD_ACCOUNT--> <!--OD_CART--> (and optionally <!--OD_BURGER-->) placed wherever your design wants them: a centred nav with icons pinned left, icons split across two groups, whatever the brief calls for. Do NOT hand-write the actual page links (Shop, About, …), a Cart href, or an account href — those come from the markers. The injected nav is mobile-responsive by default (links collapse behind a hamburger below 900px); use <!--OD_NAV_LINKS:sidebar--> instead of <!--OD_NAV_LINKS--> for a full-height slide-in drawer with a blurred backdrop instead, and place <!--OD_BURGER--> explicitly if you want the toggle button somewhere other than next to the links (e.g. after the cart icon so it's visually last). Never hand-roll your own responsive JS/media-query for the nav — the platform's CSS handles both variants; you just choose which one and where things sit. Do NOT put an announcement / promo bar ("Free delivery…", "10% off") in the header — the platform renders that from the seller's Content panel; a hand-written one just stacks a duplicate. You MAY add ONE call-to-action (e.g. "Get a quote") as a styled <a href="#contact"> or button — never a #page: link.
@@ -1100,7 +1101,7 @@ For each, give the corrected FULL html for that section (by page slug + section 
 HARD RULES for your fixes:
 - The storefront ships optional design-kit classes and scale tokens (od-section, od-container, od-grid, od-h1-3, od-btn, od-card, var(--od-s*)/var(--od-shadow-*)/var(--od-radius-*)/var(--od-text-*)) — use them where the page already leans on them, but don't force a section into kit classes just because they exist; matching the page's OWN existing visual language matters more than conformance to the kit.
 - CONTRAST: any section on an accent/dark background MUST have its text colour flipped for contrast (var(--od-accent-text) or equivalent) — via class="od-section--invert" if using the kit, or by setting colours directly otherwise. If you see dark text on the accent colour, that's the fix — it's the most common defect.
-- Inline styles for the rest + var(--od-*) only. NO <style>, NO <script>, NO @keyframes, NO inline animation:/animation-name: — they are stripped and leave the element broken.
+- Inline styles for the rest + var(--od-*) only. NO <style>, NO <script>, NO @keyframes, NO inline animation:/animation-name: — they are stripped and leave the element broken. For phone-only styling (≤700px) put the declarations in data-od-sm="…" on the element, e.g. data-od-sm="padding:24px;font-size:34px;background:rgba(0,0,0,.6)" — no url().
 - For ANY moving/interactive part use ONLY these platform hooks (the runtime animates them):
   marquee: <div data-od-marquee="30"><div style="display:inline-flex;gap:48px">…items…</div></div>
   carousel: <div data-od-carousel data-od-autoplay="5000"><div data-od-track><div data-od-slide>…</div>…</div><button type="button" data-od-prev>‹</button><button type="button" data-od-next>›</button><div data-od-dots></div></div>
@@ -1836,6 +1837,17 @@ function safeShell(kind: "header" | "footer", v: string | undefined, storeName: 
   return defaultComponents(storeName, niche)[kind];
 }
 
+/** The announcement bar is written by the model, so it can promise things the store doesn't do.
+ *  Drop any free-delivery / free-shipping clause when the seller hasn't set a free-delivery amount. */
+export function honestAnnouncement(text: string, freeShippingOver: number | null | undefined): string {
+  if (freeShippingOver != null) return text;
+  return text
+    .split(/\s+[—–|·•]\s+|(?<=[.!])\s+(?=[A-Z])/)
+    .filter((part) => !/\bfree\s+(delivery|shipping)\b/i.test(part))
+    .join(" — ")
+    .trim();
+}
+
 /** Apply a plan's announcement choice onto the seller's Content (default bar stays if the plan is silent). */
 function contentWithAnnounce(base: OrbitDesignDoc["content"], a?: Announce): OrbitDesignDoc["content"] {
   if (!a || a.show === undefined) return base;
@@ -1871,7 +1883,7 @@ async function planStore(
 - spatialSystem: the ONE way sections meet the screen and each other — SET IT and make every page obey it. This, more than colour, is what stops the store looking like every other store. See the field description; do NOT default to "a centred column, section after section".
 - tokens: a palette + font pairing that SERVES the concept, OR the seller's exact stated hex/fonts. Any direction is fair game — dark, light, loud, near-monochrome, whatever the concept calls for — but wherever you land, text/muted MUST read clearly on bg and accentText MUST read clearly on accent (light text on a dark colour, dark text on a light one — never the same tone on itself). This is the #1 way a store ships broken, so pick bg first, then choose text/muted from the opposite end of the lightness scale. googleFonts = the family names. radius 0-20, density 0.95-1.15, headingWeight 500-800. If the concept is bold, the palette can be high-contrast; if quiet-luxury, near-monochrome + one accent. **tokens.palette**: if the brief names more than one brand colour, put EACH as {name,value} here, named and coloured to fit THIS brand (never reuse a colour set from a different brief you've seen before) — the section builder uses var(--od-<name>) to give sections deliberately different colourways. Only skip it for a truly one-accent brand.
 - headerBrief / footerBrief: 1-2 sentences each describing the shape + behaviour you want (the HTML is built from these). Match the spatialSystem — a sidebar system → a vertical header; full-bleed bands → a slim flush bar that goes solid on scroll; vast-air luxury → a tall centred header.
-- announcement: decide per brand — show:false for calm/luxury, show:true + short text for DTC/hype.
+- announcement: decide per brand — show:false for calm/luxury, show:true + short text for DTC/hype. Only state facts the seller gave you (e.g. cash on delivery) — never invent a free-delivery amount, a discount, or a delivery time.
 - preloader: true if the brand wants a beat of anticipation on load (luxury / fashion / hype).
 - MOTION available to the section builder — mention it in a section's \`brief\` when it should be used: a full-bleed hero can have a background video (data-video-slot) behind a scrim with centred text; any element can drift with data-od-parallax; data-od-reveal for entrances; data-od-hover="lift|zoom|glow|underline" for hovers.
 - pages: you ALWAYS lay out these four, designed to THIS brand even if the brief never names them — home (6-9 sections), shop (a one-line hero + optional collection tiles + exactly ONE product-grid), about (story + values + a process/proof section + cta), contact (one contact section + optional faq + cta). PLUS any extra page the brief NAMES (Lookbook, Journal, Wholesale, a custom collection…). Never list product / cart / checkout / sign-in / my-account / order-tracking — those are pre-wired core pages the platform builds automatically. "home" first. Section types: ${SECTION_TYPES.join(", ")}. 3-8 sections per page. Each section \`brief\` = 1-2 sentences carrying the brief's exact intent for THAT section: its copy/headline, its colour (name the token/palette), its layout skeleton, its animation.
@@ -2147,7 +2159,7 @@ HOW TO BUILD:
 - Content tokens: {{store.name}} {{store.tagline}} {{store.year}} {{contact.email}} {{contact.phone}} {{contact.address}} {{social.instagram}} {{social.tiktok}} {{social.facebook}} {{social.x}} {{social.youtube}} — this is the COMPLETE list, never hard-code contact/social and never invent another one (it prints as literal broken text — write a real value yourself instead, e.g. a real founding year, not a token for it). These are also the ONLY brace tokens this platform understands — no {{#each}}, {{#if}}, {{/each}} or any other Handlebars/templating syntax anywhere. Need 3 repeated cards? Write all 3 out by hand.
 - TEXT vs BACKGROUND tokens are not interchangeable: --od-text / --od-muted / --od-accent-text (or a palette colour a section deliberately sits ON) are for readable copy; --od-bg / --od-surface / --od-border are backgrounds and hairlines, never a font colour — setting a heading's color to --od-surface/--od-bg is the most common way a section goes invisible. And only use var(--od-<name>) for a base token or a name that's actually in the BRAND PALETTE above — an invented name (var(--od-graphite)…) is undefined and renders transparent; use a raw hex or color-mix() for a genuine one-off instead.
 - A "product-grid" section = JUST a heading + one intro line (cards + working filters are injected). A form / sign-in / newsletter-that-stores-emails / review widget = ONE placeholder <div class="od-card" data-od-slot="short-name" data-od-purpose="one plain sentence" style="padding:var(--od-s7);text-align:center;border:1.5px dashed var(--od-border)"></div>. Functional pages keep {{product}} / {{cart}}.
-- NO <script>, NO <style>. Ground every word in the brief — no lorem, no invented stats/reviews.
+- NO <script>, NO <style> (phone-only styles go in data-od-sm="…"). Ground every word in the brief — no lorem, no invented stats/reviews.
 
 Return build_page with html for all ${page.sections.length} section ids.`,
           },
@@ -2758,7 +2770,7 @@ export function isWholeStoreRequest(m: string): boolean {
 export async function runWholeStoreBuild(businessId: string, message: string, refs: { images?: DesignRef[]; siteUrl?: string; siteHint?: string } = {}): Promise<TurnResult> {
   const business = await prisma.business.findUnique({
     where: { id: businessId },
-    select: { name: true, niche: true, products: { select: DESIGN_PRODUCT_SELECT, take: 24 } },
+    select: { name: true, niche: true, freeShippingOver: true, products: { select: DESIGN_PRODUCT_SELECT, take: 24 } },
   });
   const doc = await loadDoc(businessId);
   if (!business) return { reply: "", doc, error: "Business not found" };
@@ -2826,6 +2838,11 @@ export async function runWholeStoreBuild(businessId: string, message: string, re
   }
   for (const p of doc.pages) {
     if (p.pageType === "custom" && !next.pages.some((x) => x.slug === p.slug)) next.pages.push(p);
+  }
+
+  if (next.content?.announcement?.text) {
+    const text = honestAnnouncement(next.content.announcement.text, business.freeShippingOver);
+    next.content.announcement = { ...next.content.announcement, text, enabled: next.content.announcement.enabled && !!text };
   }
 
   const planPages = next.pages;

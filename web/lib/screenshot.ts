@@ -73,6 +73,23 @@ export function firstUrl(text: string): string | null {
   return m ? m[0].replace(/[.,;]+$/, "") : null;
 }
 
+/** A link to a photo (not a site) — the seller wants it used as an image, not matched as a reference site. */
+export function looksLikeImageUrl(url: string): boolean {
+  return (
+    /\.(png|jpe?g|webp|gif|avif|svg)(\?|#|$)/i.test(url) ||
+    /^https?:\/\/(images\.unsplash\.com|images\.pexels\.com|res\.cloudinary\.com|i\.imgur\.com|cdn\.shopify\.com\/s\/files)\//i.test(url)
+  );
+}
+
+/** The first link in the message that points at a website rather than at a photo. */
+export function firstSiteUrl(text: string): string | null {
+  for (const m of text.matchAll(/https?:\/\/[^\s)]+/gi)) {
+    const url = m[0].replace(/[.,;]+$/, "");
+    if (!looksLikeImageUrl(url)) return url;
+  }
+  return null;
+}
+
 export interface DocShot {
   label: string; // e.g. "home · desktop"
   data: string; // base64 JPEG

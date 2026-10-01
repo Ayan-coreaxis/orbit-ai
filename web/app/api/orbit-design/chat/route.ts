@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getActiveBusinessId } from "@/lib/get-active-business-id";
 import type { DesignRef } from "@/lib/orbit-design-generate";
 import { runDesignEdit } from "@/lib/design-ops";
-import { screenshotSite, firstUrl } from "@/lib/screenshot";
+import { screenshotSite, firstSiteUrl } from "@/lib/screenshot";
 
 export const maxDuration = 300; // reference screenshot + generation + text verify + visual (screenshot) review loop
 
@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
   // If the seller pasted a URL, render it so the model can actually see the site they mean.
   let siteUrl: string | undefined;
   let siteHint: string | undefined;
-  const url = firstUrl(message);
+  const url = firstSiteUrl(message);
   if (url) {
     const shot = await screenshotSite(url).catch(() => null);
     if (shot) {

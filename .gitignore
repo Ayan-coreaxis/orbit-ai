@@ -28,3 +28,6 @@ web/public/uploads/
 .DS_Store
 Thumbs.db
 *.log
+
+# launch-video work (test-account screenshots)
+brag-output*/

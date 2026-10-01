@@ -55,7 +55,7 @@ export default async function StorefrontPage({ params }: { params: Promise<{ bus
   if (!design?.published || !design.doc) {
     return (
       <main className="mx-auto flex min-h-dvh max-w-md flex-col items-center justify-center px-6 text-center">
-        <h1 className="text-lg font-semibold text-black">This store isn&apos;t live yet</h1>
+        <h1 className="text-lg font-semibold text-text">This store isn&apos;t live yet</h1>
         <p className="mt-2 text-sm text-neutral-500">The owner is still setting things up. Check back soon.</p>
       </main>
     );

@@ -37,6 +37,41 @@ describe("storefront content tokens", () => {
     expect(footer).toContain("DUKAAN");
   });
 
+  it("drops a rendered nav the model copied into the header source, so the nav isn't drawn twice", () => {
+    const doc = defaultDoc("Noor Skincare", "skincare");
+    doc.components.header = `<header><div><a href="/store/b1">Noor</a><nav aria-label="Main">
+      <input type="checkbox" class="od-nav-toggle" id="od-nav-toggle">
+      <div class="od-nav-links"><a href="/store/b1/p/shop">Shop</a></div>
+      <label for="od-nav-toggle" class="od-nav-burger" aria-label="Menu"><svg></svg></label>
+      <a href="/store/b1/account/login" data-od-account>Sign in</a>
+      <a href="/store/b1/cart" aria-label="Cart">Cart</a>
+      <!--OD_NAV--></nav></div></header>`;
+    const html = renderPageDocument(doc, { products: [], businessId: "b1" });
+    const header = html.slice(html.indexOf("<header"), html.indexOf("</header>"));
+    expect(header.match(/class="od-nav-links"/g)?.length).toBe(1);
+    expect(header.match(/data-od-account/g)?.length ?? 0).toBeLessThanOrEqual(1);
+  });
+
+  it("drops a Contact column whose email, phone, address and socials are all unset", () => {
+    const doc = defaultDoc("Noor Skincare", "skincare");
+    doc.components.footer = `<footer><div><h3>Shop</h3><div><a href="/shop">Shop</a></div></div>
+      <div>
+        <h3 style="font-size:15px">Contact</h3>
+        <div style="display:flex;flex-direction:column">
+          <a href="mailto:{{contact.email}}">{{contact.email}}</a>
+          <a href="tel:{{contact.phone}}">{{contact.phone}}</a>
+          <span>{{contact.address}}</span>
+          <div style="display:flex;gap:8px">
+            <a href="{{social.instagram}}" aria-label="Instagram"><svg width="18" height="18"><circle cx="9" cy="9" r="4"/></svg></a>
+          </div>
+        </div>
+      </div></footer>`;
+    const html = renderPageDocument(doc, { products: [], businessId: "b1" });
+    const footer = html.slice(html.indexOf("<footer"), html.indexOf("</footer>"));
+    expect(footer).not.toContain(">Contact<");
+    expect(footer).toContain(">Shop<");
+  });
+
   it('says "From" when a product\'s variants cost different amounts', () => {
     const doc = defaultDoc("Chai Wala Co.", "chai");
     const html = renderPageDocument(doc, {
