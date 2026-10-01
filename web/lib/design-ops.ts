@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { storeUrl } from "@/lib/public-url";
-import { runDesignTurn, loadDoc, type DesignRef } from "@/lib/orbit-design-generate";
+import { runDesignTurn, loadDoc, saveDoc, type DesignRef } from "@/lib/orbit-design-generate";
 import { collectSlots, planOrbitCode, runOrbitCode } from "@/lib/orbit-code";
 import { wireDoc } from "@/lib/orbit-design-wire";
 import type { OrbitDesignDoc } from "@/lib/orbit-design";
@@ -110,7 +110,10 @@ export async function publishStore(businessId: string, publish: boolean): Promis
 
 // ---------- Orchestrator proposals ----------
 
-export type DesignJob = { op: "design_request"; instruction: string } | { op: "publish_store"; publish: boolean };
+export type DesignJob =
+  | { op: "design_request"; instruction: string }
+  | { op: "publish_store"; publish: boolean }
+  | { op: "announcement"; show: boolean; text: string };
 
 export const STORE_DESIGN_SCHEMA = {
   type: "object",
@@ -121,6 +124,12 @@ export const STORE_DESIGN_SCHEMA = {
       type: "string",
       description:
         "A clear, specific design brief for Orbit Design in English, e.g. 'Replace the home hero headline with …', 'Add an About page telling the brand story: …', 'Build the whole store: warm premium snack brand, yellow + chocolate palette, pages: home, shop, about, contact'. Include the real facts it needs (brand, products, tone). Leave empty if only publishing.",
+    },
+    announcement: {
+      type: "object",
+      description:
+        "The thin bar across the top of every store page. Use THIS (not instruction) to change its text or hide it — Orbit Design can't edit that bar. show:false hides it.",
+      properties: { show: { type: "boolean" }, text: { type: "string", description: "Short, one line — under 90 characters." } },
     },
     publish: {
       type: "boolean",
@@ -133,8 +142,14 @@ export const STORE_DESIGN_SCHEMA = {
 /** `published` = the store's real state now — a publish/unpublish that changes nothing is dropped. */
 export function sanitizeDesignJobs(raw: unknown, published: boolean): DesignJob[] {
   if (!raw || typeof raw !== "object") return [];
-  const r = raw as { instruction?: unknown; publish?: unknown };
+  const r = raw as { instruction?: unknown; publish?: unknown; announcement?: unknown };
   const jobs: DesignJob[] = [];
+  const a = r.announcement as { show?: unknown; text?: unknown } | undefined;
+  if (a && typeof a === "object") {
+    const text = typeof a.text === "string" ? a.text.trim().slice(0, 200) : "";
+    const show = a.show !== false && !!text;
+    if (show || a.show === false) jobs.push({ op: "announcement", show, text });
+  }
   const hasEdit = typeof r.instruction === "string" && r.instruction.trim().length > 3;
   if (hasEdit) jobs.push({ op: "design_request", instruction: (r.instruction as string).trim().slice(0, 4000) });
   // Unpublishing a store that isn't live is meaningless; re-publishing a live store only makes
@@ -147,13 +162,19 @@ export function sanitizeDesignJobs(raw: unknown, published: boolean): DesignJob[
 export function sanitizeStoredDesignJobs(raw: unknown[]): DesignJob[] {
   return raw.filter((o): o is DesignJob => {
     const j = o as DesignJob;
-    return !!j && typeof j === "object" && ((j.op === "design_request" && typeof j.instruction === "string") || (j.op === "publish_store" && typeof j.publish === "boolean"));
+    return !!j && typeof j === "object" && ((j.op === "design_request" && typeof j.instruction === "string") ||
+        (j.op === "publish_store" && typeof j.publish === "boolean") ||
+        (j.op === "announcement" && typeof j.show === "boolean" && typeof j.text === "string"));
   });
 }
 
 export function describeDesignJobs(jobs: DesignJob[]): string[] {
   return jobs.map((j) =>
-    j.op === "publish_store"
+    j.op === "announcement"
+      ? j.show
+        ? `Top bar on every store page: "${j.text}"`
+        : "Hide the top bar on the store"
+      : j.op === "publish_store"
       ? j.publish
         ? "Publish the store — make it live for customers"
         : "Take the store offline (unpublish)"
@@ -161,15 +182,35 @@ export function describeDesignJobs(jobs: DesignJob[]): string[] {
   );
 }
 
+/** The announcement bar lives in the doc's content — set it on the draft and on the live (wired) copy. */
+async function setAnnouncement(businessId: string, show: boolean, text: string): Promise<void> {
+  const doc = await loadDoc(businessId);
+  const announcement = { enabled: show, text: text || doc.content.announcement?.text || "" };
+  await saveDoc(businessId, { ...doc, content: { ...doc.content, announcement } }, { snapshot: true });
+  const row = await prisma.storeDesign.findUnique({ where: { businessId }, select: { wired: true } });
+  if (row?.wired) {
+    const wired = JSON.parse(row.wired) as OrbitDesignDoc;
+    wired.content = { ...wired.content, announcement };
+    await prisma.storeDesign.update({ where: { businessId }, data: { wired: JSON.stringify(wired) } });
+  }
+}
+
 /** Runs after the owner's Apply, in the background; posts what happened into the Orchestrator chat. */
 export async function runDesignJobs(businessId: string, jobs: DesignJob[], planId: string | null): Promise<void> {
   const say = (content: string) =>
     prisma.orchestratorMessage.create({ data: { businessId, role: "assistant", speaker: "orchestrator", content, planId } });
   // Design edits first, publish last — so a "change X and publish" goes live with the change.
-  const ordered = [...jobs.filter((j) => j.op === "design_request"), ...jobs.filter((j) => j.op === "publish_store")];
+  const ordered = [
+    ...jobs.filter((j) => j.op === "announcement"),
+    ...jobs.filter((j) => j.op === "design_request"),
+    ...jobs.filter((j) => j.op === "publish_store"),
+  ];
   for (const j of ordered) {
     try {
-      if (j.op === "design_request") {
+      if (j.op === "announcement") {
+        await setAnnouncement(businessId, j.show, j.text);
+        await say(j.show ? `Done — the top bar on your store now reads: "${j.text}"` : "Done — the top bar is hidden on your store.");
+      } else if (j.op === "design_request") {
         const r = await runDesignEdit(businessId, j.instruction);
         if (r.error) {
           await say(`Orbit Design couldn't finish that: ${r.error}\n\nYou can open Orbit Design and try it there, or tell me what to change.`);

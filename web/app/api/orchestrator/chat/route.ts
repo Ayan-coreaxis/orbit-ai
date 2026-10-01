@@ -1,3 +1,4 @@
+import { languageNote } from "@/lib/chatbot";
 import { keepScript } from "@/lib/script-guard";
 import { NextResponse } from "next/server";
 import { anthropic, MODEL } from "@/lib/anthropic";
@@ -210,7 +211,7 @@ Needs from you: ${result.needsUserText}` : result.content;
       const msg = await anthropic.messages.create({
         model: MODEL,
         max_tokens: 16000,
-        system: SYSTEM_PROMPT_PREFIX + context + "\n" + planBlock + lookupBlock + meetingBlock + searchBlock,
+        system: [SYSTEM_PROMPT_PREFIX + context, planBlock + lookupBlock + meetingBlock + searchBlock, languageNote(message)].filter(Boolean).join("\n"),
         tools: [...extraTools, ORCHESTRATOR_TOOL],
         tool_choice: mustAnswer ? { type: "tool", name: ORCHESTRATOR_TOOL.name } : { type: "any" },
         messages: convo,

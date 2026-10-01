@@ -19,7 +19,7 @@ export async function buildOrchestratorContext(businessId: string): Promise<stri
 
   const { competitors } = await latestCompetitors(businessId);
 
-  const [productCount, lowStock, orderCount, pendingOrders, revenueAgg] = await Promise.all([
+  const [productCount, lowStock, orderCount, pendingOrders, revenueAgg, coupons, design] = await Promise.all([
     prisma.product.count({ where: { businessId } }),
     prisma.product
       .findMany({ where: { businessId }, select: { name: true, stock: true, optionTypes: true, variants: { select: { stock: true } } } })
@@ -27,6 +27,13 @@ export async function buildOrchestratorContext(businessId: string): Promise<stri
     prisma.order.count({ where: { businessId } }),
     prisma.order.count({ where: { businessId, status: "pending" } }),
     prisma.order.aggregate({ where: { businessId, status: { not: "cancelled" } }, _sum: { total: true } }),
+    prisma.coupon.findMany({
+      where: { businessId, active: true, OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] },
+      select: { code: true, type: true, value: true, minSubtotal: true, usedCount: true, autoApply: true },
+      orderBy: { createdAt: "desc" },
+      take: 15,
+    }),
+    prisma.storeDesign.findUnique({ where: { businessId }, select: { published: true } }),
   ]);
   const revenue = revenueAgg._sum.total ?? 0;
   const orderGrowth = await getOrderGrowth(businessId);
@@ -42,6 +49,7 @@ Competitor notes on file (reference only — never the base of a plan): ${
 
 REAL BUSINESS DATA (actually in the database right now — never contradict this with a made-up figure):
 - Real existing website on file: ${business.website ?? "none given"}.
+- Orbit store: ${design?.published ? "LIVE — published, customers can open it and order" : design ? "designed but NOT published yet" : "not designed yet"}.
 - Products actually listed in Orbit's own store/catalog: ${productCount} total, ${lowStock.length}${lowStock.length === 10 ? "+" : ""} low on stock${
     lowStock.length ? ` (${lowStock.map((p) => p.name).join(", ")})` : ""
   }.${
@@ -49,6 +57,14 @@ REAL BUSINESS DATA (actually in the database right now — never contradict this
       ? ` IMPORTANT: this business already has a real live website (${business.website}) — they are NOT starting from zero. Orbit's own catalog is just empty because nothing has been imported into it yet. Never tell them to "build a website" or "build a store from scratch," they already have one.`
       : ""
   }
+- Coupon codes already live in the store (don't propose creating these again): ${
+    coupons.length
+      ? coupons
+          .map((c) => `${c.code} (${c.type === "percent" ? `${c.value}% off` : `${money(c.value, business.storeCurrency)} off`}${c.minSubtotal ? `, min ${money(c.minSubtotal, business.storeCurrency)}` : ""}${c.autoApply ? ", auto-applied" : ""}, used ${c.usedCount}×)`)
+          .join(", ")
+      : "none"
+  }.
+- Delivery: ${business.shippingFee > 0 ? `${money(business.shippingFee, business.storeCurrency)} flat fee` : "free (no delivery fee set)"}${business.freeShippingOver != null ? `, free over ${money(business.freeShippingOver, business.storeCurrency)}` : ""}. Payment: ${business.paymentProvider === "both" ? "cash on delivery and card" : business.paymentProvider === "stripe" ? "card" : "cash on delivery"}.
 - Orders: ${orderCount} total, ${pendingOrders} still pending fulfillment.
 - Real revenue from actual orders placed: ${money(revenue, business.storeCurrency)} (this is the only real revenue figure — no other sales data exists in this system).
 - Real order growth, week over week: ${orderGrowth.thisWeekOrders} order(s) in the last 7 days vs ${orderGrowth.lastWeekOrders} the week before${

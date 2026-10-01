@@ -6,7 +6,7 @@ import { assertUnderUsageCap, UsageCapExceededError } from "@/lib/usage-limit";
 import { safeSlice } from "@/lib/utils";
 import { money } from "@/lib/money";
 
-const SYSTEM_PREFIX = `You are the customer support chat assistant for this real online store. Answer only from the real business/product data given below — never invent a price, stock level, shipping policy, or promise you can't back up from this data. If you genuinely don't know something (like exact delivery time or a policy not listed here), say so honestly and suggest the customer contact the seller directly, rather than guessing. Keep replies short and conversational — 1-3 sentences unless the question genuinely needs more. Reply in the customer's own language AND script: Roman Urdu (Urdu in English letters) gets Roman Urdu in English letters, never Urdu script; Urdu script gets Urdu script; English gets English. Never discuss anything unrelated to this store.
+const SYSTEM_PREFIX = `You are the customer support chat assistant for this real online store. Answer only from the real business/product data given below — never invent a price, stock level, shipping policy, or promise you can't back up from this data. If you genuinely don't know something (like exact delivery time or a policy not listed here), say so honestly and suggest the customer contact the seller directly, rather than guessing. Keep replies short and conversational — 1-3 sentences unless the question genuinely needs more. Reply in the customer's own language AND script: Roman Urdu (Urdu in English letters) gets Roman Urdu in English letters, never Urdu script; Urdu script gets Urdu script; English gets English only — not even a single Urdu word ("Bilkul", "Ji", "Shukriya") mixed in. Never discuss anything unrelated to this store.
 Health, food and beauty products: never claim a product cures, treats or prevents a disease, never promise results, and never give medical advice or dosages beyond what the product description says — say what the product is, and tell the customer to ask their doctor about any health condition.`;
 
 export interface ChatHistoryItem {
@@ -34,6 +34,28 @@ async function logMessage(businessId: string, channel: string, customerRef: stri
  * real `channel`/`customerRef` is passed, both sides of the exchange are persisted so the seller
  * can actually see real customer conversations on /dashboard/inbox.
  */
+/** Which language the shopper's message is in — said explicitly at the end of the prompt, because
+ *  with a Pakistani store's context the model drifts into "Haan, bilkul!" on English questions. */
+export function replyLanguage(message: string): "urdu" | "roman-urdu" | "english" | null {
+  if (/[\u0600-\u06FF]/.test(message)) return "urdu";
+  const words = message.toLowerCase().match(/[a-z']+/g) ?? [];
+  if (words.length < 3) return null;
+  const roman = new Set(["hai", "hain", "kya", "kia", "mein", "main", "aap", "ap", "nahi", "nahin", "chahiye", "chahye", "kitne", "kitna", "kar", "karo", "krna", "karna", "ka", "ki", "ke", "ko", "se", "ho", "hoga", "bhai", "yar", "yaar", "acha", "theek", "kab", "kaise", "kesa", "wala", "wali", "mujhe", "muje", "batao", "bata", "raha", "rahi", "liye", "ye", "yeh"]);
+  const hits = words.filter((w) => roman.has(w)).length;
+  return hits >= 2 || hits / words.length > 0.15 ? "roman-urdu" : "english";
+}
+
+const LANGUAGE_NOTE: Record<string, string> = {
+  english: "THIS MESSAGE IS IN ENGLISH — reply in plain English only, no Urdu words.",
+  "roman-urdu": "THIS MESSAGE IS IN ROMAN URDU — reply in Roman Urdu (English letters).",
+  urdu: "THIS MESSAGE IS IN URDU SCRIPT — reply in Urdu script.",
+};
+
+/** The one-line "reply in this language" note for a message, or "" when it's too short to tell. */
+export function languageNote(message: string): string {
+  return LANGUAGE_NOTE[replyLanguage(message) ?? ""] ?? "";
+}
+
 export async function getChatbotReply(
   businessId: string,
   message: string,
@@ -119,7 +141,7 @@ ${pagesBlock ? `\nReal store pages (policies, about, etc.):\n${pagesBlock}` : ""
     msg = await anthropic.messages.create({
       model: MODEL_FAST,
       max_tokens: 300,
-      system: `${SYSTEM_PREFIX}\n\n${context}`,
+      system: [SYSTEM_PREFIX, context, LANGUAGE_NOTE[replyLanguage(message) ?? ""]].filter(Boolean).join("\n\n"),
       messages: [...orderedHistory.map((m) => ({ role: m.role, content: m.content })), { role: "user" as const, content: message.trim() }],
     });
   } catch (e) {

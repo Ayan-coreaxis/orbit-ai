@@ -1,7 +1,7 @@
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { tokenCss, defaultTokens, type OrbitDesignDoc } from "@/lib/orbit-design";
+import { tokenCss, defaultTokens, googleFontHref, type OrbitDesignDoc } from "@/lib/orbit-design";
 import { money } from "@/lib/money";
 import { finalizeStripeOrder } from "@/lib/checkout-finalize";
 import { copyText, parseWidgetCopy, statusLabel } from "@/lib/widget-copy";
@@ -70,6 +70,8 @@ export default async function OrderConfirmationPage({
 
   return (
     <>
+      {/* the store's own fonts — without this the page fell back to the browser's default serif */}
+      {googleFontHref(tokens.googleFonts ?? []) && <link rel="stylesheet" href={googleFontHref(tokens.googleFonts ?? [])} />}
       <style dangerouslySetInnerHTML={{ __html: css }} />
       {!awaitingPayment && !cancelled && (
         <PixelPurchase
