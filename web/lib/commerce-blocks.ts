@@ -108,9 +108,15 @@ export function pickProducts(list: CommerceProduct[], query: string, limit: numb
   if (q === "bestsellers" || q === "featured" || q === "popular") {
     const anySales = picked.some((p) => (p.sold ?? 0) > 0);
     // Without real sales data, "bestsellers" honestly falls back to the newest, in-stock first.
+    // Real sellers first (most sold on top); the shelf is then topped up with in-stock newest
+    // items so one early sale never leaves a one-product "bestsellers" row.
+    const inStockFirst = (a: CommerceProduct, b: CommerceProduct) => Number(b.stock > 0 || !!b.hasVariants) - Number(a.stock > 0 || !!a.hasVariants);
     picked = anySales
-      ? picked.filter((p) => (p.sold ?? 0) > 0).sort((a, b) => (b.sold ?? 0) - (a.sold ?? 0))
-      : picked.sort((a, b) => Number(b.stock > 0) - Number(a.stock > 0));
+      ? [
+          ...picked.filter((p) => (p.sold ?? 0) > 0).sort((a, b) => (b.sold ?? 0) - (a.sold ?? 0)),
+          ...picked.filter((p) => !(p.sold ?? 0)).sort(inStockFirst),
+        ]
+      : picked.sort(inStockFirst);
   } else if (q === "in-stock") {
     picked = picked.filter((p) => p.stock > 0 || p.hasVariants);
   } else if (q.startsWith("category:")) {
@@ -161,9 +167,16 @@ function renderOne(kind: string, attrs: string, ctx: CommerceCtx): string {
 
   if (kind === "featured-product") {
     const want = (attr(attrs, "data-od-featured-product") || "bestseller").trim();
+    // An exact id, or the product's name (what the section is about), else the newest / bestseller.
+    const key = want.toLowerCase();
+    const byName =
+      key.length > 2 && !["bestseller", "bestsellers", "newest", "new", "featured"].includes(key)
+        ? list.find((x) => x.name.toLowerCase() === key) ?? list.find((x) => x.name.toLowerCase().includes(key) || key.includes(x.name.toLowerCase()))
+        : undefined;
     const p =
       list.find((x) => x.id === want) ??
-      (want === "newest" ? list[0] : pickProducts(list, "bestsellers", 1)[0]);
+      byName ??
+      (key === "newest" || key === "new" ? list[0] : pickProducts(list, "bestsellers", 1)[0]);
     if (!p) return "";
     const price = p.hasVariants && p.fromPrice != null && (p.maxPrice ?? p.fromPrice) > p.fromPrice ? `From ${ctx.money(p.fromPrice)}` : ctx.money(priceOf(p));
     const desc = (p.description || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 220);
@@ -233,8 +246,7 @@ ${S} .od-coll-media img{width:100%;height:100%;object-fit:cover;display:block}
 ${S} .od-coll-ph{display:flex;align-items:center;justify-content:center;width:100%;height:100%;font-family:var(--od-font-heading);font-size:32px;color:var(--od-muted)}
 ${S} .od-coll-name{font-size:14px;font-weight:600}
 ${S} .od-coll-count{font-size:12px;color:var(--od-muted)}
-${S} .od-feat{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:clamp(24px,5vw,64px);align-items:center}
-@media (max-width:720px){${S} .od-feat{grid-template-columns:1fr}}
+${S} .od-feat{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:clamp(24px,5vw,64px);align-items:center}
 ${S} .od-feat .od-feat-media{display:block;height:auto;aspect-ratio:1;max-height:560px}
 ${S} .od-feat-media img{width:100%;height:100%;object-fit:cover;display:block}
 ${S} .od-feat-name{font-family:var(--od-font-heading);font-weight:var(--od-heading-weight);font-size:var(--od-text-4xl);line-height:1.08;margin:0;color:var(--od-text)}

@@ -26,7 +26,7 @@ const ctx = (products: CommerceProduct[], preview = false): CommerceCtx => ({
 describe("commerce blocks", () => {
   it("bestsellers rank by real sales and fall back honestly without sales data", () => {
     const list = [P("a", { sold: 2 }), P("b", { sold: 9 }), P("c", { sold: 0 })];
-    expect(pickProducts(list, "bestsellers", 8).map((p) => p.id)).toEqual(["b", "a"]);
+    expect(pickProducts(list, "bestsellers", 8).map((p) => p.id)).toEqual(["b", "a", "c"]);
     const noSales = [P("a", { stock: 0 }), P("b")];
     expect(pickProducts(noSales, "bestsellers", 8).map((p) => p.id)).toEqual(["b", "a"]);
   });
@@ -66,6 +66,12 @@ describe("commerce blocks", () => {
     expect(out).toContain("Sidr Honey");
     expect(out).toContain("Rs 3,200");
     expect(out).toContain('data-od-buy="b"');
+  });
+
+  it("featured product can be chosen by its name", () => {
+    const out = renderCommerceBlocks(`<div data-od-featured-product="Wild Forest Honey 1kg"></div>`, ctx([P("a", { sold: 9, name: "Chilgoza" }), P("w", { name: "Wild Forest Honey 1kg" })]));
+    expect(out).toContain("Wild Forest Honey 1kg");
+    expect(out).not.toContain("Chilgoza");
   });
 
   it("price bands come from the real price spread", () => {
