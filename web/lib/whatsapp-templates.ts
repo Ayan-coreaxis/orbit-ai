@@ -16,7 +16,9 @@ export type WaTemplateKind =
   | "back_in_stock"
   | "cart_recovery"
   | "otp"
-  | "owner_alert";
+  | "owner_alert"
+  | "daily_briefing"
+  | "daily_briefing_ur";
 
 export interface WaTemplateDef {
   kind: WaTemplateKind;
@@ -101,6 +103,25 @@ export const WA_TEMPLATES: WaTemplateDef[] = [
     category: "UTILITY",
     vars: ["title", "details"],
     sample: "Orbit update — {{1}}: {{2}}",
+  },
+  // The daily store check on the owner's own WhatsApp. Two bodies (the fixed words can't change per
+  // message): English and Roman Urdu. The Roman Urdu one is optional — without it the English
+  // template is sent with the task lines still in the owner's language.
+  {
+    kind: "daily_briefing",
+    label: "Daily store check (to the store owner)",
+    env: "TWILIO_TEMPLATE_DAILY_BRIEFING",
+    category: "UTILITY",
+    vars: ["store name", "number of tasks", "numbered tasks on one line"],
+    sample: "Good morning! Orbit checked {{1}} — {{2}} things worth doing today: {{3}} — Reply with a number (1, 2…) and I'll prepare it. Reply STOP to turn these off.",
+  },
+  {
+    kind: "daily_briefing_ur",
+    label: "Daily store check — Roman Urdu (to the store owner)",
+    env: "TWILIO_TEMPLATE_DAILY_BRIEFING_UR",
+    category: "UTILITY",
+    vars: ["store name", "number of tasks", "numbered tasks on one line"],
+    sample: "Subah bakhair! Orbit ne {{1}} check kiya — aaj {{2}} kaam karne layak hain: {{3}} — Number bhejein (1, 2…), main tayyar kar dunga. Band karne ke liye STOP bhejein.",
   },
 ];
 

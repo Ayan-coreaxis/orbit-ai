@@ -1,8 +1,13 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getChatbotReply } from "@/lib/chatbot";
 import { whatsAppNumberKey, sendWhatsAppMessage, validTwilioSignature } from "@/lib/whatsapp";
 import { looksLikeYes, verifyLatestOrderForPhone } from "@/lib/order-verify";
+import { handleOwnerMessage, resolveOwner } from "@/lib/whatsapp-boss-server";
+import { ownerText } from "@/lib/whatsapp-boss";
+
+// The owner's messages run an Orchestrator turn after the response (Twilio only waits 15 seconds).
+export const maxDuration = 300;
 
 const normalizePhone = whatsAppNumberKey;
 
@@ -38,6 +43,20 @@ export async function POST(req: NextRequest) {
   const toNumber = normalizePhone(to);
   const businesses = await prisma.business.findMany({ where: { whatsappInboundNumber: { not: null } } });
   const matched = businesses.find((b) => b.whatsappInboundNumber && normalizePhone(b.whatsappInboundNumber) === toNumber);
+
+  // "Orbit on WhatsApp": a message from the store OWNER's own number runs the store (tasks, APPLY,
+  // STOP…) instead of going to the shopper chatbot. Matched strictly on the stored owner number,
+  // after the signature check above — a shopper's number can never get past resolveOwner.
+  const owner = await resolveOwner(matched ?? null, from, to, body);
+  if (owner.business) {
+    const ownerBusiness = owner.business;
+    after(() => handleOwnerMessage(ownerBusiness, body, from, to));
+    return emptyTwiml();
+  }
+  if (owner.ambiguous) {
+    await sendWhatsAppMessage(from, ownerText("ambiguous", "en"), { from: to });
+    return emptyTwiml();
+  }
 
   if (!matched) {
     return emptyTwiml(); // no real business owns this number — nothing honest to reply with

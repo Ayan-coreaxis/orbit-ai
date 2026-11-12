@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { money } from "@/lib/money";
 import { totalStock } from "@/lib/variants";
 import { replyLanguage } from "@/lib/chatbot";
+import { sendBriefingWhatsApp } from "@/lib/whatsapp-boss-send";
 
 /**
  * Daily store check ("Observe"). Every morning Orbit looks at the store's real data, finds the few
@@ -342,7 +343,7 @@ function plainLength(html: string | null | undefined): number {
 }
 
 /** The language the owner writes to the Orchestrator in, from their recent messages. */
-async function ownerLang(businessId: string): Promise<Lang> {
+export async function ownerLang(businessId: string): Promise<Lang> {
   const recent = await prisma.orchestratorMessage.findMany({
     where: { businessId, role: "user" },
     orderBy: { createdAt: "desc" },
@@ -450,9 +451,10 @@ function pkDayStart(now: Date): Date {
 /**
  * Run the check for one store and post it in the Orchestrator chat. Once a day unless `force`
  * (the owner pressed "Check my store now", which replaces today's briefing). Returns the message
- * id, or null when there was nothing to post.
+ * id, or null when there was nothing to post. The automatic morning run also sends it to the
+ * owner's WhatsApp when they turned "Orbit on WhatsApp" on (`whatsapp` overrides that default).
  */
-export async function runDailyBriefing(businessId: string, opts: { force?: boolean; now?: Date } = {}): Promise<{ messageId: string | null; tasks: BriefingTask[] }> {
+export async function runDailyBriefing(businessId: string, opts: { force?: boolean; now?: Date; whatsapp?: boolean } = {}): Promise<{ messageId: string | null; tasks: BriefingTask[] }> {
   const now = opts.now ?? new Date();
   const today = await prisma.orchestratorMessage.findFirst({
     where: { businessId, speaker: "briefing", createdAt: { gte: pkDayStart(now) } },
@@ -469,6 +471,14 @@ export async function runDailyBriefing(businessId: string, opts: { force?: boole
   const msg = await prisma.orchestratorMessage.create({
     data: { businessId, role: "assistant", speaker: "briefing", content: briefingIntro(tasks, lang), tasks: JSON.stringify(tasks) },
   });
+  if ((opts.whatsapp ?? !opts.force) && tasks.length) {
+    // Best effort — the briefing is already in the chat whatever WhatsApp says.
+    await sendBriefingWhatsApp(businessId, tasks, lang, { now })
+      .then((r) => {
+        if (!r.sent && r.error && !/turned off/.test(r.error)) console.warn("[daily-briefing] WhatsApp not sent", businessId, r.error);
+      })
+      .catch((e) => console.warn("[daily-briefing] WhatsApp failed", businessId, e));
+  }
   return { messageId: msg.id, tasks };
 }
 

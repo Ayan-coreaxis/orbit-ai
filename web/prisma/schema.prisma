@@ -58,6 +58,12 @@ model Business {
   // the way Facebook Login is), so a seller gets a dedicated real Twilio WhatsApp number here.
   whatsappInboundNumber String?
 
+  // "Orbit on WhatsApp": the owner gets the daily store check on their own number (`whatsapp`) and
+  // runs it by replying (1, 2…, APPLY, NO, STOP). Off until the owner turns it on in Settings.
+  whatsappBoss           Boolean   @default(false)
+  whatsappBossInboundAt  DateTime? // the owner's last WhatsApp message to Orbit — free-form replies only deliver within 24h of it
+  whatsappBossProposalId String? // the one proposal (OrchestratorMessage id) last shown to the owner on WhatsApp — APPLY / NO act on this and nothing else
+
   // Real storefront payment gateway — the SELLER's own Stripe account, so real customer
   // payments on their store go straight to them, never through the platform. "cod" (default)
   // needs nothing; "stripe" requires the seller's own secret/publishable keys.

@@ -4,6 +4,8 @@ import { WhatsAppIcon } from "@/components/icons/BrandIcons";
 import { SettingsHeader } from "@/components/settings/SettingsHeader";
 import { getSettingsBusiness } from "@/lib/settings-data";
 import { isMetaAppConfigured } from "@/lib/meta-oauth";
+import { WhatsAppBossCard } from "@/components/settings/WhatsAppBossCard";
+import { ownerNumberKey } from "@/lib/whatsapp-boss";
 
 export default async function ChannelsSettingsPage({ searchParams }: { searchParams: Promise<{ meta?: string }> }) {
   const { meta } = await searchParams;
@@ -43,8 +45,8 @@ export default async function ChannelsSettingsPage({ searchParams }: { searchPar
               them from the chat.
             </p>
           )}
-          {b.whatsapp && <p className="text-text-faint">Your own number (for order alerts and weekly updates): {b.whatsapp}</p>}
         </div>
+        <WhatsAppBossCard initialEnabled={b.whatsappBoss} ownerNumber={b.whatsapp ?? null} numberOk={!!ownerNumberKey(b.whatsapp)} />
       </Card>
     </div>
   );

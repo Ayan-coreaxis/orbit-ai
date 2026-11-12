@@ -16,6 +16,7 @@ export const getSettingsBusiness = cache(async () => {
       plan: true,
       whatsapp: true,
       whatsappInboundNumber: true,
+      whatsappBoss: true,
       metaPageId: true,
       metaPageName: true,
       metaInstagramUserId: true,
