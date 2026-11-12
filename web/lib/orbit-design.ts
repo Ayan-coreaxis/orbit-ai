@@ -2475,6 +2475,10 @@ function navResponsiveCss(scope: string): string {
   return `${scope} .od-nav-toggle{display:none}
 ${scope} .od-nav-burger{display:none;align-items:center;justify-content:center;cursor:pointer;width:32px;height:32px;color:var(--od-text)}
 ${scope} .od-nav-links{display:flex;gap:22px;align-items:center;flex-wrap:wrap}
+/* The designer sometimes drops the nav into a narrow fixed-width box (e.g. the icon corner); the links
+   then stacked one per line. Keep them on one row and let their box grow to fit. */
+${scope} header .od-nav-links:not([data-od-nav-style="sidebar"]){flex-wrap:nowrap;white-space:nowrap}
+${scope} header nav:has(> .od-nav-links),${scope} header :has(> nav > .od-nav-links){min-width:max-content}
 ${scope} .od-nav-links a{transition:padding-left .2s ease,color .2s ease}
 ${scope} .od-nav-links a:hover{padding-left:5px;color:var(--od-accent)}
 ${scope} .od-nav-icon{display:none}
