@@ -274,6 +274,7 @@ export function ProductWidget({
                 </div>
                 <button
                   ref={addBtnRef}
+                  data-od-cta
                   data-od-ripple
                   onClick={add}
                   disabled={!canBuy}

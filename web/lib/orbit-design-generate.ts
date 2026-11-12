@@ -27,6 +27,9 @@ import {
 import { SECTION_KINDS, isOrbitKind } from "@/lib/orbit-sections";
 import { DEFAULT_WIDGET_COPY, parseWidgetCopy, type WidgetCopyKey } from "@/lib/widget-copy";
 import { toStorefrontProducts } from "@/lib/storefront-products";
+import { DESIGN_SKILLS, ALWAYS_SKILLS, getSkill, skillCatalogue, skillsForBuilders } from "@/lib/design-skills";
+import { pickDirection, directionPrompt, type PickedDirection } from "@/lib/design-directions";
+import { STYLE_OPTIONS, normalizeStyle, describeStyle, mergeStyle } from "@/lib/design-style";
 
 /** Products as the storefront renders them — variant stock and "from" prices included, so the design QA and audit never see a variant product as sold out. */
 const DESIGN_PRODUCT_SELECT = {
@@ -79,6 +82,21 @@ const tokenProps = {
       "2-6 NAMED brand colours beyond the accent — the multi-hue palette a real brand system has, each one a section can take as its own background. Each becomes var(--od-<name>) usable by any section. Invent names that fit THIS brand's actual hues (a mint shop's palette looks nothing like a steel-and-concrete hardware brand's) — never default to the same handful of names every time. Omit for a strict one-accent brand.",
     items: { type: "object", properties: { name: { type: "string" }, value: { type: "string", description: "hex" } }, required: ["name", "value"] },
   },
+  style: {
+    type: "object",
+    description:
+      "the SHAPE LANGUAGE of the pieces the platform draws itself (product cards, buttons, filter pills, cart/checkout) — choose it to match the art direction so those pieces don't look the same on every store.",
+    properties: {
+      button: { type: "string", enum: [...STYLE_OPTIONS.button] },
+      card: { type: "string", enum: [...STYLE_OPTIONS.card] },
+      imageRatio: { type: "string", enum: [...STYLE_OPTIONS.imageRatio] },
+      imageShape: { type: "string", enum: [...STYLE_OPTIONS.imageShape] },
+      align: { type: "string", enum: [...STYLE_OPTIONS.align] },
+      buy: { type: "string", enum: [...STYLE_OPTIONS.buy] },
+      grid: { type: "string", enum: [...STYLE_OPTIONS.grid] },
+      caps: { type: "boolean" },
+    },
+  },
 } as const;
 
 export interface TurnResult {
@@ -117,6 +135,7 @@ ${
 
 THE DOCUMENT
 The storefront is one JSON document:
+- tokens.style — the SHAPE of the pieces the platform draws itself (product cards, buttons, filter pills, cart/checkout). When the seller asks to change how product cards or buttons look ("make the cards bordered", "pill buttons", "bigger product photos", "fewer products per row"), change tokens.style — send only the keys that change: button (${STYLE_OPTIONS.button.join("|")}), card (${STYLE_OPTIONS.card.join("|")}), imageRatio (${STYLE_OPTIONS.imageRatio.join("|")}), imageShape (${STYLE_OPTIONS.imageShape.join("|")}), align (${STYLE_OPTIONS.align.join("|")}), buy (${STYLE_OPTIONS.buy.join("|")}), grid (${STYLE_OPTIONS.grid.join("|")}), caps (true|false). Never hand-write a product card.
 - tokens — colour/type/shape, exposed as CSS variables (below). tokens.palette is a list of NAMED brand colours (name + value) beyond the accent — each becomes var(--od-NAME) and any section can use it. Add a palette (2-6 hues, named and coloured for THIS brand specifically) when the brand wants a multi-hue system; omit it for strict one-accent brands.
 - components — { header, footer } — rendered on EVERY page
 - content — the announcement bar + contact + socials, edited by the seller (not you). Reference it in your HTML with tokens: {{store.name}} {{store.tagline}} {{store.year}} {{contact.email}} {{contact.phone}} {{contact.address}} {{social.instagram}} {{social.tiktok}} {{social.facebook}} {{social.x}} {{social.youtube}}. These are the COMPLETE list — inventing another (e.g. {{store.founded}}) prints as literal broken text since nothing substitutes it; write a real value yourself instead. NEVER hard-code a phone/email/social URL — always use these tokens so the seller's edits stay in sync. There is no announcement component; the bar comes from content automatically.
@@ -538,6 +557,14 @@ function cleanTokens(t: Record<string, unknown> | undefined): Partial<DesignToke
   return Object.fromEntries(Object.entries(t).filter(([, v]) => v !== undefined && v !== null && v !== "")) as Partial<DesignTokens>;
 }
 
+/** Apply a token edit; a partial `style` edit merges onto the current style instead of replacing it. */
+function patchTokens(prev: DesignTokens, raw: Record<string, unknown> | undefined): DesignTokens {
+  const clean = cleanTokens(raw) as Record<string, unknown>;
+  const next = { ...prev, ...clean } as DesignTokens;
+  if ("style" in clean) next.style = mergeStyle(prev.style, clean.style);
+  return next;
+}
+
 /** A header the model returns is only usable if it's an actual <header> shell — the model often
  *  "edits the nav" by replacing the whole header with just the <!--OD_NAV--> marker, which wipes
  *  the logo + sticky styling. Reject those; keep the previous header. */
@@ -571,7 +598,9 @@ function applyOps(prev: OrbitDesignDoc, input: Record<string, unknown>, storeNam
         version: prev.version,
         storeName: (input.storeName as string) || prev.storeName || storeName,
         tagline: (input.tagline as string) || prev.tagline || niche,
-        tokens: { ...prev.tokens, ...cleanTokens(input.tokens as Record<string, unknown>) } as DesignTokens,
+        tokens: patchTokens(prev.tokens, input.tokens as Record<string, unknown>),
+        direction: prev.direction,
+        directionHistory: prev.directionHistory,
         content: prev.content,
         components: {
           header: usableHeader(rb.components?.header) ? rb.components!.header : prev.components.header,
@@ -587,7 +616,7 @@ function applyOps(prev: OrbitDesignDoc, input: Record<string, unknown>, storeNam
   const doc: OrbitDesignDoc = JSON.parse(JSON.stringify(prev));
   if (typeof input.storeName === "string" && input.storeName.trim()) doc.storeName = input.storeName.trim();
   if (typeof input.tagline === "string" && input.tagline.trim()) doc.tagline = input.tagline.trim();
-  Object.assign(doc.tokens, cleanTokens(input.tokens as Record<string, unknown>));
+  doc.tokens = patchTokens(doc.tokens, input.tokens as Record<string, unknown>);
 
   const comp = input.components as Partial<typeof doc.components> | undefined;
   if (comp) {
@@ -1827,6 +1856,9 @@ type StorePlan = {
   announcement?: Announce;
   spatialSystem?: string;
   preloader?: boolean;
+  /** the art direction this build was assigned + the design skills it used */
+  directionId?: string;
+  skills?: string[];
   pages: { slug: string; title: string; nav?: boolean; sections: PlannedSection[] }[];
 };
 
@@ -1860,18 +1892,52 @@ function contentWithAnnounce(base: OrbitDesignDoc["content"], a?: Announce): Orb
   };
 }
 
+const LOAD_SKILL_TOOL = {
+  name: "load_skill",
+  description: "Load one design skill's full playbook (craft rules you must follow). Call it for each skill you need BEFORE calling plan_store.",
+  input_schema: {
+    type: "object" as const,
+    properties: { name: { type: "string", enum: DESIGN_SKILLS.map((x) => x.name) } },
+    required: ["name"],
+  },
+};
+
+/** Fill the direction's style/shape defaults into the planner's tokens where it left them out. */
+function withDirectionTokens(tokens: Record<string, unknown>, pick?: PickedDirection): Record<string, unknown> {
+  const t: Record<string, unknown> = { ...tokens };
+  const own = normalizeStyle(t.style);
+  if (pick) {
+    const d = pick.direction;
+    t.style = own ?? d.style;
+    if (t.radius == null) t.radius = d.radius;
+    if (t.headingWeight == null) t.headingWeight = d.headingWeight;
+    if (t.density == null) t.density = d.density;
+    if (!t.fontHeading) t.fontHeading = `'${pick.fonts[0]}', sans-serif`;
+    if (!t.fontBody) t.fontBody = `'${pick.fonts[1]}', sans-serif`;
+  } else if (own) t.style = own;
+  return t;
+}
+
 async function planStore(
   brief: string,
   images: DesignRef[],
   business: { name: string; niche: string },
   refNote?: string,
+  pick?: PickedDirection,
 ): Promise<StorePlan | null> {
   const content: Anthropic.ContentBlockParam[] = [
     { type: "text", text: `THE BRIEF:\n${brief}${refNote ? `\n\n${refNote}` : ""}` },
     ...images.map((im): Anthropic.ContentBlockParam => ({ type: "image", source: { type: "base64", media_type: im.mediaType, data: im.data } })),
   ];
+  const loadedSkills: string[] = [];
+  const planMessages: Anthropic.MessageParam[] = [{ role: "user", content }];
+  const planExtra = `
+
+${pick ? directionPrompt(pick) + "\n\n" : ""}DESIGN SKILLS — you have a skill library, like a senior designer's reference shelf. BEFORE you call plan_store, call load_skill for the skills you need (anti-generic, typography, colour, layout-composition, ecommerce-conversion, imagery and copywriting are essential every time; add motion if anything animates; add pakistan-market when selling to Pakistan / South Asia). Their rules are binding craft knowledge; the seller's brief and the assigned direction decide the LOOK, the skills decide the QUALITY. You may load several in one turn.
+${skillCatalogue()}`;
   let msg;
   try {
+    for (let turn = 0; turn < 4; turn++) {
     msg = await anthropic.messages.create({
       model: MODEL,
       max_tokens: 20000, // a COMPACT plan — no HTML, just briefs: header/footer briefs + ~5 pages × up to 8 short section briefs
@@ -1890,17 +1956,29 @@ async function planStore(
 - The shop's ONE product-grid section renders its OWN working filters automatically — category pills, size/colour attribute pills, a price range, search and sort (whatever the catalogue supports) — never plan a separate "filters" or "search" section, and its brief is just a one-line heading/intro.
 - For EACH section pick a \`layout\` skeleton (see the layout field). VARY hard: adjacent sections never share a skeleton; the "centred heading + intro + 3 equal columns" default is used at most ONCE per page. Column ratios vary (never all 50/50). The spatialSystem governs how each section fills width and vertical space.
 - The storefront ships optional helpers (od-section / od-section--invert / od-container / od-btn / od-card / od-grid / od-h1..3 / od-lead / spacing+shadow+radius scales) — use them where they fit, but the section builder may also author its own <section> with custom padding, full-bleed width, min-height:100vh, overlap, sticky panels — whatever the spatialSystem calls for.
-Call plan_store — structure only, no section HTML.`,
-      tools: [STRUCTURE_TOOL],
-      tool_choice: { type: "tool", name: "plan_store" },
-      messages: [{ role: "user", content }],
+Call plan_store — structure only, no section HTML.${planExtra}`,
+      tools: [LOAD_SKILL_TOOL, STRUCTURE_TOOL],
+      tool_choice: turn < 3 ? { type: "auto" } : { type: "tool", name: "plan_store" },
+      messages: planMessages,
     });
+    const loads = msg.content.filter((b): b is Anthropic.ToolUseBlock => b.type === "tool_use" && b.name === "load_skill");
+    if (msg.content.some((b) => b.type === "tool_use" && b.name === "plan_store") || !loads.length) break;
+    planMessages.push({ role: "assistant", content: msg.content });
+    planMessages.push({
+      role: "user",
+      content: loads.map((l): Anthropic.ToolResultBlockParam => {
+        const sk = getSkill(String((l.input as { name?: string })?.name ?? ""));
+        if (sk && !loadedSkills.includes(sk.name)) loadedSkills.push(sk.name);
+        return { type: "tool_result", tool_use_id: l.id, content: sk ? sk.body : "Unknown skill — pick one from the catalogue." };
+      }),
+    });
+    }
   } catch {
     return null;
   }
-  const tool = msg.content.find((b) => b.type === "tool_use");
+  const tool = msg?.content.find((b) => b.type === "tool_use" && b.name === "plan_store");
   if (!tool || tool.type !== "tool_use") return null;
-  if (msg.stop_reason === "max_tokens") console.warn("[planStore] hit max_tokens — plan may be truncated");
+  if (msg?.stop_reason === "max_tokens") console.warn("[planStore] hit max_tokens — plan may be truncated");
   const p = tool.input as Partial<StorePlan>;
   // Tolerate a plan that ran out of tokens mid-way: keep the fully-formed pages, drop a trailing
   // half-written one, and only bail if there's nothing usable at all.
@@ -1938,7 +2016,15 @@ Call plan_store — structure only, no section HTML.`,
     preloader: (p as { preloader?: boolean }).preloader === true,
     storeName: String(p.storeName || business.name).slice(0, 80),
     tagline: p.tagline ? String(p.tagline).slice(0, 160) : undefined,
-    tokens: p.tokens,
+    tokens: withDirectionTokens(p.tokens as Record<string, unknown>, pick),
+    directionId: pick?.direction.id,
+    skills: [
+      ...new Set([
+        ...ALWAYS_SKILLS,
+        ...loadedSkills,
+        ...(/pakistan|karachi|lahore|islamabad|\bcod\b|cash on delivery|\bpkr\b|\brs\.? ?\d|roman urdu|urdu/i.test(brief + " " + business.niche) ? ["pakistan-market"] : []),
+      ]),
+    ],
     designDna: (p as { designDna?: string }).designDna ? String((p as { designDna?: string }).designDna).slice(0, 1400) : undefined,
     headerBrief: (p as { headerBrief?: string }).headerBrief ? String((p as { headerBrief?: string }).headerBrief).slice(0, 500) : undefined,
     footerBrief: (p as { footerBrief?: string }).footerBrief ? String((p as { footerBrief?: string }).footerBrief).slice(0, 300) : undefined,
@@ -2006,6 +2092,7 @@ async function buildSectionChunk(
   business: { name: string; niche: string; products?: { name: string; imageUrl: string | null }[] },
   concept?: string,
   spatialSystem?: string,
+  skillText?: string,
 ): Promise<Map<string, string>> {
   const list = chunk
     .map((s) => `- id "${s.id}" · type ${s.type} · "${s.label}"\n    layout: ${s.layout || "pick one that fits and differs from its neighbours"}\n    content: ${s.brief}`)
@@ -2040,7 +2127,7 @@ ${spatialSystem || "contained editorial columns with generous, consistent whites
 
 ${LAYOUT_PLAYBOOK}
 
-DESIGN TOKENS (already applied — style everything through var(--od-*), do not restate raw hex): ${JSON.stringify(tokens)}
+${skillText ? `CRAFT SKILLS (binding):\n${skillText}\n\n` : ""}DESIGN TOKENS (already applied — style everything through var(--od-*), do not restate raw hex): ${JSON.stringify(tokens)}
 
 HEADER (already built — for visual consistency only, do NOT rebuild it):
 ${header.slice(0, 1200)}
@@ -2143,7 +2230,8 @@ DESIGN DNA — build every section to THIS (it is the shared vision; do not drif
 ${plan.designDna || "Derive it now from the brief + concept: an exact type scale (hero / h2 / body sizes + fonts), a per-section colourway, one recurring motif, spacing + shape, a motion signature — then build to it."}
 
 SPATIAL SYSTEM (how every section meets the screen + its neighbours): ${plan.spatialSystem || "contained editorial columns, consistent whitespace"}
-
+${plan.tokens && (plan.tokens as { style?: unknown }).style ? `\nPLATFORM-DRAWN PIECES — the product grid cards and the cart/checkout are drawn by the platform in this style: ${describeStyle(normalizeStyle((plan.tokens as { style?: unknown }).style))}. Any buttons, cards, tags or frames YOU draw must match this shape language so the page reads as one system.\n` : ""}
+${skillsForBuilders(plan.skills ?? []) ? `CRAFT SKILLS (binding quality rules — they do not change the look, they raise the execution):\n${skillsForBuilders(plan.skills ?? [])}\n` : ""}
 TOKENS: ${JSON.stringify(plan.tokens)}${pal ? `\nBRAND PALETTE — use these boldly as section backgrounds and accents: ${pal}` : ""}
 
 HEADER (for visual consistency only, do NOT rebuild): ${header.slice(0, 1000)}
@@ -2193,7 +2281,7 @@ async function buildPageSections(
   });
   if (missing.length) {
     const retries = await Promise.all(
-      missing.map((s) => buildSectionChunk(page, [s], plan.tokens, header, brief, business, plan.concept, plan.spatialSystem)),
+      missing.map((s) => buildSectionChunk(page, [s], plan.tokens, header, brief, business, plan.concept, plan.spatialSystem, skillsForBuilders(plan.skills ?? []))),
     );
     for (const m of retries) for (const [k, v] of m) merged.set(k, v);
   }
@@ -2741,6 +2829,8 @@ async function buildBespokeDoc(
       pages: built as DesignPage[],
       tweaks: [],
       motion: plan.preloader ? { preloader: true } : undefined,
+      direction: plan.directionId,
+      directionHistory: [...(base.directionHistory ?? []), ...(base.direction ? [base.direction] : [])].slice(-6),
     } as OrbitDesignDoc,
     business.name,
     business.niche,
@@ -2799,7 +2889,10 @@ export async function runWholeStoreBuild(businessId: string, message: string, re
   let replyText: string | undefined;
   let next: OrbitDesignDoc | undefined;
 
-  const plan = await planStore(message, images, business, refNote);
+  const avoid = [...(doc.directionHistory ?? []), ...(doc.direction ? [doc.direction] : [])].slice(-4);
+  const pick = pickDirection(business.niche, message, avoid);
+  console.warn(`[runWholeStoreBuild] art direction: ${pick.direction.id} (avoiding ${avoid.join(",") || "none"})`);
+  const plan = await planStore(message, images, business, refNote, pick);
   const bespoke = plan ? await buildBespokeDoc(plan, doc, business, message) : null;
   if (plan && bespoke?.quality) {
     concept = plan.concept;

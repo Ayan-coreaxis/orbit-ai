@@ -20,6 +20,8 @@ import { defaultSpec, slugify as specSlugify, type StoreBackendSpec } from "@/li
  * entire store instantly without regenerating any HTML.
  */
 
+import { normalizeStyle, styleCss, styleVars, type DesignStyle } from "./design-style";
+
 export interface DesignTokens {
   accent: string; // primary brand / CTA colour
   accentText: string; // text that sits on top of `accent`
@@ -37,6 +39,8 @@ export interface DesignTokens {
   /** named brand colours beyond the accent — e.g. [{name:"sage",value:"#b2c691"}]. Emitted as
    * --od-<name> and usable by any section for a rich multi-hue palette. */
   palette?: { name: string; value: string }[];
+  /** shape language of the platform-drawn pieces (product cards, buttons, widgets) */
+  style?: DesignStyle;
 }
 
 /** kebab-slug a palette colour name; drops anything unsafe for a CSS custom-property name. */
@@ -176,6 +180,9 @@ export interface OrbitDesignDoc {
   tweaks?: DesignTweak[];
   /** page-shell motion the generator opts into per brand */
   motion?: { preloader?: boolean };
+  /** the art direction this store was last built to (lib/design-directions.ts) + the ones before it */
+  direction?: string;
+  directionHistory?: string[];
 }
 
 export interface StorefrontProduct {
@@ -486,6 +493,7 @@ export function normalizeDoc(doc: OrbitDesignDoc, storeName: string, niche: stri
   tokens.googleFonts = wanted.size ? [...wanted] : ["Plus Jakarta Sans"];
   const pal = normalizePalette(tokens.palette);
   tokens.palette = pal.length ? pal : undefined;
+  tokens.style = normalizeStyle(tokens.style);
   ensureReadableTokens(tokens);
 
   const base = defaultComponents(doc.storeName ?? storeName, doc.tagline ?? niche);
@@ -579,6 +587,10 @@ export function normalizeDoc(doc: OrbitDesignDoc, storeName: string, niche: stri
     pages,
     tweaks: normalizeTweaks(doc.tweaks),
     motion: doc.motion?.preloader ? { preloader: true } : undefined,
+    direction: typeof doc.direction === "string" ? doc.direction.slice(0, 40) : undefined,
+    directionHistory: Array.isArray(doc.directionHistory)
+      ? doc.directionHistory.filter((d): d is string => typeof d === "string").slice(-6)
+      : undefined,
   };
 }
 
@@ -690,7 +702,7 @@ export function tokenCss(t: DesignTokens): string {
   --od-shadow-md:0 4px 14px rgba(15,23,42,.07), 0 2px 4px rgba(15,23,42,.04);
   --od-shadow-lg:0 14px 40px rgba(15,23,42,.09), 0 4px 10px rgba(15,23,42,.04);
   --od-shadow-xl:0 28px 70px rgba(15,23,42,.12), 0 10px 20px rgba(15,23,42,.05);
-  --od-ease:cubic-bezier(.4,0,.2,1);
+  --od-ease:cubic-bezier(.4,0,.2,1);${styleVars(t.style)}
 }`;
 }
 
@@ -787,28 +799,29 @@ function productCardsHtml(
       const inner = p.imageUrl
         ? `<img src="${escapeAttr(p.imageUrl)}" alt="${escapeAttr(p.name)}" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block">`
         : imgSlot(`Product photo: ${p.name}`, "width:100%;height:100%;border-radius:0", false, preview);
-      const img = `<div style="width:100%;height:clamp(180px, 22vw, 260px);overflow:hidden;border-radius:var(--od-radius);background:var(--od-surface)">${inner}</div>`;
+      const img = `<div class="od-pc-media">${inner}</div>`;
       // A product with option axes is never "sold out" at the card — availability is per-variant on
       // the product page (and its `stock` is the summed variant stock, which can lag).
       const soldOut = !p.hasVariants && p.stock <= 0;
-      const btnStyle = `margin-top:10px;width:100%;display:block;text-align:center;background:var(--od-accent);color:var(--od-accent-text);border:none;border-radius:calc(var(--od-radius)*.7);padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;text-decoration:none`;
       const link = preview ? `href="#" data-od-pblock="product"` : `href="${base}/product/${escapeAttr(p.id)}"`;
       const buy = soldOut
-        ? `<span style="display:inline-block;margin-top:10px;font-size:12px;color:var(--od-muted)">Sold out</span>`
+        ? `<span class="od-pc-sold">Sold out</span>`
         : p.hasVariants
-          ? `<a ${link} style="${btnStyle}">Choose options</a>`
-          : `<button type="button"${preview ? "" : ` data-od-buy="${escapeAttr(p.id)}"`} style="${btnStyle}">Add to cart</button>`;
+          ? `<a ${link} class="od-pc-buy">Choose options</a>`
+          : `<button type="button"${preview ? "" : ` data-od-buy="${escapeAttr(p.id)}"`} class="od-pc-buy">Add to cart</button>`;
       const priceLabel = p.hasVariants && p.fromPrice != null && (p.fromPrice < p.price || (p.maxPrice ?? p.fromPrice) > p.fromPrice)
         ? `From ${money(p.fromPrice, currency)}`
         : money(p.price, currency);
       const optVals = Object.entries(p.options ?? {})
         .map(([name, vals]) => `${catSlug(name)}:${vals.map((v) => catSlug(v)).join(",")}`)
         .join(";");
-      return `<div data-od-card data-od-category="${escapeAttr(catSlug(p.category))}" data-od-name="${escapeAttr(p.name.toLowerCase())}" data-od-price="${p.hasVariants && p.fromPrice != null ? p.fromPrice : p.price}"${optVals ? ` data-od-optvals="${escapeAttr(optVals)}"` : ""} style="display:flex;flex-direction:column;min-width:0">
-  <a ${link} data-od-hover="zoom" style="text-decoration:none;color:inherit;display:block">
+      return `<div data-od-card data-od-category="${escapeAttr(catSlug(p.category))}" data-od-name="${escapeAttr(p.name.toLowerCase())}" data-od-price="${p.hasVariants && p.fromPrice != null ? p.fromPrice : p.price}"${optVals ? ` data-od-optvals="${escapeAttr(optVals)}"` : ""} class="od-pc">
+  <a ${link} data-od-hover="zoom" class="od-pc-link">
     ${img}
-    <div style="margin-top:12px;font-size:15px;font-weight:500;color:var(--od-text)">${escapeHtml(p.name)}</div>
-    <div style="margin-top:2px;font-size:14px;color:var(--od-muted)">${priceLabel}</div>
+    <div class="od-pc-info">
+      <div class="od-pc-name">${escapeHtml(p.name)}</div>
+      <div class="od-pc-price">${priceLabel}</div>
+    </div>
   </a>
   ${buy}
 </div>`;
@@ -818,7 +831,7 @@ function productCardsHtml(
   // Filter pills (category + attribute) + price range + search + sort — live store only.
   const cats = [...new Set(list.map((p) => (p.category || "").trim()).filter(Boolean))];
   const pill = (label: string, slug: string, active: boolean) =>
-    `<button type="button" data-od-grid-cat="${escapeAttr(slug)}" aria-pressed="${active}" style="border:1px solid var(--od-border);background:${active ? "var(--od-text)" : "transparent"};color:${active ? "var(--od-bg)" : "var(--od-muted)"};border-radius:999px;padding:7px 15px;font-size:13px;cursor:pointer;transition:background .15s,color .15s">${escapeHtml(label)}</button>`;
+    `<button type="button" class="od-pill" data-od-grid-cat="${escapeAttr(slug)}" aria-pressed="${active}" style="border:1px solid var(--od-border);background:${active ? "var(--od-text)" : "transparent"};color:${active ? "var(--od-bg)" : "var(--od-muted)"};border-radius:999px;padding:7px 15px;font-size:13px;cursor:pointer;transition:background .15s,color .15s">${escapeHtml(label)}</button>`;
 
   // Attribute groups: every option axis (Size, Colour, …) that has ≥2 distinct values across the catalogue.
   const groups = new Map<string, Set<string>>();
@@ -830,7 +843,7 @@ function productCardsHtml(
     }
   }
   const attrPill = (group: string, value: string) =>
-    `<button type="button" data-od-opt="${escapeAttr(catSlug(group))}:${escapeAttr(catSlug(value))}" aria-pressed="false" style="border:1px solid var(--od-border);background:transparent;color:var(--od-muted);border-radius:999px;padding:6px 13px;font-size:12.5px;cursor:pointer;transition:background .15s,color .15s">${escapeHtml(value)}</button>`;
+    `<button type="button" class="od-pill" data-od-opt="${escapeAttr(catSlug(group))}:${escapeAttr(catSlug(value))}" aria-pressed="false" style="border:1px solid var(--od-border);background:transparent;color:var(--od-muted);border-radius:999px;padding:6px 13px;font-size:12.5px;cursor:pointer;transition:background .15s,color .15s">${escapeHtml(value)}</button>`;
   const attrBars = [...groups.entries()]
     .filter(([, vals]) => vals.size >= 2)
     .map(
@@ -873,7 +886,7 @@ function productCardsHtml(
 <p data-od-grid-empty hidden style="color:var(--od-muted);font-size:14px;padding:24px 0;margin:0">No products match.</p>`
       : "";
 
-  return `${filterBar}${controls}<div data-od-grid style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:calc(28px*var(--od-density)) calc(24px*var(--od-density));align-items:start;margin-top:36px">${cards}</div>`;
+  return `${filterBar}${controls}<div data-od-grid style="display:grid;grid-template-columns:repeat(auto-fill,minmax(var(--od-pc-min,220px),1fr));gap:calc(28px*var(--od-density)) calc(24px*var(--od-density));align-items:start;margin-top:36px">${cards}</div>`;
 }
 
 /** kebab-ify a category name for the data-od-category attribute + filter pill. */
@@ -1074,6 +1087,10 @@ function sanitizeBlock(html: string): string {
     }
     return `<div data-blocked-form${attrs}>`;
   });
+  // Brand colours are emitted lower-case (--od-chargeblue); the model often writes the name as it
+  // invented it (var(--od-chargeBlue)). Custom properties are case-sensitive, so that reference was
+  // undefined — a gradient headline using it rendered as invisible text.
+  h = h.replace(/var\(\s*--od-[A-Za-z][A-Za-z0-9-]*/g, (m) => m.toLowerCase());
   return h;
 }
 
@@ -2345,7 +2362,7 @@ ${scope} [data-od-reveal-stagger][data-od-in]>*:nth-child(5){transition-delay:.3
 ${scope} [data-od-reveal-stagger][data-od-in]>*:nth-child(n+6){transition-delay:.4s}`;
 }
 
-function shellCss(scope: string): string {
+function shellCss(scope: string, style?: DesignStyle): string {
   return `${scope} *,${scope} *::before,${scope} *::after{box-sizing:border-box}
 ${scope}{font-family:var(--od-font-body);color:var(--od-text);background:var(--od-bg);line-height:1.6;min-height:100dvh;overflow-x:hidden}
 ${scope} img{max-width:100%;display:block;height:auto}
@@ -2353,6 +2370,7 @@ ${scope} *{overflow-wrap:break-word}
 ${scope} a{color:inherit;text-decoration:none;transition:opacity .15s ease}${scope} a:hover{opacity:.82}
 @media (prefers-reduced-motion:reduce){${scope} *{animation:none!important;transition:none!important}}
 ${designKitCss(scope)}
+${styleCss(scope, style)}
 ${navResponsiveCss(scope)}
 ${mobileSafetyCss(scope)}
 ${interactionCss(scope)}`;
@@ -2490,7 +2508,7 @@ export function renderPageParts(
     css: `${scoped}
 ${tweaksCss(doc.tweaks, `#${STORE_WRAPPER}`)}
 html,body{background:${cssColor(doc.tokens.bg)}}
-${shellCss(`#${STORE_WRAPPER}`)}
+${shellCss(`#${STORE_WRAPPER}`, doc.tokens.style)}
 ${preloader ? preloaderCss() : ""}`,
     bodyHtml: `${preloader}<div id="${STORE_WRAPPER}">${html}</div>`,
     widgets,
@@ -2524,7 +2542,7 @@ export function renderPageDocument(doc: OrbitDesignDoc, opts: RenderOpts): strin
 ${googleFontsLink(doc.tokens.googleFonts)}
 <style>${tokenCss(doc.tokens)}
 ${tweaksCss(doc.tweaks)}
-${shellCss("body")}
+${shellCss("body", doc.tokens.style)}
 body{margin:0}</style>
 </head>
 <body>
