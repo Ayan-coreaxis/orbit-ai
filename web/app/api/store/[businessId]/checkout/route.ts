@@ -237,7 +237,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ bus
   const canReachShopper = twilioConfigured() || (!!email && emailConfigured());
   const needsVerify = business.codVerification && canReachShopper;
   const settings = await getAgentSettings(businessId).catch(() => null);
-  const autoConfirm = !needsVerify && !fraud.flagged && settings?.autoConfirmCod;
+  // Only a low-risk order confirms itself; medium and high wait for the seller to look.
+  const autoConfirm = !needsVerify && !fraud.flagged && fraud.level !== "medium" && settings?.autoConfirmCod;
 
   let order;
   try {
