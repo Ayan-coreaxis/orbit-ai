@@ -21,6 +21,7 @@ import { defaultSpec, slugify as specSlugify, type StoreBackendSpec } from "@/li
  */
 
 import { normalizeStyle, styleCss, styleVars, type DesignStyle } from "./design-style";
+import { renderCommerceBlocks, commerceCss } from "./commerce-blocks";
 
 export interface DesignTokens {
   accent: string; // primary brand / CTA colour
@@ -202,6 +203,8 @@ export interface StorefrontProduct {
   maxPrice?: number;
   /** option name → its values (e.g. { Size: ["S","M","L"], Colour: ["Black"] }) — powers the shop attribute filters */
   options?: Record<string, string[]>;
+  /** units sold in the last 90 days from real orders (bestseller rails); absent when not loaded */
+  sold?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -776,6 +779,57 @@ const DUMMY_PRODUCTS: StorefrontProduct[] = [
   { id: "demo-6", name: "Bestseller", price: 4200, imageUrl: null, description: null, stock: 15 },
 ];
 
+/** One platform product card — the shop grid and the commerce rails share it. `inGrid` adds the
+ *  attributes the shop's filter/sort script reads; rail cards leave them off so filtering the shop
+ *  grid never hides a rail's cards. */
+function productCardHtml(p: StorefrontProduct, businessId: string, preview: boolean, currency?: string, inGrid = true): string {
+  const base = `/store/${businessId}`;
+
+  // A FIXED-HEIGHT image frame — never `aspect-ratio` directly on a grid descendant, which
+  // makes CSS grid mis-size the row and squish the card (the jagged/uneven-card bug).
+  const inner = p.imageUrl
+    ? `<img src="${escapeAttr(p.imageUrl)}" alt="${escapeAttr(p.name)}" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block">`
+    : imgSlot(`Product photo: ${p.name}`, "width:100%;height:100%;border-radius:0", false, preview);
+  const img = `<div class="od-pc-media">${inner}</div>`;
+  // A product with option axes is never "sold out" at the card — availability is per-variant on
+  // the product page (and its `stock` is the summed variant stock, which can lag).
+  const soldOut = !p.hasVariants && p.stock <= 0;
+  const link = preview ? `href="#" data-od-pblock="product"` : `href="${base}/product/${escapeAttr(p.id)}"`;
+  const buy = soldOut
+    ? `<span class="od-pc-sold">Sold out</span>`
+    : p.hasVariants
+      ? `<a ${link} class="od-pc-buy">Choose options</a>`
+      : `<button type="button"${preview ? "" : ` data-od-buy="${escapeAttr(p.id)}"`} class="od-pc-buy">Add to cart</button>`;
+  const priceLabel = p.hasVariants && p.fromPrice != null && (p.fromPrice < p.price || (p.maxPrice ?? p.fromPrice) > p.fromPrice)
+    ? `From ${money(p.fromPrice, currency)}`
+    : money(p.price, currency);
+  const optVals = Object.entries(p.options ?? {})
+    .map(([name, vals]) => `${catSlug(name)}:${vals.map((v) => catSlug(v)).join(",")}`)
+    .join(";");
+  if (!inGrid) {
+    return `<div class="od-pc" role="listitem">
+  <a ${link} data-od-hover="zoom" class="od-pc-link">
+    ${img}
+    <div class="od-pc-info">
+  <div class="od-pc-name">${escapeHtml(p.name)}</div>
+  <div class="od-pc-price">${priceLabel}</div>
+    </div>
+  </a>
+  ${buy}
+</div>`;
+  }
+  return `<div data-od-card data-od-category="${escapeAttr(catSlug(p.category))}" data-od-name="${escapeAttr(p.name.toLowerCase())}" data-od-price="${p.hasVariants && p.fromPrice != null ? p.fromPrice : p.price}"${optVals ? ` data-od-optvals="${escapeAttr(optVals)}"` : ""} class="od-pc">
+  <a ${link} data-od-hover="zoom" class="od-pc-link">
+    ${img}
+    <div class="od-pc-info">
+  <div class="od-pc-name">${escapeHtml(p.name)}</div>
+  <div class="od-pc-price">${priceLabel}</div>
+    </div>
+  </a>
+  ${buy}
+</div>`;
+}
+
 function productCardsHtml(
   products: StorefrontProduct[],
   businessId: string,
@@ -792,41 +846,7 @@ function productCardsHtml(
   if (!list.length) {
     return `<p style="text-align:center;color:var(--od-muted);font-size:14px;padding:40px 0">No products yet — add some in your dashboard and they'll appear here automatically.</p>`;
   }
-  const cards = list
-    .map((p) => {
-      // A FIXED-HEIGHT image frame — never `aspect-ratio` directly on a grid descendant, which
-      // makes CSS grid mis-size the row and squish the card (the jagged/uneven-card bug).
-      const inner = p.imageUrl
-        ? `<img src="${escapeAttr(p.imageUrl)}" alt="${escapeAttr(p.name)}" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block">`
-        : imgSlot(`Product photo: ${p.name}`, "width:100%;height:100%;border-radius:0", false, preview);
-      const img = `<div class="od-pc-media">${inner}</div>`;
-      // A product with option axes is never "sold out" at the card — availability is per-variant on
-      // the product page (and its `stock` is the summed variant stock, which can lag).
-      const soldOut = !p.hasVariants && p.stock <= 0;
-      const link = preview ? `href="#" data-od-pblock="product"` : `href="${base}/product/${escapeAttr(p.id)}"`;
-      const buy = soldOut
-        ? `<span class="od-pc-sold">Sold out</span>`
-        : p.hasVariants
-          ? `<a ${link} class="od-pc-buy">Choose options</a>`
-          : `<button type="button"${preview ? "" : ` data-od-buy="${escapeAttr(p.id)}"`} class="od-pc-buy">Add to cart</button>`;
-      const priceLabel = p.hasVariants && p.fromPrice != null && (p.fromPrice < p.price || (p.maxPrice ?? p.fromPrice) > p.fromPrice)
-        ? `From ${money(p.fromPrice, currency)}`
-        : money(p.price, currency);
-      const optVals = Object.entries(p.options ?? {})
-        .map(([name, vals]) => `${catSlug(name)}:${vals.map((v) => catSlug(v)).join(",")}`)
-        .join(";");
-      return `<div data-od-card data-od-category="${escapeAttr(catSlug(p.category))}" data-od-name="${escapeAttr(p.name.toLowerCase())}" data-od-price="${p.hasVariants && p.fromPrice != null ? p.fromPrice : p.price}"${optVals ? ` data-od-optvals="${escapeAttr(optVals)}"` : ""} class="od-pc">
-  <a ${link} data-od-hover="zoom" class="od-pc-link">
-    ${img}
-    <div class="od-pc-info">
-      <div class="od-pc-name">${escapeHtml(p.name)}</div>
-      <div class="od-pc-price">${priceLabel}</div>
-    </div>
-  </a>
-  ${buy}
-</div>`;
-    })
-    .join("");
+  const cards = list.map((p) => productCardHtml(p, businessId, preview, currency)).join("");
 
   // Filter pills (category + attribute) + price range + search + sort — live store only.
   const cats = [...new Set(list.map((p) => (p.category || "").trim()).filter(Boolean))];
@@ -1848,9 +1868,22 @@ export function renderPageBody(doc: OrbitDesignDoc, opts: RenderOpts): { html: s
   const preview = !!opts.preview;
   const spec = opts.spec ?? defaultSpec();
   const widgets: PageWidget[] = [];
+  const shopSlug =
+    doc.pages.find((p) => p.slug !== PRODUCT_PAGE && /^(shop|store|catalog(ue)?|products?|collections?|all|browse)$/i.test(p.slug))?.slug ?? "shop";
+  const commerce = (html: string) =>
+    renderCommerceBlocks(html, {
+      products: opts.products,
+      sample: DUMMY_PRODUCTS,
+      preview,
+      shopSlug,
+      money: (n) => money(n, opts.currency),
+      card: (p) => productCardHtml(p as StorefrontProduct, opts.businessId, preview, opts.currency, false),
+      esc: escapeHtml,
+      escAttr: escapeAttr,
+    });
   const block = (html: string) =>
     applySpec(
-      widgetMarkers(rewriteLinks(fillImageSlots(phoneStyles(sanitizeBlock(fixInlineCss(substituteContent(html, doc)))), preview), opts.businessId, preview, doc), preview, opts.currency),
+      widgetMarkers(rewriteLinks(commerce(fillImageSlots(phoneStyles(sanitizeBlock(fixInlineCss(substituteContent(html, doc)))), preview)), opts.businessId, preview, doc), preview, opts.currency),
       page.slug,
       spec,
       preview,
@@ -2371,6 +2404,7 @@ ${scope} a{color:inherit;text-decoration:none;transition:opacity .15s ease}${sco
 @media (prefers-reduced-motion:reduce){${scope} *{animation:none!important;transition:none!important}}
 ${designKitCss(scope)}
 ${styleCss(scope, style)}
+${commerceCss(scope)}
 ${navResponsiveCss(scope)}
 ${mobileSafetyCss(scope)}
 ${interactionCss(scope)}`;

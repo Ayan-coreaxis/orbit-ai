@@ -8,7 +8,7 @@ import { CartSync } from "@/components/store/CartSync";
 import { StoreCartBar } from "../../../StoreCartBar";
 import { StoreWidgets } from "@/components/store/StoreWidgets";
 import { StoreAnalyticsBeacon } from "@/components/store/StoreAnalyticsBeacon";
-import { toStorefrontProducts } from "@/lib/storefront-products";
+import { toStorefrontProducts, withSales } from "@/lib/storefront-products";
 import { parseWidgetCopy } from "@/lib/widget-copy";
 
 export const dynamic = "force-dynamic";
@@ -62,7 +62,7 @@ export default async function StorefrontSubPage({ params }: { params: Promise<{ 
   if (!doc.pages.some((p) => p.slug === slug)) notFound();
 
   const spec = parseSpec(design.backend);
-  const sfProducts: StorefrontProduct[] = toStorefrontProducts(data.products);
+  const sfProducts: StorefrontProduct[] = await withSales(businessId, toStorefrontProducts(data.products));
   const loggedIn = !!(await getStoreCustomer(businessId));
 
   const { fontHref, css, bodyHtml, widgets } = renderPageParts(doc, {

@@ -73,7 +73,8 @@ Commit to ONE bold idea and execute it with precision. Restraint and maximalism 
 - Scarcity/urgency only from real stock or a real offer — never fake timers.
 - Make the buy path short: product → size/option → add → cart → COD checkout. Do not bury it behind decorative sections.
 - Social proof: use real reviews if provided; otherwise use a promise/process section (how it is made, how it is packed), not fake quotes.
-- Category entry points: 3-6 big tappable collection tiles on the home page for a catalogue of more than ~8 products.
+- Category entry points: collection circles or tiles (data-od-collections) on the home page when the catalogue has 2+ categories.
+- Show real products high on the home page: a bestsellers or new-arrivals rail (data-od-products) right after the hero, a featured product (data-od-featured-product) further down, shop by price (data-od-price-bands) for a wide price range. These are live blocks — never hand-write product cards.
 - WhatsApp/Instagram sellers: a visible contact path (phone/WhatsApp link from the content tokens) in header or footer.`,
   },
   {

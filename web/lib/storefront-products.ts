@@ -40,3 +40,28 @@ export function toStorefrontProducts(products: ProductWithVariants[]): Storefron
     };
   });
 }
+
+/**
+ * Attach real 90-day unit sales to storefront products, so "bestsellers" rails rank by what really
+ * sold. One query per page render, cancelled orders excluded.
+ */
+export async function withSales<T extends { id: string; sold?: number }>(businessId: string, products: T[]): Promise<T[]> {
+  if (!products.length) return products;
+  const { prisma } = await import("@/lib/prisma");
+  const orders = await prisma.order.findMany({
+    where: { businessId, status: { not: "cancelled" }, createdAt: { gte: new Date(Date.now() - 90 * 86_400_000) } },
+    select: { items: true },
+    take: 3000,
+  });
+  const sold = new Map<string, number>();
+  for (const o of orders) {
+    try {
+      for (const it of JSON.parse(o.items) as { productId?: string; qty?: number }[]) {
+        if (it?.productId) sold.set(it.productId, (sold.get(it.productId) ?? 0) + (Number(it.qty) || 0));
+      }
+    } catch {
+      /* skip a malformed row */
+    }
+  }
+  return products.map((p) => ({ ...p, sold: sold.get(p.id) ?? 0 }));
+}

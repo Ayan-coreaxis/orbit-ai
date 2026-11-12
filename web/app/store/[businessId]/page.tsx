@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { migrateDoc, renderPageParts, storefrontRuntimeJs, type OrbitDesignDoc, type StorefrontProduct } from "@/lib/orbit-design";
 import { parseSpec } from "@/lib/orbit-backend-spec";
 import { getStoreCustomer } from "@/lib/store-auth";
-import { toStorefrontProducts } from "@/lib/storefront-products";
+import { toStorefrontProducts, withSales } from "@/lib/storefront-products";
 import { parseWidgetCopy } from "@/lib/widget-copy";
 import { StoreWidgets } from "@/components/store/StoreWidgets";
 import { StoreAnalyticsBeacon } from "@/components/store/StoreAnalyticsBeacon";
@@ -64,7 +64,7 @@ export default async function StorefrontPage({ params }: { params: Promise<{ bus
   const doc = safeDoc(design.wired ?? design.doc, business.name, business.niche);
   if (!doc) notFound();
 
-  const sfProducts: StorefrontProduct[] = toStorefrontProducts(products);
+  const sfProducts: StorefrontProduct[] = await withSales(businessId, toStorefrontProducts(products));
 
   const spec = parseSpec(design.backend);
   const loggedIn = !!(await getStoreCustomer(businessId));
