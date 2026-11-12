@@ -8,6 +8,7 @@ import { getBusinessSummary } from "@/lib/get-business";
 import { prisma } from "@/lib/prisma";
 import { loadStrategyLab } from "@/lib/strategy-lab";
 import { parseSummary } from "@/lib/strategy-chat";
+import { parseBriefingTasks } from "@/lib/daily-briefing";
 
 export const dynamic = "force-dynamic";
 
@@ -71,6 +72,7 @@ export default async function OrchestratorPage() {
             opsState: m.opsState,
             opsSummary: parseSummary(m.opsSummary),
             askApproval: m.askApproval,
+            tasks: parseBriefingTasks(m.tasks),
             attachments: files.get(m.id) ?? [],
           }))}
         />

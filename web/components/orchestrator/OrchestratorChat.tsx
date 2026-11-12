@@ -9,6 +9,8 @@ import { cn } from "@/lib/utils";
 import { VoiceOrb, type VoiceOrbHandle } from "@/components/orchestrator/VoiceOrb";
 import { AgentOrb, type OrbState } from "@/components/orchestrator/AgentOrb";
 import { ChatText } from "@/components/orchestrator/ChatText";
+import { BriefingTasks } from "@/components/orchestrator/BriefingTasks";
+import type { BriefingTask } from "@/lib/daily-briefing";
 
 export interface ChatMessage {
   id: string;
@@ -21,6 +23,8 @@ export interface ChatMessage {
   opsSummary?: string[] | null;
   askApproval?: boolean;
   attachments?: UploadedMedia[];
+  /** the daily store check's ranked tasks (speaker "briefing") */
+  tasks?: BriefingTask[];
 }
 
 /** Real display names + a stable color per specialist, so the same agent always reads the same
@@ -243,6 +247,23 @@ export function OrchestratorChat({
 
   const router = useRouter();
   const [resolving, setResolving] = useState<string | null>(null);
+  const [checking, setChecking] = useState(false);
+  async function checkStoreNow() {
+    if (checking) return;
+    setChecking(true);
+    try {
+      const res = await fetch("/api/orchestrator/briefing", { method: "POST" });
+      const data = (await res.json().catch(() => ({}))) as { messageId?: string | null };
+      if (res.ok && data.messageId) {
+        const r = await fetch("/api/orchestrator/messages");
+        const all = (await r.json().catch(() => ({ messages: [] }))) as { messages: ChatMessage[] };
+        const fresh = all.messages.find((x) => x.id === data.messageId);
+        if (fresh) setMessages((ms) => [...ms.filter((x) => x.speaker !== "briefing" || x.id === fresh.id || !isToday(x)), fresh].filter((x, i, arr) => arr.findIndex((y) => y.id === x.id) === i));
+      }
+    } finally {
+      setChecking(false);
+    }
+  }
   async function resolveProposal(id: string, action: "apply" | "dismiss") {
     setResolving(id);
     try {
@@ -376,6 +397,16 @@ export function OrchestratorChat({
       </div>
 
       <div ref={scrollRef} className="scrollbar-thin min-h-0 flex-1 space-y-6 overflow-y-auto px-5 py-6">
+        <div className="flex justify-end">
+          <button
+            onClick={checkStoreNow}
+            disabled={checking}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-border-strong px-3 py-1.5 text-[12px] text-text-dim hover:text-text disabled:opacity-60"
+            title="Check the store's real data now and list what's worth doing today"
+          >
+            <ClipboardCheck className="h-3.5 w-3.5" /> {checking ? "Checking your store…" : "Check my store now"}
+          </button>
+        </div>
         {messages.length === 0 && (
           <div className="flex h-full flex-col items-center justify-center gap-3 text-center text-text-faint">
             <p className="max-w-xs text-[13.5px]">
@@ -413,7 +444,7 @@ export function OrchestratorChat({
                   </div>
                 )}
                 <span className="text-[12.5px] font-semibold" style={specialist ? { color: specialist.color } : undefined}>
-                  {specialist ? specialist.name : "Orchestrator"}
+                  {specialist ? specialist.name : m.speaker === "briefing" ? "Orchestrator · Daily store check" : "Orchestrator"}
                 </span>
                 {m.needsUser && <span className="rounded-full bg-warn-soft px-2 py-0.5 text-[10.5px] font-semibold text-warn">Needs your input</span>}
               </div>
@@ -433,6 +464,9 @@ export function OrchestratorChat({
                 <div className="mt-2 pl-8">
                   <MessageFiles files={m.attachments} align="start" />
                 </div>
+              )}
+              {m.speaker === "briefing" && !!m.tasks?.length && (
+                <BriefingTasks messageId={m.id} tasks={m.tasks} onPrepare={(p) => sendMessage(p)} disabled={sending} />
               )}
               {/* Only while this request is still open (the owner hasn't replied since) and only if it asks for a file. */}
               {m.needsUser && idx > lastUserIdx && fileNeedLabel(m.content) && (
@@ -579,4 +613,12 @@ export function OrchestratorChat({
       </div>
     </div>
   );
+}
+
+/** The chat keeps one daily-check message per day; a manual re-check replaces today's. */
+function isToday(m: ChatMessage & { createdAt?: string | Date }): boolean {
+  if (!m.createdAt) return true;
+  const d = new Date(m.createdAt);
+  const n = new Date();
+  return d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth() && d.getDate() === n.getDate();
 }

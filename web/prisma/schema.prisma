@@ -440,6 +440,7 @@ model OrchestratorMessage {
   opsState       String? // pending | applied | dismissed
   opsSummary     String? // JSON string[] — what changed / what would change
   askApproval    Boolean  @default(false) // owner seems ready — UI offers the final-plan review
+  tasks          String? // JSON BriefingTask[] — the daily store check (speaker "briefing"); see lib/daily-briefing.ts
   attachments    String? // JSON string[] of MediaAsset ids the owner attached to this message
   createdAt  DateTime @default(now())
 }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getActiveBusinessId } from "@/lib/get-active-business-id";
 import { parseSummary } from "@/lib/strategy-chat";
+import { parseBriefingTasks } from "@/lib/daily-briefing";
 import { attachmentViews } from "@/lib/media";
 
 /** Orchestrator chat history. `?after=<ISO time>` returns only newer messages (the chat polls this
@@ -28,6 +29,7 @@ export async function GET(req: NextRequest) {
       opsState: m.opsState,
       opsSummary: parseSummary(m.opsSummary),
       askApproval: m.askApproval,
+      tasks: parseBriefingTasks(m.tasks),
       attachments: files.get(m.id) ?? [],
       createdAt: m.createdAt,
     })),
