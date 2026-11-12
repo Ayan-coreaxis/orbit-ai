@@ -19,13 +19,15 @@ export async function buildOrchestratorContext(businessId: string): Promise<stri
 
   const { competitors } = await latestCompetitors(businessId);
 
-  const [productCount, lowStock, orderCount, pendingOrders, revenueAgg, coupons, design] = await Promise.all([
+  const [productCount, lowStock, orderCount, pendingOrders, highRiskOpen, revenueAgg, coupons, design] = await Promise.all([
     prisma.product.count({ where: { businessId } }),
     prisma.product
       .findMany({ where: { businessId }, select: { name: true, stock: true, optionTypes: true, variants: { select: { stock: true } } } })
       .then((ps) => ps.filter((p) => totalStock(p, p.variants) <= 5).slice(0, 10)),
     prisma.order.count({ where: { businessId } }),
     prisma.order.count({ where: { businessId, status: "pending" } }),
+    // open = not yet handed to a courier, so the seller can still call the shopper first
+    prisma.order.count({ where: { businessId, riskLevel: "high", status: { in: ["pending", "confirmed"] } } }),
     prisma.order.aggregate({ where: { businessId, status: { not: "cancelled" } }, _sum: { total: true } }),
     prisma.coupon.findMany({
       where: { businessId, active: true, OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] },
@@ -66,6 +68,11 @@ REAL BUSINESS DATA (actually in the database right now — never contradict this
   }.
 - Delivery: ${business.shippingFee > 0 ? `${money(business.shippingFee, business.storeCurrency)} flat fee` : "free (no delivery fee set)"}${business.freeShippingOver != null ? `, free over ${money(business.freeShippingOver, business.storeCurrency)}` : ""}. Payment: ${business.paymentProvider === "both" ? "cash on delivery and card" : business.paymentProvider === "stripe" ? "card" : "cash on delivery"}.
 - Orders: ${orderCount} total, ${pendingOrders} still pending fulfillment.
+- COD risk: ${highRiskOpen} open order(s) (pending or confirmed, not shipped yet) scored HIGH risk by Orbit's checkout risk score${
+    highRiskOpen > 0
+      ? " — advise the seller to call or WhatsApp those shoppers to confirm before shipping (Store → Orders shows the reasons on each order). The score never blocks a sale; shipping is the seller's decision."
+      : "."
+  }
 - Real revenue from actual orders placed: ${money(revenue, business.storeCurrency)} (this is the only real revenue figure — no other sales data exists in this system).
 - Real order growth, week over week: ${orderGrowth.thisWeekOrders} order(s) in the last 7 days vs ${orderGrowth.lastWeekOrders} the week before${
     orderGrowth.orderGrowthPct !== null

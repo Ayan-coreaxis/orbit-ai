@@ -46,6 +46,9 @@ interface Order {
   verified: boolean;
   flagged: boolean;
   flagReason: string | null;
+  riskScore: number | null;
+  riskLevel: string | null;
+  riskSignals: { label: string; weight: number }[];
   paymentProvider: string;
   paymentStatus: string;
   courierName: string | null;
@@ -75,6 +78,12 @@ const STATUS: Record<string, { cls: string; icon: typeof Clock; label: string }>
   shipped: { cls: "bg-accent-soft text-accent-strong", icon: Truck, label: "Shipped" },
   fulfilled: { cls: "bg-good-soft text-good", icon: PackageCheck, label: "Delivered" },
   cancelled: { cls: "bg-panel-2 text-text-faint", icon: XCircle, label: "Cancelled" },
+};
+
+const RISK: Record<string, { cls: string; label: string }> = {
+  low: { cls: "bg-good-soft text-good", label: "Low risk" },
+  medium: { cls: "bg-warn-soft text-warn", label: "Medium risk" },
+  high: { cls: "bg-bad-soft text-bad", label: "High risk" },
 };
 
 export function OrdersManager({
@@ -292,6 +301,7 @@ export function OrdersManager({
             const expanded = open === o.id;
             const s = STATUS[o.status] ?? STATUS.pending;
             const SIcon = s.icon;
+            const risk = o.riskLevel ? RISK[o.riskLevel] : undefined;
             return (
               <div key={o.id} className={`flex items-stretch ${loading ? "opacity-60 transition-opacity" : "transition-opacity"}`}>
                 <label className="flex flex-none cursor-pointer items-center pl-3" onClick={(e) => e.stopPropagation()}>
@@ -322,6 +332,14 @@ export function OrdersManager({
                   {o.flagged && (
                     <span className="flex-none rounded-md bg-bad-soft px-1.5 py-0.5 text-[11px] font-semibold text-bad" title={o.flagReason ?? ""}>
                       Flagged
+                    </span>
+                  )}
+                  {risk && (
+                    <span
+                      className={`flex-none rounded-md px-1.5 py-0.5 text-[11px] font-semibold ${risk.cls}`}
+                      title={o.riskScore != null ? `Risk score ${o.riskScore} of 100` : undefined}
+                    >
+                      {risk.label}
                     </span>
                   )}
                   {!o.verified && (
@@ -377,8 +395,34 @@ export function OrdersManager({
                         </div>
                       </div>
 
-                      {o.flagged && o.flagReason && (
+                      {/* scored orders list their reasons under "Order risk" — only repeat the flag when it says more (a courier return) */}
+                      {o.flagged && o.flagReason && (!risk || o.riskSignals.length === 0 || o.flagReason.includes("Returned by courier")) && (
                         <p className="mt-2 rounded-md bg-bad-soft px-2 py-1 text-[11.5px] text-bad">⚠️ {o.flagReason}</p>
+                      )}
+
+                      {risk && (
+                        <>
+                          <SubHead className="mt-4">Order risk</SubHead>
+                          <div className="mt-1.5 flex items-center gap-2">
+                            <span className={`rounded-md px-1.5 py-0.5 text-[11px] font-semibold ${risk.cls}`}>{risk.label}</span>
+                            {o.riskScore != null && <span className="tabular-nums text-text-faint">{o.riskScore} / 100</span>}
+                          </div>
+                          {o.riskLevel === "high" && (
+                            <p className="mt-1.5 font-medium text-bad">Call or WhatsApp to confirm before shipping.</p>
+                          )}
+                          {o.riskSignals.length > 0 ? (
+                            <ul className="mt-1.5 space-y-1">
+                              {o.riskSignals.map((sig, i) => (
+                                <li key={i} className="flex gap-1.5 text-text-dim">
+                                  <span className={`flex-none font-semibold ${sig.weight > 0 ? "text-bad" : "text-good"}`}>{sig.weight > 0 ? "+" : "−"}</span>
+                                  <span>{sig.label}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <p className="mt-1.5 text-text-faint">Nothing unusual about this order.</p>
+                          )}
+                        </>
                       )}
 
                       <SubHead className="mt-4">Deliver to</SubHead>

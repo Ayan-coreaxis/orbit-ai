@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getActiveBusinessId } from "@/lib/get-active-business-id";
 import { prisma } from "@/lib/prisma";
+import { parseRiskSignals } from "@/lib/fraud";
 
 const PAGE = 30;
 const STATUSES = ["pending", "confirmed", "shipped", "fulfilled", "cancelled"];
@@ -87,6 +88,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ busi
         verified: o.verified,
         flagged: o.flagged,
         flagReason: o.flagReason,
+        riskScore: o.riskScore,
+        riskLevel: o.riskLevel,
+        riskSignals: parseRiskSignals(o.riskSignals),
+        courierStatus: o.courierStatus,
+        courierStatusText: o.courierStatusText,
+        courierCheckedAt: o.courierCheckedAt,
         subtotal: o.subtotal,
         shippingFee: o.shippingFee,
         taxAmount: o.taxAmount,

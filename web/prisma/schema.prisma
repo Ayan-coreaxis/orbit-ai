@@ -810,7 +810,10 @@ model Order {
   capiSentAt              DateTime? // when the Purchase reached Meta's Conversions API
   flagged                 Boolean        @default(false) // real heuristic screen at checkout — never fabricated, only set when a real rule actually matched
   flagReason              String?
-  confirmedAt             DateTime? // set the moment a real order auto-confirms (passed the real fraud screen) or a seller manually confirms one that was flagged
+  riskScore               Int? // 0–100 COD risk score from lib/fraud.ts at checkout; null on orders placed before scoring existed
+  riskLevel               String? // low | medium | high
+  riskSignals             String? // JSON: [{label, weight}] — the real signals behind the score, in plain words
+  confirmedAt            DateTime? // set the moment a real order auto-confirms (passed the real fraud screen) or a seller manually confirms one that was flagged
   confirmationNotifiedAt  DateTime? // when the real WhatsApp order-confirmation message actually sent
   confirmationNotifyError String? // honest — set only if the real WhatsApp send actually failed, never pretend it sent
   // Real seller-entered dispatch info — never a guessed/generated tracking number, always what the seller actually typed after handing the package to a real courier.
@@ -830,6 +833,7 @@ model Order {
 
   @@index([businessId, status])
   @@index([businessId, createdAt])
+  @@index([customerPhone]) // the risk score looks a phone's history up across stores at every checkout
 }
 
 /**

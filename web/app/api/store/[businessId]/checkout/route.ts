@@ -128,6 +128,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ bus
     customerId: customer?.id ?? null,
     subtotal: quote.subtotal,
     items: quote.lineItems,
+    address,
+    shipping: structured,
   });
 
   const jar = await cookies();
@@ -165,6 +167,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ bus
     clientToken,
     flagged: fraud.flagged,
     flagReason: fraud.reason,
+    riskScore: fraud.score,
+    riskLevel: fraud.level,
+    riskSignals: JSON.stringify(fraud.signals),
   };
 
   // ---------------- Stripe ----------------

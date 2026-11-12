@@ -75,6 +75,11 @@ export default function PrivacyPage() {
               <li>To run the store: take orders, confirm them, send order and delivery updates, and answer questions.</li>
               <li>To create content and ads the seller asks for, and to publish or run them only when the seller approves.</li>
               <li>To keep Orbit secure, prevent fraud (for example fake cash-on-delivery orders) and fix problems.</li>
+              <li>
+                To give each order a risk score for the seller. The score uses the phone number and address on the order, the order itself, and how earlier orders from the
+                same phone number ended (delivered, cancelled or returned) — in that store and, as numbers only, in other stores on Orbit. A seller never sees which other
+                store an order was placed with or what was bought there. The score does not stop an order; the seller decides whether to call you to confirm it.
+              </li>
               <li>To bill sellers and enforce plan limits.</li>
               <li>We do not sell personal information, and we do not use shoppers&apos; information to advertise Orbit.</li>
             </ul>
