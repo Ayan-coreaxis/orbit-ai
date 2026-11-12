@@ -220,13 +220,11 @@ Needs from you: ${result.needsUserText}` : result.content;
   const hasMedia = (await prisma.mediaAsset.count({ where: { businessId } })) > 0;
   // import_products_from reads the owner's old shop — offered only when the owner typed a link in
   // this message or a recent one, and only for those hosts.
-  const importHosts = hostsMentioned([message, ...orderedHistory.filter((m) => m.role === "user").slice(-4).map((m) => m.content)].join("
-"));
+  const importHosts = hostsMentioned([message, ...orderedHistory.filter((m) => m.role === "user").slice(-4).map((m) => m.content)].join("\n"));
   let imports = 0;
   let imported: ImportedProduct[] = [];
   const importBlock = importHosts.size
-    ? `
-IMPORT: the owner wrote a link. If they ask to import / bring / copy their products from it (their old shop), call ${IMPORT_PRODUCTS_TOOL.name} with that link, then propose the items it returns through import_products — it is a proposal with Apply like any other. Don't use it for a competitor's site or when they didn't ask to import.`
+    ? `\nIMPORT: the owner wrote a link. If they ask to import / bring / copy their products from it (their old shop), call ${IMPORT_PRODUCTS_TOOL.name} with that link, then propose the items it returns through import_products — it is a proposal with Apply like any other. Don't use it for a competitor's site or when they didn't ask to import.`
     : "";
   const extraTools = [...lookups, ...(canSearch ? [WEB_SEARCH_TOOL, READ_PAGE_TOOL] : []), ...(hasMedia ? [OPEN_MEDIA_TOOL] : []), ...(importHosts.size ? [IMPORT_PRODUCTS_TOOL] : [])];
   let block: Anthropic.Messages.ToolUseBlock | undefined;
