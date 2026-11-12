@@ -4,8 +4,9 @@ import { useMemo, useState } from "react";
 import { Card, Button } from "@/components/ui";
 import { money } from "@/lib/money";
 import { cartesian, comboKey, comboLabel, parseOptionTypes, type OptionType } from "@/lib/variants";
-import { Plus, Trash2, Pencil, X } from "lucide-react";
+import { Plus, Trash2, Pencil, X, Download } from "lucide-react";
 import { ImageUpload } from "@/components/ImageUpload";
+import { ProductImport } from "@/components/store/ProductImport";
 
 interface RawVariant {
   id?: string;
@@ -43,6 +44,8 @@ export function ProductManager({ initialProducts, currency }: { initialProducts:
   const [vrows, setVrows] = useState<VRow[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const hasOpts = optTypes.length > 0 && optTypes.every((t) => t.name && t.values.length);
 
@@ -148,12 +151,37 @@ export function ProductManager({ initialProducts, currency }: { initialProducts:
         <div className="text-[14px] font-semibold">
           Products <span className="text-text-faint">({products.length})</span>
         </div>
-        {editing === null && (
-          <Button variant="secondary" onClick={openNew} className="!py-2 !text-[13px]">
-            <Plus className="h-4 w-4" /> Add product
-          </Button>
+        {editing === null && !importing && (
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setNotice(null);
+                setImporting(true);
+              }}
+              className="!py-2 !text-[13px]"
+            >
+              <Download className="h-4 w-4" /> Import products
+            </Button>
+            <Button variant="secondary" onClick={openNew} className="!py-2 !text-[13px]">
+              <Plus className="h-4 w-4" /> Add product
+            </Button>
+          </div>
         )}
       </div>
+
+      {importing && (
+        <ProductImport<P>
+          currency={currency}
+          onClose={() => setImporting(false)}
+          onDone={(all, message) => {
+            setProducts(all);
+            setNotice(message);
+            setImporting(false);
+          }}
+        />
+      )}
+      {notice && !importing && <p className="mt-3 rounded-lg bg-good-soft px-3 py-2 text-[13px] text-good">{notice}</p>}
 
       {editing !== null && (
         <div className="mt-5 rounded-xl border border-border-strong bg-panel-2 p-4">
@@ -294,9 +322,9 @@ export function ProductManager({ initialProducts, currency }: { initialProducts:
       )}
 
       <div className="mt-5 divide-y divide-border">
-        {products.length === 0 && editing === null && (
+        {products.length === 0 && editing === null && !importing && (
           <p className="rounded-lg border border-dashed border-border py-8 text-center text-[13px] text-text-faint">
-            No products yet. Add your first one, then design the storefront in Orbit Design.
+            No products yet. Add your first one — or import your whole catalogue from your old shop or a sheet — then design the storefront in Orbit Design.
           </p>
         )}
         {products.map((p) => {

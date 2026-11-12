@@ -19,6 +19,8 @@ import { PLATFORM_MAP, storeStatusContext } from "@/lib/platform-map";
 import { describeDesignJobs, sanitizeDesignJobs, type DesignJob } from "@/lib/design-ops";
 import { describeStudioRequests, sanitizeStudioRequests, studioContext } from "@/lib/studio/ops";
 import { describeMetaOps, metaContext, sanitizeMetaOps } from "@/lib/meta-ops";
+import { toProductCreate, type ImportedProduct } from "@/lib/product-import";
+import { IMPORT_PRODUCTS_TOOL, hostsMentioned, pickImported, runOrchestratorImport } from "@/lib/product-import-server";
 import { READ_PAGE_TOOL, WEB_SEARCH_TOOL, formatResults, readPageText, searchForBusiness, searchStatus } from "@/lib/web-search";
 
 export const maxDuration = 180;
@@ -200,18 +202,26 @@ Needs from you: ${result.needsUserText}` : result.content;
   const MAX_OPENS = 2;
   // open_media lets the Orchestrator re-read a file sent earlier (e.g. the rest of a catalog PDF).
   const hasMedia = (await prisma.mediaAsset.count({ where: { businessId } })) > 0;
-  const extraTools = [...lookups, ...(canSearch ? [WEB_SEARCH_TOOL, READ_PAGE_TOOL] : []), ...(hasMedia ? [OPEN_MEDIA_TOOL] : [])];
+  // import_products_from reads the owner's old shop — offered only when the owner typed a link in
+  // this message or a recent one, and only for those hosts.
+  const importHosts = hostsMentioned([message, ...orderedHistory.filter((m) => m.role === "user").slice(-4).map((m) => m.content)].join("\n"));
+  let imports = 0;
+  let imported: ImportedProduct[] = [];
+  const importBlock = importHosts.size
+    ? `\nIMPORT: the owner wrote a link. If they ask to import / bring / copy their products from it (their old shop), call ${IMPORT_PRODUCTS_TOOL.name} with that link, then propose the items it returns through import_products — it is a proposal with Apply like any other. Don't use it for a competitor's site or when they didn't ask to import.`
+    : "";
+  const extraTools = [...lookups, ...(canSearch ? [WEB_SEARCH_TOOL, READ_PAGE_TOOL] : []), ...(hasMedia ? [OPEN_MEDIA_TOOL] : []), ...(importHosts.size ? [IMPORT_PRODUCTS_TOOL] : [])];
   let block: Anthropic.Messages.ToolUseBlock | undefined;
   try {
     for (let step = 0; step < 9 && !block; step++) {
       const mustAnswer =
         !extraTools.length ||
         step >= 6 ||
-        ((!canSearch || (searches >= search.perTurn && reads >= 2)) && (!hasMedia || opens >= MAX_OPENS) && (!lookups.length || lookupsUsed >= MAX_LOOKUPS));
+        ((!canSearch || (searches >= search.perTurn && reads >= 2)) && (!hasMedia || opens >= MAX_OPENS) && (!lookups.length || lookupsUsed >= MAX_LOOKUPS) && (!importHosts.size || imports >= 1));
       const msg = await anthropic.messages.create({
         model: MODEL,
         max_tokens: 16000,
-        system: [SYSTEM_PROMPT_PREFIX + context, planBlock + lookupBlock + meetingBlock + searchBlock, languageNote(message)].filter(Boolean).join("\n"),
+        system: [SYSTEM_PROMPT_PREFIX + context, planBlock + lookupBlock + importBlock + meetingBlock + searchBlock, languageNote(message)].filter(Boolean).join("\n"),
         tools: [...extraTools, ORCHESTRATOR_TOOL],
         tool_choice: mustAnswer ? { type: "tool", name: ORCHESTRATOR_TOOL.name } : { type: "any" },
         messages: convo,
@@ -241,6 +251,18 @@ Needs from you: ${result.needsUserText}` : result.content;
           else {
             lookupsUsed++;
             content = await runLookup(businessId, u.name, (u.input ?? {}) as Record<string, unknown>, { currency, oldestInHistory });
+          }
+          results.push({ type: "tool_result", tool_use_id: u.id, content });
+          continue;
+        }
+        if (u.name === IMPORT_PRODUCTS_TOOL.name) {
+          let content: string;
+          if (imports >= 1) content = "Only one import per reply — answer with what you have.";
+          else {
+            imports++;
+            const r = await runOrchestratorImport(businessId, String(input.url ?? ""), importHosts, currency);
+            imported = r.products;
+            content = r.text;
           }
           results.push({ type: "tool_result", tool_use_id: u.id, content });
           continue;
@@ -283,7 +305,7 @@ Needs from you: ${result.needsUserText}` : result.content;
     const detail = e instanceof Error ? e.message : "Unknown error";
     return NextResponse.json({ error: `Orchestrator couldn't respond: ${detail}` }, { status: 502 });
   }
-  const out = (block?.input ?? {}) as { reply?: string; ops?: unknown; store_changes?: unknown; product_changes?: unknown; new_products?: unknown; delete_products?: unknown; store_design?: unknown; create_content?: unknown; social_posts?: unknown; meta_ads?: unknown; draft_new_plan?: boolean; plan_note?: string; ask_approval?: boolean };
+  const out = (block?.input ?? {}) as { reply?: string; ops?: unknown; store_changes?: unknown; product_changes?: unknown; new_products?: unknown; import_products?: unknown; delete_products?: unknown; store_design?: unknown; create_content?: unknown; social_posts?: unknown; meta_ads?: unknown; draft_new_plan?: boolean; plan_note?: string; ask_approval?: boolean };
   // Only links the model was really shown by web_search can be cited.
   const cited = (Array.isArray((out as { sources?: unknown }).sources) ? ((out as { sources?: unknown[] }).sources as unknown[]) : [])
     .filter((u): u is string => typeof u === "string" && seen.has(u))
@@ -311,6 +333,8 @@ Needs from you: ${result.needsUserText}` : result.content;
   const storeChanges = [
     ...sanitizeStoreChanges(out.store_changes).filter((c) => !sameAsNow(c)),
     ...(await sanitizeProductChanges(businessId, out.product_changes, out.new_products, out.delete_products)),
+    // Products read from the owner's old shop this turn — exactly as the source lists them.
+    ...pickImported(imported, out.import_products).map(toProductCreate),
   ];
   const isLive = !!(await prisma.storeDesign.findUnique({ where: { businessId }, select: { published: true } }))?.published;
   const designJobs: DesignJob[] = sanitizeDesignJobs(out.store_design, isLive);

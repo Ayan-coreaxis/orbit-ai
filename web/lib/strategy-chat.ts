@@ -58,6 +58,12 @@ export const ORCHESTRATOR_TOOL: Anthropic.Messages.Tool = {
       store_changes: STORE_CHANGES_SCHEMA as unknown as Record<string, unknown>,
       product_changes: PRODUCT_CHANGES_SCHEMA as unknown as Record<string, unknown>,
       new_products: NEW_PRODUCTS_SCHEMA as unknown as Record<string, unknown>,
+      import_products: {
+        type: "array",
+        items: { type: "string" },
+        description:
+          "Only after import_products_from returned items in THIS reply: the item refs to propose adding to the store (e.g. ['I1','I4']) or ['ALL']. They are added exactly as the source lists them, as a proposal with Apply. Never retype those items into new_products.",
+      },
       store_design: STORE_DESIGN_SCHEMA as unknown as Record<string, unknown>,
       delete_products: DELETE_PRODUCTS_SCHEMA as unknown as Record<string, unknown>,
       create_content: CREATE_CONTENT_SCHEMA as unknown as Record<string, unknown>,
