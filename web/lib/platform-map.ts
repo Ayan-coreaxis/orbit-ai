@@ -19,7 +19,7 @@ ORBIT DASHBOARD — where things are (send the owner to these exact places; neve
 - Content: Orbit Studio (make product photos, posts, banners, try-ons, reels, UGC and ads — Growth/Scale plans) + Share (post a finished image/reel to Facebook / Instagram) + what was posted. Ads: complete Meta ads with results (built paused; Activate / Pause there). Inbox: customer messages.
 - Money: real revenue & margins. Tax: tax owed. Returns: returns & disputes. Reviews: product reviews. Experiments: A/B tests. Competitors: competitor scans.
 - Connections (Settings → Connections & Skills): MCP connectors, skills and plugins for agents.
-- Settings & Billing: Facebook/Instagram connect (+ connection check, pick Page / ad account), Domain (the store on its own domain), Payment method (COD / Stripe) + store currency, Delivery fee / free-delivery / tax (store operations), Shipping zones, Chat widget & checkout extra fields, Team, plan & usage.`;
+- Settings & Billing: Facebook/Instagram connect (+ connection check, pick Page / ad account), Domain (the store on its own domain), Payment method (COD / Stripe / JazzCash / Easypaisa — the seller pastes their own merchant details in Settings > Payments) + store currency, Delivery fee / free-delivery / tax (store operations), Shipping zones, Chat widget & checkout extra fields, Team, plan & usage.`;
 
 type Doc = Pick<OrbitDesignDoc, "storeName" | "tagline" | "content" | "pages">;
 
@@ -29,6 +29,8 @@ export async function storeStatusContext(businessId: string): Promise<string> {
       where: { id: businessId },
       select: {
         paymentProvider: true,
+        jazzcashIntegritySalt: true,
+        easypaisaHashKey: true,
         stripeSecretKey: true,
         storeCurrency: true,
         shippingFee: true,
@@ -78,7 +80,7 @@ export async function storeStatusContext(businessId: string): Promise<string> {
     `- Live: ${design?.published ? `YES — ${await storeUrl(businessId)}` : "NO (draft only)"}${design?.published && design.backendWiredAt && design.updatedAt > design.backendWiredAt ? " — design edited since last publish; publish again to push everything live" : ""}`,
     built ? `- Brand on the store: name "${doc?.storeName}", tagline "${doc?.tagline}", logo ${content?.logoUrl ? "set" : "missing"}, announcement bar ${content?.announcement?.enabled ? `"${content.announcement.text}"` : "off"}, contact ${[content?.contactPhone, content?.contactEmail].filter(Boolean).join(" / ") || "missing"}, socials ${Object.entries(content?.socials ?? {}).filter(([, v]) => v).map(([k]) => k).join(", ") || "none"}` : "",
     `- Products: ${products.length} (${products.filter((p) => p.imageUrl).length} with photos)`,
-    `- Payments: ${b.paymentProvider === "stripe" ? (b.stripeSecretKey ? "Stripe (connected)" : "Stripe selected but keys missing") : "Cash on delivery"}; currency ${(b.storeCurrency || "usd").toUpperCase()}; delivery fee ${b.shippingFee}; ${zones} shipping zone(s)`,
+    `- Payments: ${b.paymentProvider === "stripe" ? (b.stripeSecretKey ? "Stripe (connected)" : "Stripe selected but keys missing") : "Cash on delivery"}${b.jazzcashIntegritySalt ? " + JazzCash" : ""}${b.easypaisaHashKey ? " + Easypaisa" : ""}; currency ${(b.storeCurrency || "usd").toUpperCase()}; delivery fee ${b.shippingFee}; ${zones} shipping zone(s)`,
     `- Connected: Facebook ${b.metaPageId ? "yes" : "no"}, Instagram ${b.metaInstagramUserId ? "yes" : "no"}, Ad account ${b.metaAdAccountId ? "yes" : "no"}, WhatsApp ${b.whatsappInboundNumber ? "yes" : "no"}`,
     missing.length ? `- NOT READY YET: ${missing.join("; ")}` : "- Launch checklist: all basics in place.",
   ].filter(Boolean);

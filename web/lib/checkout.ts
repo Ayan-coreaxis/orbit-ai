@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { isOnlinePayment } from "@/lib/payment-methods";
 import { money } from "@/lib/money";
 import { resolvePurchasable } from "@/lib/variants";
 import { lookupGiftCard, giftCardRedeemAmount } from "@/lib/gift-cards";
@@ -77,7 +78,7 @@ export function computeTotals(input: {
  * must only put back what was taken — otherwise an unpaid card order would create phantom stock.
  */
 export function stockWasTaken(order: { paymentProvider: string; paymentStatus: string; flagReason?: string | null }): boolean {
-  if (order.paymentProvider !== "stripe") return true;
+  if (!isOnlinePayment(order.paymentProvider)) return true;
   return order.paymentStatus === "paid" && !(order.flagReason ?? "").includes("stock ran out");
 }
 

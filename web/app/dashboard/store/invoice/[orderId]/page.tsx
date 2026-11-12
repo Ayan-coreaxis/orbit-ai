@@ -1,3 +1,4 @@
+import { paymentMethodLabel } from "@/lib/payment-methods";
 import { notFound } from "next/navigation";
 import { getActiveBusinessId } from "@/lib/get-active-business-id";
 import { prisma } from "@/lib/prisma";
@@ -82,7 +83,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ orderI
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".05em", color: "#888" }}>Payment</div>
           <div style={{ fontSize: 14, marginTop: 4 }}>
-            {order.paymentProvider === "stripe" ? "Paid by card" : "Cash on delivery"} · {order.paymentStatus}
+            {order.paymentProvider === "stripe" ? "Paid by card" : paymentMethodLabel(order.paymentProvider)} · {order.paymentStatus}
           </div>
           {order.courierName && (
             <div style={{ fontSize: 13, marginTop: 6, color: "#555" }}>

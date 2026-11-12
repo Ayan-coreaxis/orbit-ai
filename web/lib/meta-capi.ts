@@ -1,4 +1,5 @@
 import { createHash } from "crypto";
+import { isOnlinePayment } from "@/lib/payment-methods";
 import { prisma } from "@/lib/prisma";
 import { GRAPH_BASE } from "@/lib/meta-oauth";
 import { clientIp } from "@/lib/guard";
@@ -76,7 +77,7 @@ export async function sendPurchaseEvent(orderId: string, f: Fetch = fetch): Prom
   // Only real sales: not cancelled, card orders paid, COD orders confirmed by the shopper and not
   // held as suspicious (a flagged order counts once the seller confirms or ships it).
   if (order.status === "cancelled") return { sent: false, error: "Cancelled." };
-  if (order.paymentProvider === "stripe" && order.paymentStatus !== "paid") return { sent: false, error: "Not paid yet." };
+  if (isOnlinePayment(order.paymentProvider) && order.paymentStatus !== "paid") return { sent: false, error: "Not paid yet." };
   if (!order.verified) return { sent: false, error: "Waiting for the shopper to confirm." };
   if (order.flagged && !["confirmed", "shipped", "fulfilled"].includes(order.status)) return { sent: false, error: "Flagged — waiting for the seller." };
   const token = b.metaCapiToken?.trim() || b.metaUserToken;

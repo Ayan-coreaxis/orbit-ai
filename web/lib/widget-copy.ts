@@ -30,6 +30,8 @@ export const DEFAULT_WIDGET_COPY = {
   "cart.clear": "Clear",
   "cart.cod": "Cash on delivery",
   "cart.payByCard": "Pay by card",
+  "cart.payJazzcash": "JazzCash",
+  "cart.payEasypaisa": "Easypaisa",
   "cart.placingOrder": "Placing order…",
   "cart.placeOrder": "Place order · {total}",
   "cart.payAmount": "Pay {total}",

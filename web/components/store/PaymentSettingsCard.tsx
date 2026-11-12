@@ -4,15 +4,20 @@ import { useState } from "react";
 import { Card, SectionLabel, Pill } from "@/components/ui";
 import { CreditCard } from "lucide-react";
 import { STORE_CURRENCIES } from "@/lib/currencies";
+import { WalletSettings, type WalletStatus } from "./WalletSettings";
 
 export function PaymentSettingsCard({
   initialProvider,
   initialStripeConfigured,
   initialCurrency,
+  initialWallets,
+  easypaisaIpnUrl,
 }: {
   initialProvider: string;
   initialStripeConfigured: boolean;
   initialCurrency: string;
+  initialWallets: WalletStatus;
+  easypaisaIpnUrl: string;
 }) {
   const [provider, setProvider] = useState(initialProvider);
   const [secretKey, setSecretKey] = useState("");
@@ -60,7 +65,7 @@ export function PaymentSettingsCard({
       </div>
       <p className="mt-2 text-[13px] leading-relaxed text-text-dim">
         Real customer payments go straight to your own account — the platform never touches this
-        money. Bring your own Stripe account to accept real cards, or stay on cash on delivery.
+        money. Bring your own Stripe account to accept real cards, add JazzCash or Easypaisa below, or stay on cash on delivery.
       </p>
 
       <div className="mt-4">
@@ -149,6 +154,8 @@ export function PaymentSettingsCard({
       {message && (
         <p className={`mt-3 text-[12.5px] ${message.tone === "good" ? "text-good" : "text-bad"}`}>{message.text}</p>
       )}
+
+      <WalletSettings initial={initialWallets} isPkr={currency.toLowerCase() === "pkr"} easypaisaIpnUrl={easypaisaIpnUrl} />
     </Card>
   );
 }

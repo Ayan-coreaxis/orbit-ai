@@ -1,3 +1,4 @@
+import { isWalletProvider, paymentMethodLabel } from "@/lib/payment-methods";
 import type Anthropic from "@anthropic-ai/sdk";
 import { prisma } from "@/lib/prisma";
 import { money } from "@/lib/money";
@@ -217,7 +218,7 @@ async function findOrders(businessId: string, input: Record<string, unknown>, cu
     } catch {
       city = "";
     }
-    const pay = o.paymentProvider === "cod" ? `COD ${o.paymentStatus === "paid" ? "cash collected" : "not collected yet"}` : `card ${o.paymentStatus}`;
+    const pay = o.paymentProvider === "cod" ? `COD ${o.paymentStatus === "paid" ? "cash collected" : "not collected yet"}` : `${isWalletProvider(o.paymentProvider) ? paymentMethodLabel(o.paymentProvider) : "card"} ${o.paymentStatus}`;
     return `#${o.id.slice(-6).toUpperCase()} · ${o.createdAt.toISOString().slice(0, 10)} · ${o.customerName} (${o.customerPhone})${city ? ` · ${city}` : ""} · ${items} · ${money(o.total, currency)} · ${o.status}${o.verified ? "" : " (awaiting customer confirmation)"} · ${pay}${o.riskLevel ? ` · ${o.riskLevel} risk (${o.riskScore ?? "?"}/100)` : ""}${o.flagged ? ` · FLAGGED: ${o.flagReason ?? ""}` : ""}${o.couponCode ? ` · code ${o.couponCode}` : ""}`;
   });
   return `${count} order${count === 1 ? "" : "s"} match${count > orders.length ? ` (newest ${orders.length} shown)` : ""}:\n${lines.join("\n")}`;

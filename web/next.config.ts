@@ -6,7 +6,7 @@ const securityHeaders = [
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   { key: "Permissions-Policy", value: "camera=(), geolocation=(), payment=(self), microphone=(self)" },
   // Pages may only be framed by Orbit itself (Orbit Design previews) — stops clickjacking.
-  { key: "Content-Security-Policy", value: "frame-ancestors 'self'; base-uri 'self'; form-action 'self' https://checkout.stripe.com; object-src 'none'" },
+  { key: "Content-Security-Policy", value: "frame-ancestors 'self'; base-uri 'self'; form-action 'self' https://checkout.stripe.com https://sandbox.jazzcash.com.pk https://payments.jazzcash.com.pk https://easypaystg.easypaisa.com.pk https://easypay.easypaisa.com.pk; object-src 'none'" },
   { key: "X-Frame-Options", value: "SAMEORIGIN" },
 ];
 

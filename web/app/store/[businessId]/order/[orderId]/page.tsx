@@ -4,6 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { tokenCss, defaultTokens, googleFontHref, type OrbitDesignDoc } from "@/lib/orbit-design";
 import { money } from "@/lib/money";
 import { finalizeStripeOrder } from "@/lib/checkout-finalize";
+import { isOnlinePayment, isWalletProvider, paymentMethodLabel } from "@/lib/payment-methods";
+import { getStoreStripe, paymentOptions } from "@/lib/store-stripe";
 import { copyText, parseWidgetCopy, statusLabel } from "@/lib/widget-copy";
 import { PixelPurchase } from "@/components/store/PixelPurchase";
 import { StoreCartBar } from "../../../StoreCartBar";
@@ -25,10 +27,10 @@ export default async function OrderConfirmationPage({
   searchParams,
 }: {
   params: Promise<{ businessId: string; orderId: string }>;
-  searchParams: Promise<{ session_id?: string }>;
+  searchParams: Promise<{ session_id?: string; pay?: string; why?: string }>;
 }) {
   const { businessId, orderId } = await params;
-  const { session_id } = await searchParams;
+  const { session_id, pay, why } = await searchParams;
 
   // Coming back from Stripe — confirm the payment before we render "order placed".
   if (session_id) {
@@ -42,7 +44,7 @@ export default async function OrderConfirmationPage({
 
   const business = await prisma.business.findUnique({
     where: { id: businessId },
-    select: { name: true, storeCurrency: true, storeDesign: { select: { doc: true } }, widgetCopy: true },
+    select: { name: true, storeCurrency: true, storeDesign: { select: { doc: true } }, widgetCopy: true, paymentProvider: true },
   });
   const widgetCopy = parseWidgetCopy(business?.widgetCopy);
   let doc: OrbitDesignDoc | null = null;
@@ -64,8 +66,27 @@ export default async function OrderConfirmationPage({
   const css = `${tokenCss(tokens).replace(":root{", "body{")}
 *{box-sizing:border-box}body{margin:0;font-family:var(--od-font-body);color:var(--od-text);background:var(--od-bg);line-height:1.6}`;
 
-  const awaitingPayment = order.paymentProvider === "stripe" && order.paymentStatus !== "paid";
   const cancelled = order.status === "cancelled";
+  const awaitingPayment = isOnlinePayment(order.paymentProvider) && order.paymentStatus !== "paid";
+  // An unpaid JazzCash / Easypaisa order: the shopper can try the wallet again, or (when the store
+  // takes cash) switch this same order to cash on delivery. `pay` / `why` only pick the wording —
+  // whether it's paid always comes from the order itself.
+  const walletName = isWalletProvider(order.paymentProvider) ? paymentMethodLabel(order.paymentProvider) : null;
+  const walletUnpaid = !!walletName && awaitingPayment && !cancelled && order.status === "pending";
+  const codOffered = walletUnpaid && paymentOptions(business?.paymentProvider, !!(await getStoreStripe(businessId))).includes("cod");
+  const walletMessage = !walletUnpaid
+    ? null
+    : pay === "confirming"
+      ? `We're waiting for ${walletName} to confirm your payment. This usually takes a moment — refresh this page shortly. If you didn't finish paying, you can try again.`
+      : pay === "failed"
+        ? why === "mismatch" || why === "unverified"
+          ? `We couldn't confirm a ${walletName} payment for this order, so it isn't paid yet. You can try again${codOffered ? " or pay cash on delivery instead" : ""}. If money left your account, contact ${storeName} with your order number.`
+          : `Your ${walletName} payment didn't go through, so this order isn't paid yet. You can try again${codOffered ? " or pay cash on delivery instead" : ""}.`
+        : pay === "unavailable"
+          ? `${walletName} isn't available on this store right now.${codOffered ? " You can pay cash on delivery instead." : ""}`
+          : pay === "codfailed"
+            ? `We couldn't switch this order to cash on delivery — an item may have just sold out. Please contact ${storeName}.`
+            : `This order is waiting for your ${walletName} payment.`;
   const stepIdx = cancelled ? -1 : STEPS.indexOf(order.status as (typeof STEPS)[number]);
 
   return (
@@ -95,13 +116,35 @@ export default async function OrderConfirmationPage({
               : copyText("order.placedHeading", widgetCopy)}
         </h1>
         <p style={{ color: "var(--od-muted)" }}>
-          {awaitingPayment
+          {walletMessage
+            ? walletMessage
+            : awaitingPayment
             ? `We haven't received payment for this order yet. If you completed checkout, refresh in a moment.`
             : cancelled
               ? `This order was cancelled. If that's a surprise, contact ${storeName}.`
               : `Thanks, ${order.customerName.split(" ")[0]}. ${storeName} has your order and will call ${order.customerPhone} to confirm delivery.`}
         </p>
 
+        {walletUnpaid && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 16 }}>
+            <a
+              href={`/api/store/${businessId}/pay/${order.id}`}
+              style={{ padding: "10px 18px", borderRadius: "var(--od-radius)", background: "var(--od-accent)", color: "var(--od-accent-text, #fff)", textDecoration: "none", fontSize: 14, fontWeight: 600 }}
+            >
+              {pay === "failed" || pay === "confirming" ? `Try ${walletName} again` : `Pay with ${walletName}`}
+            </a>
+            {codOffered && (
+              <form method="post" action={`/api/store/${businessId}/pay/${order.id}/cod`} style={{ margin: 0 }}>
+                <button
+                  type="submit"
+                  style={{ padding: "10px 18px", borderRadius: "var(--od-radius)", background: "transparent", color: "var(--od-text)", border: "1px solid var(--od-border)", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+                >
+                  Pay cash on delivery instead
+                </button>
+              </form>
+            )}
+          </div>
+        )}
         {!awaitingPayment && !cancelled && (
           <div style={{ display: "flex", gap: 0, marginTop: 20 }}>
             {STEPS.map((s, i) => (
@@ -167,7 +210,17 @@ export default async function OrderConfirmationPage({
               </div>
             ))}
           <div style={{ display: "flex", justifyContent: "space-between", marginTop: 14, paddingTop: 14, borderTop: "1px solid var(--od-border)", fontWeight: 700 }}>
-            <span>Total ({order.paymentProvider === "stripe" ? "paid by card" : "cash on delivery"})</span>
+            <span>
+              Total (
+              {order.paymentProvider === "stripe"
+                ? "paid by card"
+                : isWalletProvider(order.paymentProvider)
+                  ? order.paymentStatus === "paid"
+                    ? `paid by ${paymentMethodLabel(order.paymentProvider)}`
+                    : `${paymentMethodLabel(order.paymentProvider)} — not paid yet`
+                  : "cash on delivery"}
+              )
+            </span>
             <span>{money(order.total, business?.storeCurrency)}</span>
           </div>
         </div>

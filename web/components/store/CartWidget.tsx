@@ -1,5 +1,6 @@
 "use client";
 
+import type { PaymentMethod } from "@/lib/payment-methods";
 import { firePixel } from "@/lib/pixel-client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -102,8 +103,8 @@ export function CartWidget({
   const [useLoyalty, setUseLoyalty] = useState(false);
   const [loyaltyPointsInput, setLoyaltyPointsInput] = useState("");
   const [quote, setQuote] = useState<Quote | null>(null);
-  const [options, setOptions] = useState<("cod" | "stripe")[]>(["cod"]);
-  const [payment, setPayment] = useState<"cod" | "stripe">("cod");
+  const [options, setOptions] = useState<PaymentMethod[]>(["cod"]);
+  const [payment, setPayment] = useState<PaymentMethod>("cod");
   const [submitting, setSubmitting] = useState(false);
   const [errorState, setErrorState] = useState<{ msg: string; key: string } | null>(null);
   const [placed, setPlaced] = useState<null | { needsVerify: boolean }>(null);
@@ -372,7 +373,8 @@ export function CartWidget({
         return;
       }
       if (data.redirect) {
-        window.location.href = data.redirect; // off to Stripe
+        if (payment !== "stripe") clearCart(businessId); // a wallet order already exists — retry and "switch to COD" live on its order page
+        window.location.href = data.redirect; // off to Stripe, or to JazzCash / Easypaisa
         return;
       }
       clearCart(businessId);
@@ -790,7 +792,7 @@ export function CartWidget({
                 {options.map((o) => (
                   <label key={o} style={{ display: "flex", gap: 10, alignItems: "center", fontSize: 14, cursor: "pointer" }}>
                     <input type="radio" name="pay" checked={payment === o} onChange={() => setPayment(o)} style={{ accentColor: "var(--od-accent)" }} />
-                    {o === "cod" ? copyText("cart.cod", widgetCopy) : copyText("cart.payByCard", widgetCopy)}
+                    {copyText(o === "cod" ? "cart.cod" : o === "jazzcash" ? "cart.payJazzcash" : o === "easypaisa" ? "cart.payEasypaisa" : "cart.payByCard", widgetCopy)}
                   </label>
                 ))}
               </div>
@@ -803,7 +805,7 @@ export function CartWidget({
             <button type="button" className="odw-btn" disabled={submitting} onClick={() => placeOrder()}>
               {submitting
                 ? copyText("cart.placingOrder", widgetCopy)
-                : payment === "stripe"
+                : payment !== "cod"
                   ? copyText("cart.payAmount", widgetCopy, { total: money(totalShown, currency) })
                   : copyText("cart.placeOrder", widgetCopy, { total: money(totalShown, currency) })}
             </button>

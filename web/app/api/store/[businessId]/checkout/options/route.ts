@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getStoreStripe, paymentOptions } from "@/lib/store-stripe";
+import { getStoreStripe } from "@/lib/store-stripe";
+import { getStoreWallets, allPaymentOptions } from "@/lib/store-wallets";
 
 /** Public: what the storefront cart should show — payment methods + shipping rule. */
 export async function GET(_req: Request, { params }: { params: Promise<{ businessId: string }> }) {
@@ -13,7 +14,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ busines
 
   const conn = await getStoreStripe(businessId);
   return NextResponse.json({
-    options: paymentOptions(b.paymentProvider, !!conn),
+    options: allPaymentOptions(b.paymentProvider, !!conn, await getStoreWallets(businessId)),
     currency: b.storeCurrency || "usd",
     shippingFee: b.shippingFee || 0,
     freeShippingOver: b.freeShippingOver,

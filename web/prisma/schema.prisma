@@ -71,6 +71,15 @@ model Business {
   stripeSecretKey      String? // seller's own — never the platform's key
   stripePublishableKey String?
   stripeWebhookSecret  String? // seller's own storefront webhook signing secret (optional — the return-url check is the primary confirmation path)
+  // Pakistani wallets on the SELLER's own merchant accounts (PKR stores only) — offered at checkout
+  // next to paymentProvider's methods whenever the credentials below are saved. lib/pk-wallets.ts
+  jazzcashMerchantId    String?
+  jazzcashPassword      String? // seller's own — never sent back to the dashboard
+  jazzcashIntegritySalt String? // seller's own — signs every request and verifies every response
+  jazzcashSandbox       Boolean @default(true)
+  easypaisaStoreId      String?
+  easypaisaHashKey      String? // seller's own — never sent back to the dashboard
+  easypaisaSandbox      Boolean @default(true)
   storeCurrency        String  @default("usd") // real 3-letter currency Stripe should charge in — must match what the seller's own Stripe account actually settles in
   shippingFee          Float   @default(0) // flat delivery fee added at checkout, in storeCurrency — the fallback rate when no zone matches (or no zones exist)
   freeShippingOver     Float? // order subtotal at/above which shipping is free — null = never free (applies to the fallback rate; a zone can also set its own)
@@ -848,7 +857,8 @@ model Order {
   verifiedAt              DateTime?
   verifyToken             String? // one-time token for the "confirm your order" link
   status                  String         @default("pending") // pending | confirmed | shipped | fulfilled | cancelled — real fulfillment status
-  paymentProvider         String         @default("cod") // cod | stripe
+  paymentProvider         String         @default("cod") // cod | stripe | jazzcash | easypaisa
+  paymentRef              String? // JazzCash pp_TxnRefNo / Easypaisa orderRefNum of the latest attempt; once paid, the reference that was paid
   paymentStatus           String         @default("paid") // paid | pending | failed — cod is treated as "paid" (paid on delivery); real Stripe orders start "pending" and flip to "paid" only once a real Checkout Session is confirmed
   stripeSessionId         String? // real Stripe Checkout Session id, for real Stripe orders only
   adContext               String? // JSON {fbp, fbc, ip, ua, url} from the checkout request — matches the Conversions API purchase to the shopper

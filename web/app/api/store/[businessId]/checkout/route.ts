@@ -9,7 +9,9 @@ import { notifyOrder, originFromRequest } from "@/lib/order-notify";
 import { adContextFrom, sendPurchaseEvent } from "@/lib/meta-capi";
 import { notifyCustomer, notifySeller } from "@/lib/notify";
 import { quoteCheckout, applyStockDelta, OutOfStockError } from "@/lib/checkout";
-import { getStoreStripe, paymentOptions } from "@/lib/store-stripe";
+import { getStoreStripe } from "@/lib/store-stripe";
+import { getStoreWallets, allPaymentOptions } from "@/lib/store-wallets";
+import { isWalletProvider, type PaymentMethod } from "@/lib/payment-methods";
 import { screenOrder } from "@/lib/fraud";
 import { bestEffort } from "@/lib/log";
 import { newVerifyToken } from "@/lib/order-verify";
@@ -40,7 +42,8 @@ function formatAddress(a: AddressInput, fallback: string): string {
 /**
  * The one checkout endpoint. Server-authoritative pricing (`quoteCheckout` — items, coupon rules,
  * shipping, tax), a real fraud screen, optional COD confirmation, idempotency, then a
- * cash-on-delivery order or a Stripe Checkout Session on the SELLER's own account. Notifications
+ * cash-on-delivery order, a Stripe Checkout Session, or a JazzCash / Easypaisa hosted payment —
+ * all on the SELLER's own account. Notifications
  * run after the response so a slow Twilio never slows checkout.
  */
 export async function POST(req: NextRequest, { params }: { params: Promise<{ businessId: string }> }) {
@@ -78,7 +81,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ bus
     couponCode?: string;
     giftCardCode?: string;
     loyaltyPointsRedeem?: number;
-    payment?: "cod" | "stripe";
+    payment?: PaymentMethod;
     clientToken?: string;
     customFields?: Record<string, unknown>;
   };
@@ -91,7 +94,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ bus
   // ---- idempotency: a retried submit returns the first order ----
   if (clientToken) {
     const existing = await prisma.order.findUnique({ where: { clientToken } });
-    if (existing) return NextResponse.json({ orderId: existing.id, total: existing.total, duplicate: true });
+    if (existing)
+      return NextResponse.json({
+        orderId: existing.id,
+        total: existing.total,
+        duplicate: true,
+        // an unpaid wallet order still needs its trip to the wallet's page
+        ...(existing.businessId === businessId && isWalletProvider(existing.paymentProvider) && existing.paymentStatus !== "paid" && existing.status === "pending"
+          ? { redirect: `${originFromRequest(req)}/api/store/${businessId}/pay/${existing.id}` }
+          : {}),
+      });
   }
 
   const structured = b.shipping && typeof b.shipping === "object" ? { ...b.shipping, city: displayCity(b.shipping.city) } : null;
@@ -118,8 +130,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ bus
   if (!quote.ok) return NextResponse.json({ error: quote.error ?? "Couldn't price this order." }, { status: 400 });
 
   const conn = await getStoreStripe(businessId);
-  const allowed = paymentOptions(business.paymentProvider, !!conn);
-  const payment: "cod" | "stripe" = b.payment && allowed.includes(b.payment) ? b.payment : allowed[0];
+  const wallets = await getStoreWallets(businessId);
+  const allowed = allPaymentOptions(business.paymentProvider, !!conn, wallets);
+  const payment: PaymentMethod = b.payment && allowed.includes(b.payment) ? b.payment : allowed[0];
 
   const origin = originFromRequest(req);
 
@@ -171,6 +184,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ bus
     riskLevel: fraud.level,
     riskSignals: JSON.stringify(fraud.signals),
   };
+
+  // ---------------- JazzCash / Easypaisa ----------------
+  // The order waits unpaid (no stock taken yet, like a card order); the shopper goes to Orbit's
+  // hand-off page, which posts them to the wallet. It only becomes paid on a verified response.
+  if (isWalletProvider(payment)) {
+    const order = await prisma.order.create({
+      data: { ...baseData, status: "pending", paymentProvider: payment, paymentStatus: "pending", verified: true },
+    });
+    return NextResponse.json({ redirect: `${origin}/api/store/${businessId}/pay/${order.id}`, orderId: order.id });
+  }
 
   // ---------------- Stripe ----------------
   if (payment === "stripe") {

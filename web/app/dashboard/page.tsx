@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { paymentMethodLabel } from "@/lib/payment-methods";
 import {
   AlertTriangle,
   ArrowRight,
@@ -263,7 +264,7 @@ export default async function DashboardPage() {
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-[13.5px] font-medium">{o.customerName}</div>
                       <div className="text-[11.5px] text-text-faint">
-                        #{o.id.slice(-6).toUpperCase()} · {formatRelativeTime(o.createdAt, now)} · {o.paymentProvider === "cod" ? "COD" : "Card"}
+                        #{o.id.slice(-6).toUpperCase()} · {formatRelativeTime(o.createdAt, now)} · {o.paymentProvider === "cod" ? "COD" : paymentMethodLabel(o.paymentProvider)}
                       </div>
                     </div>
                     <div className="text-right">
