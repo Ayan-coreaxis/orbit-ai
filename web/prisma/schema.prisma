@@ -178,6 +178,44 @@ model Business {
   studioJobs  StudioJob[]
   socialPosts SocialPost[]
   platformPayments PlatformPayment[]
+  commentRules     CommentRule[]
+  commentDmLogs    CommentDmLog[]
+}
+
+// Instagram comment-to-DM: when someone comments one of `keywords` on the seller's post, Orbit
+// sends that person a private reply (and optionally a short public reply under the comment).
+model CommentRule {
+  id          String   @id @default(cuid())
+  businessId  String
+  business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  keywords    String // JSON: string[] — lower-case words / short phrases, matched as whole words
+  postId      String? // Instagram media id; null = every post
+  dmText      String // may contain {{product}} {{price}} {{link}}
+  productId   String? // the product {{product}} / {{price}} / {{link}} are filled from; null = the store itself ({{link}} only)
+  product     Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  publicReply String? // short reply posted under the comment; null = no public reply
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  @@index([businessId, active])
+}
+
+// One row per Instagram comment a rule matched — stops a redelivered webhook from sending twice
+// and is what the per-commenter rate limit counts.
+model CommentDmLog {
+  id            String   @id @default(cuid())
+  businessId    String
+  business      Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  ruleId        String?
+  commentId     String // Instagram comment id
+  commenterId   String // Instagram-scoped user id of the commenter
+  commenterName String?
+  status        String   @default("pending") // pending | sent | failed | rate_limited
+  error         String?
+  createdAt     DateTime @default(now())
+
+  @@unique([businessId, commentId])
+  @@index([businessId, commenterId, createdAt])
 }
 
 /** A staff account with dashboard access to a business it doesn't own — invited by email. If the
@@ -656,6 +694,7 @@ model Product {
 
   variants     ProductVariant[]
   bundleItems  BundleItem[]
+  commentRules CommentRule[]
 }
 
 model Category {

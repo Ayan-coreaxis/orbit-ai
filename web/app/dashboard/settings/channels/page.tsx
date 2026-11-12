@@ -6,11 +6,28 @@ import { getSettingsBusiness } from "@/lib/settings-data";
 import { isMetaAppConfigured } from "@/lib/meta-oauth";
 import { WhatsAppBossCard } from "@/components/settings/WhatsAppBossCard";
 import { ownerNumberKey } from "@/lib/whatsapp-boss";
+import { CommentRulesManager } from "@/components/settings/CommentRulesManager";
+import { listCommentRules } from "@/lib/comment-rules-data";
+import { prisma } from "@/lib/prisma";
+import { publicStoreUrl } from "@/lib/public-url";
+import { money } from "@/lib/money";
 
 export default async function ChannelsSettingsPage({ searchParams }: { searchParams: Promise<{ meta?: string }> }) {
   const { meta } = await searchParams;
   const b = await getSettingsBusiness();
   if (!b) return <p className="text-[13.5px] text-text-faint">No business yet — finish setup first.</p>;
+
+  const [rules, products, igPosts, storeLink] = await Promise.all([
+    listCommentRules(b.businessId),
+    prisma.product.findMany({ where: { businessId: b.businessId }, orderBy: { createdAt: "desc" }, take: 300, select: { id: true, name: true, price: true } }),
+    prisma.socialPost.findMany({
+      where: { businessId: b.businessId, platform: "instagram", status: "posted", externalId: { not: null } },
+      orderBy: { createdAt: "desc" },
+      take: 30,
+      select: { externalId: true, caption: true, createdAt: true },
+    }),
+    publicStoreUrl(b.businessId),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -24,6 +41,17 @@ export default async function ChannelsSettingsPage({ searchParams }: { searchPar
         hasAdAccount={!!b.metaAdAccountId}
         connectedAt={b.metaConnectedAt ? b.metaConnectedAt.toISOString() : null}
         metaStatus={meta}
+      />
+
+      <CommentRulesManager
+        initial={rules}
+        products={products.map((p) => ({ id: p.id, name: p.name, price: money(p.price, b.storeCurrency), link: storeLink ? `${storeLink}/product/${p.id}` : null }))}
+        posts={igPosts.map((p) => ({
+          id: p.externalId!,
+          label: `${p.createdAt.toISOString().slice(0, 10)} — ${p.caption.replace(/\s+/g, " ").trim().slice(0, 50) || "Instagram post"}`,
+        }))}
+        storeLink={storeLink}
+        instagramConnected={!!b.metaInstagramUserId}
       />
 
       <Card className="p-6 sm:p-7">

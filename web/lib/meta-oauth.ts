@@ -25,7 +25,15 @@ const SCOPES = [
   "pages_messaging", // the store chatbot answers Messenger DMs
   "pages_manage_metadata", // subscribe the Page so its DMs reach Orbit
   "instagram_manage_messages", // …and Instagram DMs
+  "instagram_manage_comments", // comment-to-DM: get comments on the seller's posts, reply under them
 ].join(",");
+
+/**
+ * App Review list for Instagram comment-to-DM: instagram_manage_comments (new),
+ * instagram_manage_messages, instagram_basic, pages_messaging, pages_manage_metadata,
+ * pages_read_engagement, pages_show_list. When META_LOGIN_CONFIG_ID is set the permissions come
+ * from that Configuration instead of SCOPES — add instagram_manage_comments to it in the Meta app.
+ */
 
 /** The permissions each Orbit feature needs — the connection check reports what's missing. */
 export const NEEDED_PERMISSIONS: Record<string, string[]> = {
@@ -35,6 +43,7 @@ export const NEEDED_PERMISSIONS: Record<string, string[]> = {
   "Read ad results": ["ads_read"],
   "Answer Messenger DMs": ["pages_messaging", "pages_manage_metadata"],
   "Answer Instagram DMs": ["instagram_manage_messages"],
+  "Instagram comment-to-DM": ["instagram_manage_comments", "instagram_manage_messages"],
 };
 
 function getAppCredentials(): { appId: string; appSecret: string } | null {

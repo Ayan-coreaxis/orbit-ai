@@ -2,11 +2,13 @@ import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
 import { GRAPH_BASE } from "@/lib/meta-oauth";
 import { getChatbotReply } from "@/lib/chatbot";
+import { handleInstagramComments, type CommentChange, type CommentOutcome } from "@/lib/comment-dm";
 
 /**
  * Facebook Messenger + Instagram DMs → the seller's store chatbot, and into /dashboard/inbox.
  *  - The platform owner points the Meta app's webhook (objects "page" and "instagram", field
- *    "messages") at /api/webhooks/meta with META_WEBHOOK_VERIFY_TOKEN.
+ *    "messages"; plus "comments" on "instagram" for comment-to-DM, see lib/comment-dm.ts) at
+ *    /api/webhooks/meta with META_WEBHOOK_VERIFY_TOKEN.
  *  - When a seller connects (or switches) their Page, Orbit subscribes that Page to the app.
  *  - Each incoming DM is checked against Meta's signature, answered by the chatbot, and the reply
  *    goes back from the seller's own Page / Instagram account.
@@ -30,7 +32,15 @@ export function validMetaSignature(raw: string, header: string | null): boolean 
   return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
 
-/** Ask Meta to deliver this Page's (and its Instagram's) messages to Orbit. Best effort. */
+/**
+ * Webhook fields Orbit subscribes to on the Meta app's "instagram" object (App dashboard >
+ * Webhooks): "messages" for DMs and "comments" for comment-to-DM. With Facebook Login these are
+ * app-level subscriptions — there is no per-account call for them; an Instagram account's events
+ * start arriving once its linked Page has the app installed, which subscribePage does.
+ */
+export const INSTAGRAM_WEBHOOK_FIELDS = ["messages", "comments"] as const;
+
+/** Ask Meta to deliver this Page's (and its Instagram's) messages and comments to Orbit. Best effort. */
 export async function subscribePage(pageId: string, pageToken: string, f: Fetch = fetch): Promise<{ ok: boolean; error?: string }> {
   try {
     const res = await f(`${GRAPH_BASE}/${pageId}/subscribed_apps`, {
@@ -79,7 +89,7 @@ type Messaging = {
   message?: { mid?: string; text?: string; is_echo?: boolean; attachments?: { type?: string }[] };
   postback?: { title?: string; payload?: string };
 };
-export type MetaWebhookBody = { object?: string; entry?: { id?: string; messaging?: Messaging[] }[] };
+export type MetaWebhookBody = { object?: string; entry?: { id?: string; messaging?: Messaging[]; changes?: CommentChange[] }[] };
 
 // Meta can deliver the same message twice; remember recent ids so the customer gets one answer.
 const seen = new Map<string, number>();
@@ -92,13 +102,22 @@ function firstTime(mid: string): boolean {
 }
 
 /** Handle one verified webhook delivery. Returns what it did, for logs/tests. */
-export async function handleMetaWebhook(body: MetaWebhookBody, f: Fetch = fetch): Promise<{ handled: number; replies: { to: string; sent: boolean; error?: string }[] }> {
+export async function handleMetaWebhook(body: MetaWebhookBody, f: Fetch = fetch): Promise<{ handled: number; replies: { to: string; sent: boolean; error?: string }[]; comments: CommentOutcome[] }> {
   const channel: DmChannel | null = body.object === "page" ? "messenger" : body.object === "instagram" ? "instagram" : null;
-  const out = { handled: 0, replies: [] as { to: string; sent: boolean; error?: string }[] };
+  const out = { handled: 0, replies: [] as { to: string; sent: boolean; error?: string }[], comments: [] as CommentOutcome[] };
   if (!channel) return out;
 
   for (const entry of body.entry ?? []) {
     if (!entry.id) continue;
+    // Instagram comments (comment-to-DM) arrive as "changes"; DMs as "messaging".
+    if (channel === "instagram" && entry.changes?.length) {
+      try {
+        out.comments.push(...(await handleInstagramComments(entry.id, entry.changes, f)));
+      } catch (e) {
+        console.error("meta.webhook comments failed:", e);
+      }
+    }
+    if (!entry.messaging?.length) continue;
     const business = await prisma.business.findFirst({
       where: channel === "messenger" ? { metaPageId: entry.id } : { metaInstagramUserId: entry.id },
       select: { id: true, metaAccessToken: true, metaPageId: true, metaInstagramUserId: true },
