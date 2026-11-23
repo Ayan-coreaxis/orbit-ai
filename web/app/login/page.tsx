@@ -14,7 +14,7 @@ export default function LoginPage() {
       footer={
         <>
           New to Orbit?{" "}
-          <Link href="/signup" className="font-medium text-zinc-200 hover:text-white">
+          <Link href="/signup" className="font-medium text-text hover:text-text">
             Create an account
           </Link>
         </>

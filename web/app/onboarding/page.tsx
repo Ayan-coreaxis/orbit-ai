@@ -238,21 +238,15 @@ export default function Onboarding() {
   const canContinueStep0 = business.name.trim().length > 0 && business.niche.trim().length > 0;
 
   return (
-    <div ref={pageRef} className="relative min-h-screen overflow-hidden bg-[#0a0a0c] text-zinc-100">
-      <div
-        className="pointer-events-none absolute inset-x-0 top-0 h-[600px]"
-        style={{
-          background: "radial-gradient(600px circle at 50% 0%, rgba(168,85,247,0.18), transparent 60%)",
-        }}
-      />
+    <div ref={pageRef} className="relative min-h-screen overflow-hidden text-text">
       <div className="relative flex min-h-screen items-center justify-center px-6 py-12">
         <div className="w-full max-w-xl">
           <div data-entrance className="mb-8 flex items-center justify-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 via-fuchsia-500 to-orange-400">
-              <Compass className="h-4.5 w-4.5 text-white" strokeWidth={2.5} />
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-tomato">
+              <Compass className="h-[18px] w-[18px] text-white" strokeWidth={2.4} />
             </div>
             <span className="text-[16px] font-semibold tracking-tight">
-              orbit<span className="bg-gradient-to-r from-violet-400 via-fuchsia-400 to-orange-400 bg-clip-text text-transparent">.ai</span>
+              Orbit
             </span>
           </div>
 
@@ -264,8 +258,8 @@ export default function Onboarding() {
                     className={cn(
                       "flex h-7 w-7 items-center justify-center rounded-full text-[12px] font-medium transition-all duration-300",
                       i <= step
-                        ? "bg-gradient-to-br from-violet-500 via-fuchsia-500 to-orange-400 text-white"
-                        : "bg-zinc-900 text-zinc-600 border border-zinc-800",
+                        ? "bg-accent text-panel"
+                        : "bg-panel text-text-faint border border-border-strong",
                     )}
                   >
                     {i + 1}
@@ -274,7 +268,7 @@ export default function Onboarding() {
                     <div
                       className={cn(
                         "h-px w-8 transition-colors duration-300",
-                        i < step ? "bg-fuchsia-500/60" : "bg-zinc-800",
+                        i < step ? "bg-accent" : "bg-border-strong",
                       )}
                     />
                   )}
@@ -286,13 +280,13 @@ export default function Onboarding() {
           <div
             ref={cardRef}
             data-entrance
-            className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-9 shadow-2xl backdrop-blur"
+            className="rounded-2xl border border-border-strong bg-panel p-9 shadow-2xl backdrop-blur"
           >
             <div ref={stepContentRef}>
               {step === 0 && (
                 <div>
-                  <h2 className="text-xl font-semibold text-white">What&apos;s your website?</h2>
-                  <p className="mt-1.5 text-[14.5px] text-zinc-400">
+                  <h2 className="text-xl font-semibold text-text">What&apos;s your website?</h2>
+                  <p className="mt-1.5 text-[14.5px] text-text-dim">
                     Give us your real site and AI reads it — business name, what you sell, and your
                     Instagram if it&apos;s linked — then does a real search to find your real competitors.
                     Nothing here is guessed; you can edit anything before we generate your plan.
@@ -312,7 +306,7 @@ export default function Onboarding() {
                         <button
                           onClick={analyzeWithAI}
                           disabled={!website.trim() || analyzing}
-                          className="flex shrink-0 items-center gap-1.5 rounded-lg bg-gradient-to-r from-violet-500 via-fuchsia-500 to-orange-500 px-4 py-2.5 text-[13.5px] font-semibold text-white disabled:opacity-40"
+                          className="flex shrink-0 items-center gap-1.5 rounded-lg bg-accent px-4 py-2.5 text-[13.5px] font-semibold text-panel disabled:opacity-40"
                         >
                           {analyzing ? (
                             <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -325,13 +319,13 @@ export default function Onboarding() {
                     </Field>
 
                     {discoverError && (
-                      <p className="rounded-xl bg-amber-500/10 border border-amber-500/20 p-3.5 text-[13px] leading-relaxed text-amber-300">
+                      <p className="rounded-xl bg-warn-soft border border-warn/25 p-3.5 text-[13px] leading-relaxed text-warn">
                         {discoverError}
                       </p>
                     )}
 
                     {analyzed && (
-                      <div className="flex items-center gap-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 p-3.5 text-[13px] text-emerald-300">
+                      <div className="flex items-center gap-2 rounded-xl bg-good-soft border border-good/25 p-3.5 text-[13px] text-good">
                         <Check className="h-3.5 w-3.5 shrink-0" />
                         Read your site — review and edit what AI found below.
                       </div>
@@ -361,7 +355,7 @@ export default function Onboarding() {
                     {!analyzed && !manualMode && (
                       <button
                         onClick={() => setManualMode(true)}
-                        className="text-[13px] font-medium text-zinc-500 hover:text-zinc-300"
+                        className="text-[13px] font-medium text-text-faint hover:text-text"
                       >
                         No website, or I&apos;d rather type this myself →
                       </button>
@@ -372,8 +366,8 @@ export default function Onboarding() {
 
               {step === 1 && (
                 <div>
-                  <h2 className="text-xl font-semibold text-white">How do you want to work?</h2>
-                  <p className="mt-1.5 text-[14.5px] text-zinc-400">
+                  <h2 className="text-xl font-semibold text-text">How do you want to work?</h2>
+                  <p className="mt-1.5 text-[14.5px] text-text-dim">
                     Your AI team always optimizes for the same thing — real orders and real growth.
                     This just changes how it gets there.
                   </p>
@@ -388,16 +382,16 @@ export default function Onboarding() {
                           className={cn(
                             "flex flex-col items-start gap-2 rounded-xl border p-4 text-left transition-colors",
                             selected
-                              ? "border-fuchsia-500 bg-fuchsia-500/10"
-                              : "border-zinc-800 bg-zinc-900/60 hover:border-zinc-700",
+                              ? "border-accent bg-accent-soft"
+                              : "border-border-strong bg-panel hover:border-accent",
                           )}
                         >
                           <div className="flex w-full items-center justify-between">
-                            <Icon className={cn("h-4.5 w-4.5", selected ? "text-fuchsia-400" : "text-zinc-500")} />
-                            {selected && <Check className="h-3.5 w-3.5 text-fuchsia-400" />}
+                            <Icon className={cn("h-4.5 w-4.5", selected ? "text-accent" : "text-text-faint")} />
+                            {selected && <Check className="h-3.5 w-3.5 text-tomato" />}
                           </div>
-                          <span className="text-[14px] font-semibold text-white">{m.label}</span>
-                          <span className="text-[12.5px] leading-relaxed text-zinc-400">{m.description}</span>
+                          <span className="text-[14px] font-semibold text-text">{m.label}</span>
+                          <span className="text-[12.5px] leading-relaxed text-text-dim">{m.description}</span>
                         </button>
                       );
                     })}
@@ -407,23 +401,23 @@ export default function Onboarding() {
 
               {step === 2 && (
                 <div>
-                  <h2 className="text-xl font-semibold text-white">A few questions about {business.name || "your business"}</h2>
-                  <p className="mt-1.5 text-[14.5px] text-zinc-400">
+                  <h2 className="text-xl font-semibold text-text">A few questions about {business.name || "your business"}</h2>
+                  <p className="mt-1.5 text-[14.5px] text-text-dim">
                     Written by AI for what you sell. Answer what you can — skip anything you&apos;re not sure about. Your AI team reads these before every plan.
                   </p>
                   {loadingQuestions ? (
-                    <div className="mt-8 flex items-center gap-2.5 text-[13.5px] text-zinc-400">
-                      <Loader2 className="h-4 w-4 animate-spin text-fuchsia-400" /> Writing questions for your business…
+                    <div className="mt-8 flex items-center gap-2.5 text-[13.5px] text-text-dim">
+                      <Loader2 className="h-4 w-4 animate-spin text-tomato" /> Writing questions for your business…
                     </div>
                   ) : (
                     <div className="mt-6 space-y-5">
                       {questions.map((q) => (
                         <div key={q.id}>
-                          <div className="text-[14px] font-medium text-zinc-200">{q.question}</div>
-                          {q.why && <div className="mt-0.5 text-[12px] text-zinc-500">{q.why}</div>}
+                          <div className="text-[14px] font-medium text-text">{q.question}</div>
+                          {q.why && <div className="mt-0.5 text-[12px] text-text-faint">{q.why}</div>}
                           {q.type === "choice" && q.options?.length ? (
                             <div className="mt-2 flex flex-wrap gap-2">
-                              <div className="w-full text-[11px] text-zinc-600">Pick all that apply</div>
+                              <div className="w-full text-[11px] text-text-faint">Pick all that apply</div>
                               {q.options.map((o) => {
                                 // multi-select: the answer is the picked options joined with "; " (in option order)
                                 const picked = (answers[q.id] ?? "").split("; ").filter(Boolean);
@@ -439,7 +433,7 @@ export default function Onboarding() {
                                     }
                                     className={cn(
                                       "rounded-lg border px-3 py-1.5 text-[13px] transition-colors",
-                                      on ? "border-fuchsia-500 bg-fuchsia-500/10 text-white" : "border-zinc-800 bg-zinc-900/60 text-zinc-400 hover:border-zinc-700",
+                                      on ? "border-accent bg-accent-soft text-text" : "border-border-strong bg-panel text-text-dim hover:border-accent",
                                     )}
                                   >
                                     {o}
@@ -464,8 +458,8 @@ export default function Onboarding() {
 
               {step === 3 && (
                 <div>
-                  <h2 className="text-xl font-semibold text-white">Where do you sell &amp; talk to customers?</h2>
-                  <p className="mt-1.5 text-[14.5px] text-zinc-400">
+                  <h2 className="text-xl font-semibold text-text">Where do you sell &amp; talk to customers?</h2>
+                  <p className="mt-1.5 text-[14.5px] text-text-dim">
                     Your AI team will post and reply across whatever you connect here.
                   </p>
                   <div className="mt-6 space-y-4">
@@ -486,24 +480,24 @@ export default function Onboarding() {
                       />
                     </Field>
                     {foundOnSite.length > 0 && (
-                      <div className="rounded-xl border border-emerald-900/60 bg-emerald-950/30 p-3.5 text-[13px] leading-relaxed text-zinc-300">
-                        <div className="text-[12px] font-medium text-emerald-400">Found for your business</div>
+                      <div className="rounded-xl border border-good/25 bg-good-soft p-3.5 text-[13px] leading-relaxed text-text">
+                        <div className="text-[12px] font-medium text-good">Found for your business</div>
                         <div className="mt-1.5 flex flex-wrap gap-1.5">
                           {foundOnSite.map((f) => (
-                            <span key={f.label} className="rounded-md bg-zinc-900 px-2 py-1 text-[12px] text-zinc-400">
-                              {f.label}: <span className="text-zinc-200">{f.value}</span>
-                              {f.searched && <span className="ml-1 text-amber-400">*</span>}
+                            <span key={f.label} className="rounded-md bg-panel px-2 py-1 text-[12px] text-text-dim">
+                              {f.label}: <span className="text-text">{f.value}</span>
+                              {f.searched && <span className="ml-1 text-warn">*</span>}
                             </span>
                           ))}
                         </div>
                         {foundOnSite.some((f) => f.searched) && (
-                          <div className="mt-2 text-[11.5px] text-zinc-500">
-                            <span className="text-amber-400">*</span> Your site doesn&apos;t link these — AI found them with a web search. Please check they&apos;re really yours.
+                          <div className="mt-2 text-[11.5px] text-text-faint">
+                            <span className="text-warn">*</span> Your site doesn&apos;t link these — AI found them with a web search. Please check they&apos;re really yours.
                           </div>
                         )}
                       </div>
                     )}
-                    <p className="rounded-xl bg-zinc-900 border border-zinc-800 p-3.5 text-[13px] leading-relaxed text-zinc-500">
+                    <p className="rounded-xl bg-panel border border-border-strong p-3.5 text-[13px] leading-relaxed text-text-faint">
                       No rush — you can connect WhatsApp and Instagram later from Settings. Your website chat works right away either way.
                     </p>
                   </div>
@@ -512,8 +506,8 @@ export default function Onboarding() {
 
               {step === 4 && (
                 <div>
-                  <h2 className="text-xl font-semibold text-white">Who are your competitors?</h2>
-                  <p className="mt-1.5 text-[14.5px] text-zinc-400">
+                  <h2 className="text-xl font-semibold text-text">Who are your competitors?</h2>
+                  <p className="mt-1.5 text-[14.5px] text-text-dim">
                     {competitors.some(Boolean)
                       ? "AI found these from a real search — remove any that aren't right, or add more."
                       : "Add a few links. Your AI team keeps notes on them as reference — your plan is built from your own business, not copied from theirs."}
@@ -534,7 +528,7 @@ export default function Onboarding() {
                         {competitors.length > 1 && (
                           <button
                             onClick={() => setCompetitors(competitors.filter((_, idx) => idx !== i))}
-                            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-zinc-800 text-zinc-500 hover:text-red-400"
+                            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border-strong text-text-faint hover:text-bad"
                           >
                             <X className="h-3.5 w-3.5" />
                           </button>
@@ -544,13 +538,13 @@ export default function Onboarding() {
                     {competitors.length < 10 && (
                       <button
                         onClick={() => setCompetitors([...competitors, ""])}
-                        className="flex items-center gap-1.5 text-[13.5px] font-medium text-fuchsia-400 hover:text-fuchsia-300"
+                        className="flex items-center gap-1.5 text-[13.5px] font-medium text-tomato hover:text-tomato"
                       >
                         <Plus className="h-3.5 w-3.5" /> Add another
                       </button>
                     )}
                     {error && (
-                      <p className="rounded-xl bg-red-500/10 border border-red-500/20 p-3.5 text-[13px] leading-relaxed text-red-400">
+                      <p className="rounded-xl bg-bad-soft border border-bad/25 p-3.5 text-[13px] leading-relaxed text-bad">
                         {error}
                       </p>
                     )}
@@ -562,13 +556,13 @@ export default function Onboarding() {
                 <div className="flex flex-col items-center py-10 text-center">
                   <div className="relative flex h-14 w-14 items-center justify-center">
                     <div className="absolute inset-0 animate-spin rounded-full bg-[conic-gradient(from_0deg,#a855f7,#ec4899,#f97316,#a855f7)] [mask:radial-gradient(farthest-side,transparent_calc(100%-3px),#000_calc(100%-3px))]" />
-                    <Loader2 className="h-6 w-6 animate-spin text-fuchsia-400" />
+                    <Loader2 className="h-6 w-6 animate-spin text-tomato" />
                   </div>
-                  <p className="mt-5 text-[14.5px] text-zinc-300">{progressText}</p>
-                  <div className="mt-6 h-1 w-48 overflow-hidden rounded-full bg-zinc-800">
-                    <div className="h-full w-1/3 animate-[slide_1.2s_ease-in-out_infinite] rounded-full bg-gradient-to-r from-violet-500 via-fuchsia-500 to-orange-400" />
+                  <p className="mt-5 text-[14.5px] text-text">{progressText}</p>
+                  <div className="mt-6 h-1 w-48 overflow-hidden rounded-full bg-panel-2">
+                    <div className="h-full w-1/3 animate-[slide_1.2s_ease-in-out_infinite] rounded-full bg-accent" />
                   </div>
-                  <p className="mt-4 text-[12px] text-zinc-500">This can take up to 30 seconds — real analysis, not a demo.</p>
+                  <p className="mt-4 text-[12px] text-text-faint">This can take up to 30 seconds — real analysis, not a demo.</p>
                   <style>{`
                     @keyframes slide { 0% { transform: translateX(-100%); } 100% { transform: translateX(300%); } }
                   `}</style>
@@ -581,7 +575,7 @@ export default function Onboarding() {
                 {step > 0 ? (
                   <button
                     onClick={back}
-                    className="flex items-center gap-1.5 text-[14px] font-medium text-zinc-400 hover:text-white"
+                    className="flex items-center gap-1.5 text-[14px] font-medium text-text-dim hover:text-text"
                   >
                     <ArrowLeft className="h-3.5 w-3.5" /> Back
                   </button>
@@ -591,7 +585,7 @@ export default function Onboarding() {
                 <button
                   onClick={next}
                   disabled={(step === 0 && !canContinueStep0) || (step === 1 && !businessModel) || (step === 2 && loadingQuestions)}
-                  className="group inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-violet-500 via-fuchsia-500 to-orange-500 px-5 py-2.5 text-[14.5px] font-semibold text-white shadow-[0_0_20px_rgba(217,70,239,0.22)] transition-transform hover:scale-[1.02] disabled:opacity-40 disabled:hover:scale-100"
+                  className="group inline-flex items-center gap-2 rounded-xl bg-accent px-5 py-2.5 text-[14.5px] font-semibold text-panel shadow-[0_0_20px_rgba(217,70,239,0.22)] transition-transform hover:scale-[1.02] disabled:opacity-40 disabled:hover:scale-100"
                 >
                   {step === LAST_INPUT_STEP ? "Finish setup" : step === 2 && !Object.values(answers).some((a) => a.trim()) ? "Skip for now" : "Continue"}
                   <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
@@ -605,19 +599,19 @@ export default function Onboarding() {
       <style>{`
         .dark-input {
           width: 100%;
-          border-radius: 0.6rem;
-          border: 1px solid rgb(39 39 42);
-          background: rgb(24 24 27 / 0.8);
-          padding: 0.65rem 0.85rem;
-          font-size: 0.95rem;
-          color: #f4f4f5;
+          border-radius: 1rem;
+          border: 1px solid var(--border-strong);
+          background: var(--panel-2);
+          padding: 0.8rem 1rem;
+          font-size: 0.98rem;
+          color: var(--text);
           outline: none;
           transition: border-color 0.15s ease, box-shadow 0.15s ease;
         }
-        .dark-input::placeholder { color: rgb(113 113 122); }
+        .dark-input::placeholder { color: var(--text-faint); }
         .dark-input:focus {
-          border-color: #d946ef;
-          box-shadow: 0 0 0 3px rgba(217, 70, 239, 0.15);
+          border-color: var(--accent);
+          box-shadow: 0 0 0 4px var(--accent-soft);
         }
       `}</style>
     </div>
@@ -627,7 +621,7 @@ export default function Onboarding() {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="mb-1.5 block text-[13.5px] font-medium text-zinc-400">
+      <span className="mb-1.5 block text-[13.5px] font-medium text-text-dim">
         {label}
       </span>
       {children}

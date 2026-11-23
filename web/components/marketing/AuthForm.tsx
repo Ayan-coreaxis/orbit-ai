@@ -60,7 +60,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
         onChange={(e) => setPassword(e.target.value)}
         placeholder={mode === "signup" ? "At least 8 characters" : "Your password"}
         trailing={
-          <button type="button" onClick={() => setShow(!show)} className="text-zinc-500 hover:text-zinc-300" aria-label={show ? "Hide password" : "Show password"}>
+          <button type="button" onClick={() => setShow(!show)} className="text-text-faint hover:text-text" aria-label={show ? "Hide password" : "Show password"}>
             {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </button>
         }
@@ -69,36 +69,36 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
         <div className="orbit-fade flex items-center gap-2">
           <div className="flex flex-1 gap-1">
             {[1, 2, 3].map((i) => (
-              <span key={i} className={`h-1 flex-1 rounded-full transition-colors duration-300 ${strength >= i ? (strength === 1 ? "bg-red-400" : strength === 2 ? "bg-amber-400" : "bg-emerald-400") : "bg-white/10"}`} />
+              <span key={i} className={`h-1 flex-1 rounded-full transition-colors duration-300 ${strength >= i ? (strength === 1 ?"bg-red-400" : strength === 2 ? "bg-amber-400" : "bg-emerald-400") : "bg-white/10"}`} />
             ))}
           </div>
-          <span className="text-[11.5px] text-zinc-500">{strength === 1 ? "Too short" : strength === 2 ? "Okay" : "Strong"}</span>
+          <span className="text-[11.5px] text-text-faint">{strength === 1 ? "Too short" : strength === 2 ? "Okay" : "Strong"}</span>
         </div>
       )}
       {mode === "login" && (
         <div className="text-right">
-          <Link href="/forgot-password" className="text-[13px] text-zinc-400 hover:text-white">
+          <Link href="/forgot-password" className="text-[13px] text-text-dim hover:text-text">
             Forgot password?
           </Link>
         </div>
       )}
       {error && (
-        <p role="alert" className="orbit-fade rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-[13px] text-red-300">
+        <p role="alert" className="orbit-fade rounded-xl border border-bad/25 bg-bad-soft p-3 text-[13px] text-bad">
           {error}
         </p>
       )}
       <button
         type="submit"
         disabled={loading}
-        className="press group flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-500 via-fuchsia-500 to-orange-500 px-4 py-3.5 text-[15px] font-semibold text-white shadow-[0_10px_30px_-10px_rgba(217,70,239,0.6)] transition-opacity disabled:opacity-60"
+        className="press group flex w-full items-center justify-center gap-2 rounded-full bg-accent px-4 py-3.5 text-[15.5px] font-semibold text-panel shadow-[0_10px_26px_-12px_var(--accent)] transition-opacity disabled:opacity-60"
       >
         {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <>{mode === "login" ? "Log in" : "Create account"} <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" /></>}
       </button>
       {mode === "signup" && (
-        <p className="text-center text-[12px] leading-relaxed text-zinc-500">
+        <p className="text-center text-[12px] leading-relaxed text-text-faint">
           By creating an account you agree to the{" "}
-          <Link href="/terms" className="text-zinc-300 underline underline-offset-2 hover:text-white">Terms</Link> and{" "}
-          <Link href="/privacy" className="text-zinc-300 underline underline-offset-2 hover:text-white">Privacy Policy</Link>.
+          <Link href="/terms" className="text-text underline underline-offset-2 hover:text-text">Terms</Link> and{" "}
+          <Link href="/privacy" className="text-text underline underline-offset-2 hover:text-text">Privacy Policy</Link>.
         </p>
       )}
     </form>
