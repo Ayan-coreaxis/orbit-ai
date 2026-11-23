@@ -107,12 +107,14 @@ export function Studio() {
           )}
         </div>
         {!s.allowed ? (
-          <div className="flex items-start gap-3 border-t border-border bg-panel-2 px-6 py-4">
-            <Lock className="mt-0.5 h-4 w-4 shrink-0 text-text-faint" />
-            <div className="text-[13px] leading-relaxed text-text-dim">
-              Orbit Studio comes with the <b>Growth ($75)</b> plan — 50 images + 5 reels a month — and the <b>Scale ($150)</b> plan — 100 images + 12 reels. You can
-              look around below; upgrade in <a href="/dashboard/settings/plan" className="text-accent hover:underline">Plan &amp; billing</a> to start making.
+          <div className="flex flex-wrap items-center gap-3 border-t border-border bg-panel-2 px-6 py-4">
+            <Lock className="h-4 w-4 shrink-0 text-text-faint" />
+            <div className="min-w-0 flex-1 text-[14.5px] text-text-dim">
+              Studio is on the <b className="text-text">Growth</b> and <b className="text-text">Scale</b> plans. Look around below — upgrade to start making.
             </div>
+            <a href="/dashboard/settings/plan" className="btn-primary !py-2 text-[13.5px]">
+              See plans
+            </a>
           </div>
         ) : !s.enabled ? (
           <Notice>Orbit Studio is switched off by the platform right now.</Notice>

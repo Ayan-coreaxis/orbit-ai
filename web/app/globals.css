@@ -252,12 +252,13 @@ body {
   --border-strong: rgba(28, 52, 40, 0.17);
   --text: #18261e;
   --text-dim: #48564d;
-  --text-faint: #6b7569;
+  --text-faint: #5f695d;
   --accent: #1f4a37;
   --accent-soft: rgba(31, 74, 55, 0.1);
   --accent-strong: #173829;
   --accent-gradient: linear-gradient(135deg, #1f4a37, #1f4a37);
   --tomato: #f2462e;
+  --tomato-fill: #d93a23; /* tomato surfaces carrying white text — 4.6:1, passes WCAG AA */
   --tomato-soft: rgba(242, 70, 46, 0.12);
   --tomato-strong: #c9301b;
   --good: #23784a;
@@ -294,6 +295,7 @@ html[data-app-theme="forest"] .orbit-app {
   --accent-strong: #f6efe2;
   --accent-gradient: linear-gradient(135deg, #2c6a4e, #2c6a4e);
   --tomato: #ff5a40;
+  --tomato-fill: #d93a23;
   --tomato-soft: rgba(255, 90, 64, 0.15);
   --tomato-strong: #ff7a63;
   --good: #6cc08e;
@@ -432,3 +434,13 @@ html[data-app-theme="forest"] .orbit-app {
   border: 1px solid var(--glass-border);
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.6) inset, 0 24px 60px -20px rgba(23, 56, 41, 0.35);
 }
+
+/* Filled tomato surfaces use the AA-safe shade; dots, bars and badges keep the brand tomato. */
+.orbit-app .bg-tomato { background-color: var(--tomato-fill); }
+
+/* Keyboard users always see where they are. */
+.orbit-app :focus-visible {
+  outline: 2.5px solid var(--accent);
+  outline-offset: 2px;
+}
+.orbit-app .glass :focus-visible, .orbit-app .bg-accent :focus-visible { outline-color: var(--tomato); }

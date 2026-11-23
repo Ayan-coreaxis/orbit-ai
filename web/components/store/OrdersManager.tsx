@@ -322,13 +322,15 @@ export function OrdersManager({
                 <button
                   onClick={() => setOpen(expanded ? null : o.id)}
                   aria-expanded={expanded}
-                  className="flex w-full items-center gap-3 px-3 py-3 text-left text-[13px] outline-none hover:bg-panel-2 focus-visible:bg-panel-2"
+                  className="flex w-full flex-wrap items-center gap-x-3 gap-y-2 px-3 py-3 text-left text-[13.5px] outline-none hover:bg-panel-2 focus-visible:bg-panel-2 sm:flex-nowrap"
                 >
                   <ChevronDown
                     className={`h-4 w-4 flex-none text-text-faint transition-transform ${expanded ? "rotate-180" : ""}`}
                   />
                   <span className="w-16 flex-none font-mono text-[12px] text-text-faint">#{o.number}</span>
                   <span className="min-w-0 flex-1 truncate font-medium">{o.customerName}</span>
+                  {/* badges: a second line on phones, inline on wider screens */}
+                  <span className="order-last flex w-full flex-wrap items-center gap-1.5 pl-7 sm:order-none sm:w-auto sm:flex-nowrap sm:pl-0">
                   {o.flagged && (
                     <span className="flex-none rounded-md bg-bad-soft px-1.5 py-0.5 text-[11px] font-semibold text-bad" title={o.flagReason ?? ""}>
                       Flagged
@@ -349,7 +351,8 @@ export function OrdersManager({
                     <SIcon className="h-3 w-3" />
                     {s.label}
                   </span>
-                  <span className="w-20 flex-none text-right tabular-nums">{money(o.total, currency)}</span>
+                  </span>
+                  <span className="w-20 flex-none text-right font-semibold tabular-nums">{money(o.total, currency)}</span>
                   <span className="hidden w-20 flex-none text-right text-[12px] tabular-nums text-text-faint sm:inline">
                     {new Date(o.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
                   </span>
