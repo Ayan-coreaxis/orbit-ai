@@ -24,7 +24,7 @@ const SECTIONS: { label: string; href: string; also?: string[] }[] = [
 /** Pages inside a section, shown as a glass segmented control under the nav. */
 const SUBNAV: Record<string, { label: string; href: string }[]> = {
   "/dashboard/store": [
-    { label: "Products & orders", href: "/dashboard/store" },
+    { label: "Store", href: "/dashboard/store" },
     { label: "Media", href: "/dashboard/media" },
     { label: "Reviews", href: "/dashboard/reviews" },
     { label: "Returns", href: "/dashboard/returns" },

@@ -3,6 +3,7 @@ import { Card, Pill } from "@/components/ui";
 import { getActiveBusinessId } from "@/lib/get-active-business-id";
 import { prisma } from "@/lib/prisma";
 import { Mail, MessageCircle } from "lucide-react";
+import { EmptyState } from "@/components/dashboard/EmptyState";
 import { FacebookIcon, InstagramIcon, WhatsAppIcon } from "@/components/icons/BrandIcons";
 
 function ChannelIcon({ channel }: { channel: string }) {
@@ -57,7 +58,7 @@ export default async function InboxPage() {
   return (
     <div>
       <Topbar
-        title="Customer Messages"
+        title="Inbox"
         subtitle={
           total > 0
             ? [
@@ -69,7 +70,7 @@ export default async function InboxPage() {
             : "No conversations yet"
         }
       />
-      <div className="max-w-[1200px] space-y-4 p-5 sm:p-8 lg:p-10">
+      <div className="page-body space-y-4">
         {contactMessages.length > 0 && (
           <Card className="p-0">
             <div className="flex items-center gap-2 border-b border-border px-5 py-3.5 text-[12.5px] font-medium text-text-dim">
@@ -96,14 +97,12 @@ export default async function InboxPage() {
           </Card>
         )}
         {total === 0 ? (
-          <Card className="flex flex-col items-center gap-3 p-12 text-center">
-            <MessageCircle className="h-6 w-6 text-text-faint" />
-            <p className="max-w-md text-[13.5px] leading-relaxed text-text-faint">
-              No real customer conversations yet. Your website chat widget, WhatsApp (once a number
-              is assigned) and your Facebook Page&apos;s Messenger and Instagram DMs (once Meta is
-              connected) all write here — this fills in the moment a real customer asks something.
-            </p>
-          </Card>
+          <EmptyState
+            icon={MessageCircle}
+            title="No messages yet"
+            body="Chats from your website, WhatsApp, Messenger and Instagram all land here."
+            action={{ label: "Connect WhatsApp & Instagram", href: "/dashboard/settings/channels" }}
+          />
         ) : (
           conversations.map((c) => {
             const lastMessage = c.messages[c.messages.length - 1];

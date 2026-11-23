@@ -128,7 +128,7 @@ export default async function AgentDetailPage({
   return (
     <div>
       <Topbar title={agent.name} subtitle={agent.layer} />
-      <div className="max-w-[900px] space-y-6 p-5 sm:p-8 lg:p-10">
+      <div className="page-body space-y-6">
         <Link
           href="/dashboard"
           className="inline-flex items-center gap-1.5 text-[13.5px] text-text-faint hover:text-text-dim"

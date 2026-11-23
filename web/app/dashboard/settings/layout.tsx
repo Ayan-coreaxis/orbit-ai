@@ -7,8 +7,8 @@ export default async function SettingsLayout({ children }: { children: React.Rea
   const real = await getBusinessSummary();
   return (
     <div>
-      <Topbar title="Settings" subtitle={real?.businessName ?? "No business yet"} />
-      <div className="mx-auto max-w-[1200px] p-5 sm:p-8 lg:flex lg:gap-10 lg:p-10">
+      <Topbar title="Settings" subtitle={real ? `Everything about how ${real.businessName} runs` : "No business yet"} />
+      <div className="page-body lg:flex lg:gap-10">
         <SettingsNav />
         <div className="min-w-0 flex-1 pt-5 lg:pt-0">{children}</div>
       </div>

@@ -4,6 +4,8 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Card } from "@/components/ui";
 import { useDashToast, DashToastHost } from "@/components/dash-toast";
+import { EmptyState } from "@/components/dashboard/EmptyState";
+import { RotateCcw } from "lucide-react";
 import { money } from "@/lib/money";
 
 interface ReturnRow {
@@ -73,7 +75,7 @@ export function ReturnsManager({ rows, currency }: { rows: ReturnRow[]; currency
     <Card className="overflow-hidden p-0">
       <DashToastHost items={toasts} />
       {rows.length === 0 ? (
-        <p className="p-6 text-[13px] text-text-faint">No return requests yet.</p>
+        <EmptyState icon={RotateCcw} title="No returns" body="When a customer asks to return an order, it shows up here." compact />
       ) : (
         <div className="divide-y divide-border">
           {rows.map((r) => (

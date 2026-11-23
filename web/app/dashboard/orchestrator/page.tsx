@@ -23,7 +23,7 @@ export default async function OrchestratorPage() {
   if (!real) {
     return (
       <div>
-        <Topbar title="Talk to your Orchestrator" subtitle="No business yet" />
+        <Topbar title="Orchestrator" subtitle="No business yet" />
         <div className="mx-5 sm:mx-8 lg:mx-10 mt-6 rounded-xl border border-border bg-panel-2 px-4 py-3.5 text-[13.5px] text-text-dim">
           Complete onboarding first — the Orchestrator needs your business to talk about.
         </div>
@@ -55,9 +55,9 @@ export default async function OrchestratorPage() {
   }
 
   return (
-    <div className="flex h-full flex-col overflow-hidden">
-      <Topbar title="Talk to your Orchestrator" subtitle={`${real.businessName} — plan, discuss and decide together, on your real data`} />
-      <div className="min-h-0 flex-1 px-6 py-5 lg:px-8">
+    <div className="flex flex-col lg:h-[calc(100dvh-76px)]">
+      <Topbar title="Orchestrator" subtitle="Ask anything. It plans from your real numbers — you approve every change." />
+      <div className="min-h-0 flex-1 px-5 pb-6 pt-5 sm:px-8 xl:pl-2 xl:pr-10">
         <OrchestratorWorkspace
           active={lab.active}
           canHire={lab.canHire}

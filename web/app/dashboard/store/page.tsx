@@ -16,10 +16,8 @@ import { LoyaltyManager } from "@/components/store/LoyaltyManager";
 import { ReferralManager } from "@/components/store/ReferralManager";
 import { GiftCardsManager } from "@/components/store/GiftCardsManager";
 import { BundlesManager } from "@/components/store/BundlesManager";
-import { getStoreKpis, type StoreKpis } from "@/lib/store-analytics";
-import { money } from "@/lib/money";
-import { Sparkline } from "@/components/store/mini-chart";
-import { TrendingUp, TrendingDown, ExternalLink, Sparkles } from "lucide-react";
+import { getStoreKpis } from "@/lib/store-analytics";
+import { ExternalLink, Sparkles } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -46,54 +44,36 @@ export default async function StoreAdminPage() {
 
   return (
     <div>
-      <Topbar title="Store" subtitle="Catalog, orders, and storefront performance — all in one place" />
-      <div className="mx-auto max-w-[1120px] space-y-5 p-6 lg:p-10">
+      <Topbar
+        title="Store"
+        subtitle="Orders, products, customers and offers"
+        actions={
+          businessId ? (
+            <>
+              <span className={`inline-flex items-center gap-2 rounded-full px-3.5 py-2 text-[13.5px] font-semibold ${design?.published ? "bg-good-soft text-good" : "bg-panel-2 text-text-dim"}`}>
+                <span className={`h-2 w-2 rounded-full ${design?.published ? "bg-good" : "bg-text-faint"}`} />
+                {design?.published ? "Live" : "Not published"}
+              </span>
+              {design?.published ? (
+                <Link href={`/store/${businessId}`} target="_blank" className="btn-primary">
+                  View store <ExternalLink className="h-4 w-4" />
+                </Link>
+              ) : (
+                <Link href="/dashboard/orbit-design" className="btn-primary">
+                  <Sparkles className="h-4 w-4" /> Design & publish
+                </Link>
+              )}
+            </>
+          ) : undefined
+        }
+      />
+      <div className="page-body space-y-5">
         {!businessId ? (
           <Card className="p-6">
-            <p className="text-[13.5px] text-text-faint">No business yet — complete onboarding first.</p>
+            <p className="text-[14px] text-text-dim">No business yet — finish setup first.</p>
           </Card>
         ) : (
           <>
-            {/* storefront status */}
-            <Card className="flex flex-wrap items-center gap-x-4 gap-y-3 px-5 py-4">
-              <span className="relative flex h-2.5 w-2.5" aria-hidden>
-                <span
-                  className={`absolute inline-flex h-full w-full rounded-full opacity-75 ${
-                    design?.published ? "animate-ping bg-good" : ""
-                  }`}
-                />
-                <span className={`relative inline-flex h-2.5 w-2.5 rounded-full ${design?.published ? "bg-good" : "bg-text-faint"}`} />
-              </span>
-              <div className="min-w-0">
-                <div className="text-[14px] font-semibold leading-tight">Storefront</div>
-                <div className="mt-0.5 text-[12.5px] text-text-dim">
-                  {design?.published ? "Live and accepting orders" : "Draft — not published yet"}
-                </div>
-              </div>
-              <div className="ml-auto flex flex-wrap items-center gap-2">
-                <Link
-                  href="/dashboard/orbit-design"
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-border-strong px-3 py-1.5 text-[13px] font-medium text-text-dim transition-colors hover:border-accent-strong/40 hover:text-text"
-                >
-                  <Sparkles className="h-3.5 w-3.5" strokeWidth={2} />
-                  Orbit Design
-                </Link>
-                {design?.published && (
-                  <Link
-                    href={`/store/${businessId}`}
-                    target="_blank"
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-accent-soft px-3 py-1.5 text-[13px] font-semibold text-accent-strong transition-opacity hover:opacity-90"
-                  >
-                    View live store
-                    <ExternalLink className="h-3.5 w-3.5" strokeWidth={2.2} />
-                  </Link>
-                )}
-              </div>
-            </Card>
-
-            {/* KPI strip */}
-            {kpis && <KpiStrip k={kpis} currency={currency} />}
-
             <StoreTabs
               ordersBadge={pendingOrders || undefined}
               products={
@@ -192,66 +172,4 @@ export default async function StoreAdminPage() {
 
 function EmptyRow({ children }: { children: React.ReactNode }) {
   return <p className="mt-4 rounded-lg border border-dashed border-border py-6 text-center text-[13px] text-text-faint">{children}</p>;
-}
-
-/** Headline numbers — from the cheap getStoreKpis() aggregate, not the full analytics query. */
-function KpiStrip({ k, currency }: { k: StoreKpis; currency: string }) {
-  const last7 = k.spark.slice(-7);
-  const prev7 = k.spark.slice(0, 7);
-  const rev7 = last7.reduce((s, d) => s + d.revenue, 0);
-  const revPrev = prev7.reduce((s, d) => s + d.revenue, 0);
-  const ord7 = last7.reduce((s, d) => s + d.orders, 0);
-  const ordPrev = prev7.reduce((s, d) => s + d.orders, 0);
-
-  const tiles = [
-    {
-      label: "Revenue · 7d",
-      value: money(Math.round(rev7), currency),
-      delta: pctDelta(rev7, revPrev),
-      spark: k.spark.map((d) => d.revenue),
-    },
-    { label: "Orders · 7d", value: ord7.toLocaleString(), delta: pctDelta(ord7, ordPrev), spark: k.spark.map((d) => d.orders) },
-    { label: "Visitors · 30d", value: k.visitors30.toLocaleString(), delta: null, spark: null },
-    {
-      label: "Conversion · 30d",
-      value: `${k.conversion30.toFixed(k.conversion30 < 10 ? 1 : 0)}%`,
-      delta: null,
-      spark: null,
-    },
-  ];
-
-  return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-      {tiles.map((t) => (
-        <Card key={t.label} className="flex flex-col justify-between px-4 py-3.5">
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0">
-              <div className="text-[11px] font-medium uppercase tracking-[0.05em] text-text-faint">{t.label}</div>
-              <div className="mt-1.5 text-[20px] font-semibold tabular-nums leading-none">{t.value}</div>
-            </div>
-            {t.delta != null ? (
-              <span
-                className={`inline-flex flex-none items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[11px] font-semibold tabular-nums ${
-                  t.delta >= 0 ? "bg-good-soft text-good" : "bg-bad-soft text-bad"
-                }`}
-              >
-                {t.delta >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                {Math.abs(t.delta).toFixed(0)}%
-              </span>
-            ) : null}
-          </div>
-          {t.spark && t.spark.some((v) => v > 0) ? (
-            <Sparkline values={t.spark} className="mt-2.5 w-full" />
-          ) : (
-            <div className="mt-2.5 h-[28px]" />
-          )}
-        </Card>
-      ))}
-    </div>
-  );
-}
-
-function pctDelta(now: number, prev: number): number | null {
-  if (prev <= 0) return null; // no prior-week baseline — don't fabricate a "+100%"
-  return ((now - prev) / prev) * 100;
 }

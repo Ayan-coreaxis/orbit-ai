@@ -137,11 +137,11 @@ export default async function DashboardPage() {
 
   // What to do next — only real, checkable facts, most urgent first.
   const todos: Todo[] = [];
-  if (!productCount) todos.push({ href: "/dashboard/store", icon: PackageX, title: "Add your products", body: "Your store is empty — add what you sell, with prices and photos, so there's something to buy.", tone: "accent" });
+  if (!productCount) todos.push({ href: "/dashboard/store#products", icon: PackageX, title: "Add your products", body: "Your store is empty — add what you sell, with prices and photos, so there's something to buy.", tone: "accent" });
   if (real.planWaiting) todos.push({ href: "/dashboard/orchestrator", icon: Sparkles, title: "Your growth plan is ready", body: "Talk it through with your Orchestrator and approve it.", tone: "accent" });
   if (flagged) todos.push({ href: "/dashboard/store", icon: AlertTriangle, title: `${flagged} order${flagged === 1 ? "" : "s"} look suspicious`, body: "Check them before you ship.", tone: "bad" });
   if (unconfirmed) todos.push({ href: "/dashboard/store", icon: MessageSquare, title: `${unconfirmed} COD order${unconfirmed === 1 ? "" : "s"} waiting for the customer`, body: "They were asked to confirm on WhatsApp.", tone: "warn" });
-  if (lowStock.length) todos.push({ href: "/dashboard/store", icon: PackageX, title: `${lowStock.length} product${lowStock.length === 1 ? "" : "s"} running low`, body: lowStock.map((p) => `${p.name} (${p.stock})`).join(", "), tone: "warn" });
+  if (lowStock.length) todos.push({ href: "/dashboard/store#products", icon: PackageX, title: `${lowStock.length} product${lowStock.length === 1 ? "" : "s"} running low`, body: lowStock.map((p) => `${p.name} (${p.stock})`).join(", "), tone: "warn" });
   if (!storeDesign?.published) todos.push({ href: "/dashboard/orbit-design", icon: Store, title: "Publish your storefront", body: productCount ? `${productCount} products are ready — design the store and publish it.` : "Tell Orbit Design what you want and it builds it live.", tone: "accent" });
   if (!business?.courierProvider || business.courierProvider === "manual") todos.push({ href: "/dashboard/settings/delivery", icon: Truck, title: "Connect your courier", body: "Book PostEx, Leopards or TCS from an order and track deliveries automatically.", tone: "neutral" });
   if (!business?.metaPageId) todos.push({ href: "/dashboard/settings/channels", icon: Megaphone, title: "Connect Facebook & Instagram", body: "Post reels and run ads straight from Orbit.", tone: "neutral" });
@@ -260,7 +260,7 @@ export default async function DashboardPage() {
             {[
               { label: "To confirm", value: pendingCount, href: "/dashboard/store#orders" },
               { label: "To ship", value: toShip, href: "/dashboard/store#orders" },
-              { label: "Low stock", value: lowStock.length, href: "/dashboard/store" },
+              { label: "Low stock", value: lowStock.length, href: "/dashboard/store#products" },
             ].map((t) => (
               <Link key={t.label} href={t.href} className="hover-lift rounded-[14px] bg-panel p-3">
                 <div className="text-[12.5px] text-text-faint">{t.label}</div>

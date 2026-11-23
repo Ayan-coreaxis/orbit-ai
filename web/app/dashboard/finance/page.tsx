@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Topbar } from "@/components/Topbar";
-import { Card, SectionLabel, Pill } from "@/components/ui";
+import { Card } from "@/components/ui";
+import { EmptyState } from "@/components/dashboard/EmptyState";
 import { getBusinessSummary } from "@/lib/get-business";
 import { getRealFinance } from "@/lib/get-real-finance";
 import { prisma } from "@/lib/prisma";
@@ -17,8 +18,8 @@ export default async function FinancePage() {
 
   return (
     <div>
-      <Topbar title="How Your Store Is Doing" subtitle="Revenue and margin from your own orders — never estimated" />
-      <div className="max-w-[1200px] space-y-6 p-5 sm:p-8 lg:p-10">
+      <Topbar title="Money" subtitle="Sales and profit from your real orders" />
+      <div className="page-body space-y-6">
         {!real || !finance ? (
           <Card className="p-6">
             <p className="text-[13.5px] text-text-faint">
@@ -27,67 +28,62 @@ export default async function FinancePage() {
           </Card>
         ) : (
           <>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <Card className="p-5">
-                <div className="text-[12.5px] font-medium text-text-faint">Revenue, last 7 days</div>
-                <div className="mt-2.5 text-2xl font-semibold">{money(finance.revenueLast7Days, currency)}</div>
+            <div className="orbit-stagger grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <div className="hover-lift rounded-[26px] bg-tomato p-6 text-white shadow-[0_18px_40px_-18px_var(--tomato)]">
+                <div className="text-[14px] font-medium text-white/85">Sales · last 7 days</div>
+                <div className="mt-3 text-[34px] font-semibold leading-none tracking-tight">{money(finance.revenueLast7Days, currency)}</div>
+              </div>
+              <Card className="hover-lift p-6">
+                <div className="text-[14px] font-medium text-text-dim">Orders · last 7 days</div>
+                <div className="mt-3 text-[34px] font-semibold leading-none tracking-tight">{finance.ordersLast7Days}</div>
               </Card>
-              <Card className="p-5">
-                <div className="text-[12.5px] font-medium text-text-faint">Orders, last 7 days</div>
-                <div className="mt-2.5 text-2xl font-semibold">{finance.ordersLast7Days}</div>
-              </Card>
-              <Card className="p-5">
-                <div className="text-[12.5px] font-medium text-text-faint">Gross profit, last 7 days</div>
+              <Card className="hover-lift p-6">
+                <div className="text-[14px] font-medium text-text-dim">Profit · last 7 days</div>
                 {finance.realGrossProfitLast7Days !== null ? (
                   <>
-                    <div className="mt-2.5 flex items-center gap-2 text-2xl font-semibold">
-                      <TrendingUp className="h-5 w-5 text-good" />
+                    <div className="mt-3 flex items-center gap-2 text-[34px] font-semibold leading-none tracking-tight">
                       {money(finance.realGrossProfitLast7Days, currency)}
+                      <TrendingUp className="h-5 w-5 text-good" />
                     </div>
                     {finance.costCoverageRatio < 0.99 && (
-                      <div className="mt-1.5 text-[11.5px] text-text-faint">
-                        Based on {(finance.costCoverageRatio * 100).toFixed(0)}% of revenue — the rest is
-                        from products with no real cost price on file yet.
+                      <div className="mt-2 text-[13px] text-text-faint">
+                        From {(finance.costCoverageRatio * 100).toFixed(0)}% of sales — some products have no cost price yet.
                       </div>
                     )}
                   </>
                 ) : (
-                  <div className="mt-2.5 text-[13px] text-text-faint">
-                    No real cost prices on file yet.{" "}
-                    <Link href="/dashboard/store" className="underline">
-                      Add one on a product
-                    </Link>{" "}
-                    to see real margin.
+                  <div className="mt-3">
+                    <div className="text-[15px] text-text-dim">Add your cost prices to see profit.</div>
+                    <Link href="/dashboard/store#products" className="btn-soft mt-3 !py-2 text-[13.5px]">
+                      Add cost prices
+                    </Link>
                   </div>
                 )}
               </Card>
             </div>
 
-            <Card className="p-7">
-              <SectionLabel>Revenue, last 7 days</SectionLabel>
-              <div className="mt-4">
-                <RevenueChart data={finance.dailyRevenue} currency={currency} />
-              </div>
-            </Card>
-
-            <Card className="p-6">
-              <div className="flex items-start gap-3">
-                <CircleDollarSign className="mt-0.5 h-4 w-4 shrink-0 text-text-faint" />
-                <div>
-                  <p className="text-[13px] leading-relaxed text-text-dim">
-                    Gross profit here is revenue minus the real cost price you enter per product — it&apos;s
-                    real, not estimated, but only as complete as the cost prices you&apos;ve filled in.
-                    Ad spend and cost-per-customer still aren&apos;t shown — no ad spend is actually being
-                    tracked anywhere in the platform yet.
-                  </p>
-                  {finance.costCoverageRatio < 0.99 && (
-                    <Pill tone="warn">
-                      Add real cost prices in Store → Products for a complete number
-                    </Pill>
-                  )}
+            {finance.dailyRevenue.some((d) => d.revenue > 0) ? (
+              <Card className="p-7">
+                <h2 className="text-[19px] font-semibold tracking-tight">Sales, day by day</h2>
+                <p className="mt-1 text-[14px] text-text-faint">The last 7 days</p>
+                <div className="mt-5">
+                  <RevenueChart data={finance.dailyRevenue} currency={currency} />
                 </div>
-              </div>
-            </Card>
+              </Card>
+            ) : (
+              <EmptyState
+                icon={CircleDollarSign}
+                title="No sales in the last 7 days"
+                body="Your day-by-day chart appears here with the next order."
+                action={{ label: "Ask Orbit how to get sales", href: "/dashboard/orchestrator" }}
+                compact
+              />
+            )}
+
+            <p className="flex items-center gap-2 px-1 text-[13.5px] text-text-faint">
+              <CircleDollarSign className="h-4 w-4" />
+              Profit = sales minus the cost price you enter for each product. Ad spend is not included yet.
+            </p>
           </>
         )}
       </div>

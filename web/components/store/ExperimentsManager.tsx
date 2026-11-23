@@ -104,7 +104,7 @@ export function ExperimentsManager({ experiments }: { experiments: ExperimentRow
 
       {experiments.length === 0 ? (
         <Card className="p-6">
-          <p className="text-[13.5px] text-text-faint">No experiments yet — start one above.</p>
+          <p className="py-6 text-center text-[14.5px] text-text-dim">No experiments yet. Start one above to test two versions of a page or offer.</p>
         </Card>
       ) : (
         <div className="space-y-4">

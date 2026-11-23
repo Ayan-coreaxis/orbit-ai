@@ -7,8 +7,8 @@ export default async function AdsPage() {
   const businessId = await getActiveBusinessId();
   return (
     <div>
-      <Topbar title="Ads" subtitle="Real Meta ads on Facebook & Instagram — built paused, you start the spend" />
-      <div className="max-w-[1100px] p-5 sm:p-8 lg:p-10">
+      <Topbar title="Ads" subtitle="Facebook and Instagram ads. Nothing spends until you press Start." />
+      <div className="page-body">
         {businessId ? (
           <AdsManager />
         ) : (

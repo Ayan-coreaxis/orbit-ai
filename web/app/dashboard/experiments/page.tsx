@@ -26,10 +26,10 @@ export default async function ExperimentsPage() {
   return (
     <div>
       <Topbar
-        title="Experimentation (A/B)"
+        title="Experiments"
         subtitle={businessId ? `${experiments.length} real experiment${experiments.length === 1 ? "" : "s"}` : "No business yet"}
       />
-      <div className="max-w-[1000px] space-y-6 p-5 sm:p-8 lg:p-10">
+      <div className="page-body space-y-6">
         {!businessId ? (
           <Card className="p-6">
             <p className="text-[13.5px] text-text-faint">No business yet — finish setup first.</p>

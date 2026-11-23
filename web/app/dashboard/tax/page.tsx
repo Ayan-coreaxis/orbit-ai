@@ -10,8 +10,8 @@ export default async function TaxPage() {
 
   return (
     <div>
-      <Topbar title="Tax & Compliance" subtitle="Tax owed, from your rate and your revenue" />
-      <div className="max-w-[900px] space-y-6 p-5 sm:p-8 lg:p-10">
+      <Topbar title="Tax" subtitle="Tax owed, worked out from your rate and your sales" />
+      <div className="page-body space-y-6">
         {!businessId || !summary ? (
           <Card className="p-6">
             <p className="text-[13.5px] text-text-faint">No business yet — finish setup first.</p>

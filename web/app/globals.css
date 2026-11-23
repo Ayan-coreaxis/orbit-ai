@@ -406,3 +406,20 @@ html[data-app-theme="forest"] .orbit-app {
 /* Page content enters softly on every navigation */
 /* backwards (not both): a transform left behind would trap position:fixed children */
 .page-enter { animation: orbit-fade-up 0.45s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+
+/* ---------- page system (dashboard) ----------
+   One content column for every page: same left edge as the page title, same max width. */
+.orbit-app .page-body {
+  max-width: 1400px;
+  padding: 24px 20px 48px;
+}
+@media (min-width: 640px) { .orbit-app .page-body { padding: 28px 32px 56px; } }
+@media (min-width: 1280px) { .orbit-app .page-body { padding: 28px 40px 64px 8px; } }
+
+/* Readability floor: nothing a seller has to read is smaller than ~12.5px, and no shouty
+   all-caps labels — sentence case reads faster. (Tokens like "COD" are written in caps.) */
+.orbit-app .text-\[10px\], .orbit-app .text-\[10\.5px\], .orbit-app .text-\[11px\], .orbit-app .text-\[11\.5px\] { font-size: 12.5px; }
+.orbit-app .text-\[12px\] { font-size: 13px; }
+.orbit-app .text-xs { font-size: 12.5px; line-height: 1.45; }
+.orbit-app .uppercase { text-transform: none; letter-spacing: 0; }
+.orbit-app .tracking-wider, .orbit-app .tracking-widest { letter-spacing: 0; }

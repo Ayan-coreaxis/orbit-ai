@@ -2,6 +2,7 @@ import { Topbar } from "@/components/Topbar";
 import { Card, Pill } from "@/components/ui";
 import { getActiveBusinessId } from "@/lib/get-active-business-id";
 import { prisma } from "@/lib/prisma";
+import { EmptyState } from "@/components/dashboard/EmptyState";
 import { Star, AlertTriangle } from "lucide-react";
 
 export default async function ReviewsPage() {
@@ -17,14 +18,14 @@ export default async function ReviewsPage() {
   return (
     <div>
       <Topbar
-        title="Reviews & Reputation"
+        title="Reviews"
         subtitle={
           businessId
             ? `${reviews.length} real review request${reviews.length === 1 ? "" : "s"} sent · ${submitted.length} responded`
             : "No business yet"
         }
       />
-      <div className="max-w-[1000px] space-y-6 p-5 sm:p-8 lg:p-10">
+      <div className="page-body space-y-6">
         {!businessId ? (
           <Card className="p-6">
             <p className="text-[13.5px] text-text-faint">No business yet — finish setup first.</p>
@@ -58,9 +59,13 @@ export default async function ReviewsPage() {
 
             <Card className="overflow-hidden">
               {reviews.length === 0 ? (
-                <p className="p-6 text-[13.5px] text-text-faint">
-                  No review requests yet — the first one goes out 3 days after you mark an order delivered.
-                </p>
+                <EmptyState
+                  icon={Star}
+                  title="No reviews yet"
+                  body="Three days after an order is delivered, Orbit asks that customer for a review."
+                  action={{ label: "See your orders", href: "/dashboard/store#orders" }}
+                  compact
+                />
               ) : (
                 <div className="divide-y divide-border">
                   {reviews.map((r) => (

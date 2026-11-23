@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, Check, Clapperboard, ExternalLink, Loader2, Megaphone, Pause, Play, Plus, Trash2, X } from "lucide-react";
 import { Button, Card, Pill } from "@/components/ui";
+import { EmptyState } from "@/components/dashboard/EmptyState";
 import { cn } from "@/lib/utils";
 
 type Campaign = {
@@ -163,7 +164,7 @@ export function AdsManager() {
       {err && <Card className="p-4 text-[13px] text-bad">{err}</Card>}
 
       {data.campaigns.length === 0 ? (
-        <Card className="p-8 text-center text-[13.5px] text-text-faint">No ads yet. Create one above, or ask your Orchestrator to plan one.</Card>
+        <EmptyState icon={Megaphone} title="No ads yet" body="Create one above, or ask the Orchestrator to plan an ad from your best product." action={{ label: "Ask the Orchestrator", href: "/dashboard/orchestrator" }} compact />
       ) : (
         <div className="grid gap-3">
           {data.campaigns.map((c) => {

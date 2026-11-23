@@ -8,7 +8,7 @@ export default async function MediaPage() {
   const media = businessId ? await listMedia(businessId) : [];
   return (
     <div>
-      <Topbar title="Media library" subtitle="Every photo, video, voice note and PDF you've given Orbit — your agents use these with your Orchestrator's permission" />
+      <Topbar title="Media library" subtitle="Photos, videos, voice notes and PDFs you have shared with Orbit" />
       <div className="px-6 py-6 lg:px-10">
         <MediaLibrary initial={media} />
       </div>

@@ -26,7 +26,7 @@ export function SettingsNav() {
             aria-current={isActive(pathname, item.href) ? "page" : undefined}
             className={cn(
               "shrink-0 whitespace-nowrap rounded-full px-3 py-1.5 text-[12.5px] font-medium",
-              isActive(pathname, item.href) ? "bg-accent text-white" : "bg-panel-2 text-text-dim hover:text-text",
+              isActive(pathname, item.href) ? "bg-accent text-panel" : "bg-panel text-text-dim hover:text-text",
             )}
           >
             {item.label}
@@ -36,7 +36,7 @@ export function SettingsNav() {
       <nav aria-label="Settings" className="sticky top-6 hidden w-56 shrink-0 space-y-5 self-start lg:block">
         {SETTINGS_GROUPS.map((g) => (
           <div key={g.title}>
-            <div className="mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-text-faint">{g.title}</div>
+            <div className="mb-1.5 px-3.5 text-[13px] font-semibold text-text-faint">{g.title}</div>
             <div className="space-y-0.5">
               {g.items.map((item) => {
                 const Icon = item.icon;
@@ -47,8 +47,8 @@ export function SettingsNav() {
                     href={item.href}
                     aria-current={active ? "page" : undefined}
                     className={cn(
-                      "flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13.5px] transition-colors",
-                      active ? "bg-accent-soft font-medium text-accent-strong" : "text-text-dim hover:bg-panel-2 hover:text-text",
+                      "flex items-center gap-2.5 rounded-full px-3.5 py-2 text-[14px] transition-colors",
+                      active ? "bg-accent font-medium text-panel" : "text-text-dim hover:bg-panel hover:text-text",
                     )}
                   >
                     <Icon className="h-4 w-4 shrink-0" />

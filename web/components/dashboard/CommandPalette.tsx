@@ -10,7 +10,7 @@ type Entry = { label: string; hint: string; href: string; icon: React.ComponentT
 const ACTIONS: Entry[] = [
   { label: "Ask the Orchestrator", hint: "Action", href: "/dashboard/orchestrator", icon: MessageSquarePlus, keywords: "ask chat question plan" },
   { label: "Make a photo or reel", hint: "Action", href: "/dashboard/content", icon: Clapperboard, keywords: "studio create reel image video" },
-  { label: "Add a product", hint: "Action", href: "/dashboard/store", icon: Package, keywords: "new product add item" },
+  { label: "Add a product", hint: "Action", href: "/dashboard/store#products", icon: Package, keywords: "new product add item" },
   { label: "Connect a courier", hint: "Action", href: "/dashboard/settings/delivery", icon: Truck, keywords: "postex leopards tcs courier" },
   { label: "Connect your domain", hint: "Action", href: "/dashboard/settings/domain", icon: Globe, keywords: "domain dns website address" },
 ];
