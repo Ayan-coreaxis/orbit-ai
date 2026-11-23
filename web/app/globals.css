@@ -423,3 +423,12 @@ html[data-app-theme="forest"] .orbit-app {
 .orbit-app .text-xs { font-size: 12.5px; line-height: 1.45; }
 .orbit-app .uppercase { text-transform: none; letter-spacing: 0; }
 .orbit-app .tracking-wider, .orbit-app .tracking-widest { letter-spacing: 0; }
+@keyframes orbit-ring { 0%, 100% { transform: rotate(0); } 15% { transform: rotate(14deg); } 30% { transform: rotate(-12deg); } 45% { transform: rotate(8deg); } 60% { transform: rotate(-5deg); } 75% { transform: rotate(2deg); } }
+/* Menus and popovers: still glass at the edges, but solid enough to read over busy cards. */
+.glass-solid {
+  background: color-mix(in srgb, var(--panel) 94%, transparent);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  backdrop-filter: blur(24px) saturate(160%);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.6) inset, 0 24px 60px -20px rgba(23, 56, 41, 0.35);
+}

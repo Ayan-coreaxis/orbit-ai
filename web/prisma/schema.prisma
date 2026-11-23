@@ -14,6 +14,8 @@ model User {
   email        String   @unique
   passwordHash String
   createdAt    DateTime @default(now())
+  /// set when the owner clicks the link in the welcome email (null = not verified yet)
+  emailVerifiedAt DateTime?
 
   businesses  Business[]
   memberships BusinessMember[]

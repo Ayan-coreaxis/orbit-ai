@@ -1,4 +1,4 @@
-import { CreditCard, Globe, LayoutGrid, Megaphone, Plug, ShoppingCart, Store, Truck, Users, Wallet, Activity } from "lucide-react";
+import { UserCog, CreditCard, Globe, LayoutGrid, Megaphone, Plug, ShoppingCart, Store, Truck, Users, Wallet, Activity } from "lucide-react";
 
 /** The seller's Settings sections, grouped — used by the side menu and the overview grid. */
 export const SETTINGS_GROUPS = [
@@ -8,6 +8,7 @@ export const SETTINGS_GROUPS = [
       { href: "/dashboard/settings", label: "Overview", icon: LayoutGrid, desc: "Everything at a glance" },
       { href: "/dashboard/settings/plan", label: "Plan & billing", icon: CreditCard, desc: "Your plan, AI allowance and invoices" },
       { href: "/dashboard/settings/team", label: "Team", icon: Users, desc: "People who can work on this store" },
+      { href: "/dashboard/settings/account", label: "Account & data", icon: UserCog, desc: "Login email, download your data, delete account" },
     ],
   },
   {

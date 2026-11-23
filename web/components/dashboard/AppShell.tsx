@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
-import { Compass, Images, LogOut, Menu, MessageCircle, Moon, Plug, Search, Settings, Sparkles, Sun, X } from "lucide-react";
+import { Compass, HelpCircle, Images, LogOut, MailCheck, Menu, MessageCircle, Moon, Plug, Search, Settings, Sparkles, Sun, X } from "lucide-react";
+import { NotificationBell } from "@/components/dashboard/NotificationBell";
 import { cn } from "@/lib/utils";
 import { NAV_GROUPS, isActive } from "@/components/dashboard/nav";
 import { CommandPalette } from "@/components/dashboard/CommandPalette";
 
-type Props = { businessName?: string; talkBadge?: boolean; userEmail?: string };
+type Props = { businessName?: string; talkBadge?: boolean; userEmail?: string; emailVerified?: boolean };
 
 /** Top-level sections (the glass pill nav). `also` = pages that belong to the section. */
 const SECTIONS: { label: string; href: string; also?: string[] }[] = [
@@ -159,7 +160,7 @@ function RailButton({ href, onClick, label, children, active }: { href?: string;
   );
 }
 
-export function AppShell({ businessName, talkBadge, userEmail, children }: Props & { children: React.ReactNode }) {
+export function AppShell({ businessName, talkBadge, userEmail, emailVerified = true, children }: Props & { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [theme, setTheme] = useAppTheme();
@@ -277,6 +278,7 @@ export function AppShell({ businessName, talkBadge, userEmail, children }: Props
               <button onClick={() => setPalette(true)} className="flex h-10 w-10 items-center justify-center rounded-full text-text-dim transition-colors hover:bg-panel hover:text-text" aria-label="Search (Ctrl K)" title="Search · Ctrl K">
                 <Search className="h-[18px] w-[18px]" />
               </button>
+              <NotificationBell />
               <Link href="/dashboard/orchestrator" className="relative flex h-10 w-10 items-center justify-center rounded-full text-text-dim transition-colors hover:bg-panel hover:text-text" aria-label="Ask the Orchestrator" title="Ask the Orchestrator">
                 <Sparkles className="h-[18px] w-[18px]" />
                 {talkBadge && <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-tomato ring-2 ring-[var(--panel)]" />}
@@ -325,6 +327,9 @@ export function AppShell({ businessName, talkBadge, userEmail, children }: Props
             </RailButton>
           </div>
           <div className="glass mt-auto flex flex-col gap-1 rounded-full p-1.5">
+            <RailButton label="Help & support" href="/dashboard/help" active={under(pathname, "/dashboard/help")}>
+              <HelpCircle className="h-[18px] w-[18px]" />
+            </RailButton>
             <RailButton label="Log out" onClick={logOut}>
               <LogOut className="h-[18px] w-[18px]" />
             </RailButton>
@@ -332,6 +337,7 @@ export function AppShell({ businessName, talkBadge, userEmail, children }: Props
         </aside>
 
         <main id="main" className="min-w-0 flex-1 pb-16">
+          {!emailVerified && <VerifyBanner email={userEmail} />}
           {sub && (
             <div className="px-5 pt-5 sm:px-8 xl:pl-2 xl:pr-10">
               <div className="glass scrollbar-thin inline-flex max-w-full overflow-x-auto rounded-full">
@@ -348,5 +354,59 @@ export function AppShell({ businessName, talkBadge, userEmail, children }: Props
       {drawerEl}
       <CommandPalette open={palette} onClose={() => setPalette(false)} />
     </>
+  );
+}
+
+/** Soft reminder until the owner confirms their email. Dismissable for this browser session. */
+function VerifyBanner({ email }: { email?: string }) {
+  const [hidden, setHidden] = useState(false);
+  const [state, setState] = useState<"idle" | "sending" | "sent" | "error">("idle");
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem("orbit.verify.hidden")) setHidden(true);
+    } catch {
+      /* private mode */
+    }
+  }, []);
+  if (hidden) return null;
+  async function resend() {
+    setState("sending");
+    const r = await fetch("/api/auth/verify", { method: "POST" }).catch(() => null);
+    setState(r?.ok ? "sent" : "error");
+  }
+  return (
+    <div className="px-5 pt-5 sm:px-8 xl:pl-2 xl:pr-10">
+      <div className="glass orbit-fade flex flex-wrap items-center gap-3 rounded-[20px] px-4 py-3">
+        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-tomato-soft text-tomato-strong">
+          <MailCheck className="h-[18px] w-[18px]" />
+        </span>
+        <span className="min-w-0 flex-1 text-[14.5px]">
+          {state === "sent" ? (
+            <>Sent — check {email ?? "your inbox"} and click the link.</>
+          ) : (
+            <>Confirm your email so we can reach you about orders and billing.</>
+          )}
+        </span>
+        {state !== "sent" && (
+          <button onClick={resend} disabled={state === "sending"} className="btn-primary !py-2 text-[13.5px] disabled:opacity-60">
+            {state === "sending" ? "Sending…" : state === "error" ? "Try again" : "Send link"}
+          </button>
+        )}
+        <button
+          onClick={() => {
+            setHidden(true);
+            try {
+              sessionStorage.setItem("orbit.verify.hidden", "1");
+            } catch {
+              /* private mode */
+            }
+          }}
+          className="rounded-full p-2 text-text-faint hover:bg-panel hover:text-text"
+          aria-label="Hide"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+    </div>
   );
 }

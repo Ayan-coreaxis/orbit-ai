@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { hashPassword, setSessionCookie } from "@/lib/auth";
 import { linkPendingInvites, getMemberBusinessIds } from "@/lib/team";
+import { sendVerifyEmail } from "@/lib/email-verify";
 
 export async function POST(req: NextRequest) {
   const limited = await throttle(req, "signup", 20, 3600000);
@@ -29,6 +30,8 @@ export async function POST(req: NextRequest) {
   });
 
   await setSessionCookie(user.id);
+  // Welcome email with a confirm link — never blocks signup if email isn't configured.
+  await sendVerifyEmail(user).catch(() => null);
 
   // auto-accept any team invite sitting under this exact email, and land them straight in that
   // business's dashboard if they don't own one of their own yet (a brand-new signup never does)

@@ -15,6 +15,7 @@ import {
   Receipt,
   Megaphone,
   Plug,
+  HelpCircle,
   type LucideIcon,
 } from "lucide-react";
 
@@ -62,6 +63,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/dashboard/settings/connections", label: "Connections", icon: Plug, keywords: "mcp skills plugins tools" },
       { href: "/dashboard/settings", label: "Settings", icon: Settings, keywords: "plan billing domain courier whatsapp meta pixel delivery" },
+      { href: "/dashboard/help", label: "Help & support", icon: HelpCircle, keywords: "help support faq guide contact question" },
     ],
   },
 ];

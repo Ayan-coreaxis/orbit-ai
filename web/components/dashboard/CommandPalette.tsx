@@ -53,8 +53,8 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
 
   return (
     <div className="fixed inset-0 z-[60] flex items-start justify-center px-4 pt-[12vh]" role="dialog" aria-modal="true" aria-label="Search">
-      <button className="orbit-fade absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} aria-label="Close search" />
-      <div className="orbit-scale-in relative w-full max-w-lg overflow-hidden rounded-2xl border border-border bg-panel shadow-2xl">
+      <button className="orbit-fade absolute inset-0 bg-[#18261e]/25 backdrop-blur-md" onClick={onClose} aria-label="Close search" />
+      <div className="glass-solid orbit-scale-in relative w-full max-w-xl overflow-hidden rounded-[28px]">
         <div className="flex items-center gap-3 border-b border-border px-4">
           <Search className="h-4.5 w-4.5 text-text-faint" />
           <input
