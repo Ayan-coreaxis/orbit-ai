@@ -36,6 +36,7 @@ import { CountUp } from "@/components/dashboard/CountUp";
 import { money } from "@/lib/money";
 import { totalStock } from "@/lib/variants";
 import { agentLabel as readableAgent } from "@/lib/admin-stats";
+import { parseBriefingTasks } from "@/lib/daily-briefing";
 
 export const dynamic = "force-dynamic";
 
@@ -110,6 +111,26 @@ export default async function DashboardPage() {
     getRealAgentActivity(businessId),
     getRecentAgentActivity(businessId, 40),
   ]);
+  const since56 = new Date(now.getTime() - 56 * 86400000);
+  const [weekOrders, briefing, toShip, pendingCount] = await Promise.all([
+    prisma.order.findMany({ where: { businessId, createdAt: { gte: since56 }, status: { not: "cancelled" } }, select: { total: true, status: true, createdAt: true } }),
+    prisma.orchestratorMessage.findFirst({ where: { businessId, speaker: "briefing" }, orderBy: { createdAt: "desc" }, select: { tasks: true, createdAt: true } }),
+    prisma.order.count({ where: { businessId, status: "confirmed" } }),
+    prisma.order.count({ where: { businessId, status: "pending" } }),
+  ]);
+  // Sales per week, oldest first: settled (confirmed / shipped / delivered) vs still pending.
+  const weeks = Array.from({ length: 8 }, (_, i) => {
+    const end = new Date(now.getTime() - (7 - i) * 7 * 86400000);
+    const start = new Date(end.getTime() - 7 * 86400000);
+    const inWeek = weekOrders.filter((o) => o.createdAt > start && o.createdAt <= end);
+    return {
+      label: `${start.getDate()} ${start.toLocaleDateString("en-GB", { month: "short" })}`,
+      settled: inWeek.filter((o) => o.status !== "pending").reduce((a, o) => a + o.total, 0),
+      pending: inWeek.filter((o) => o.status === "pending").reduce((a, o) => a + o.total, 0),
+    };
+  });
+  const weekMax = Math.max(1, ...weeks.map((w) => w.settled + w.pending));
+  const briefTasks = parseBriefingTasks(briefing?.tasks).filter((t) => t.state !== "done" && t.state !== "skipped").slice(0, 4);
   const currency = business?.storeCurrency ?? "pkr";
   const visitors7 = Number(visitors[0]?.c ?? 0);
   const needsAttention = unconfirmed + flagged;
@@ -182,150 +203,267 @@ export default async function DashboardPage() {
   ];
 
   const toneCls: Record<Todo["tone"], string> = {
-    accent: "bg-accent-soft text-accent-strong",
+    accent: "bg-accent-soft text-accent",
     warn: "bg-warn-soft text-warn",
-    bad: "bg-bad-soft text-bad",
+    bad: "bg-tomato-soft text-tomato-strong",
     neutral: "bg-panel-2 text-text-dim",
   };
+  const revenueGrowth =
+    orderGrowth.lastWeekRevenue > 0 ? ((orderGrowth.thisWeekRevenue - orderGrowth.lastWeekRevenue) / orderGrowth.lastWeekRevenue) * 100 : null;
+  const conversion = visitors7 ? (orderGrowth.thisWeekOrders / visitors7) * 100 : null;
+  const firstName = real.businessName;
+  const todayCount = briefTasks.length || Math.min(todos.length, 4);
+  const delta = (pct: number | null) =>
+    pct === null ? null : (
+      <span className={pct >= 0 ? "chip-up" : "chip-down"}>
+        {pct >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+        {Math.abs(pct).toFixed(0)}%
+      </span>
+    );
 
   return (
     <div>
-      <Topbar title={`${greeting(now)} 👋`} subtitle={`${real.businessName} · ${now.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" })}`} />
-      <div className="max-w-[1400px] space-y-6 p-5 sm:p-8 lg:p-10">
-        {/* KPIs */}
-        <div className="orbit-stagger grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
-          {kpis.map((k) => (
-            <Card key={k.label} className={`hover-lift p-4 sm:p-5 ${k.alert ? "border-warn/40" : ""}`}>
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-[12px] font-medium text-text-faint sm:text-[12.5px]">{k.label}</span>
-                <k.icon className={`h-4 w-4 ${k.alert ? "text-warn" : "text-text-faint"}`} />
-              </div>
-              <div className="mt-2 text-[22px] font-semibold tracking-tight sm:text-[26px]">{k.value}</div>
-              <div className="mt-1 truncate text-[11.5px] text-text-faint sm:text-[12px]">{k.sub}</div>
-            </Card>
-          ))}
-        </div>
+      <header className="px-5 pb-2 pt-7 sm:px-8 sm:pt-9 xl:pl-2 xl:pr-10">
+        <h1 className="text-[34px] font-semibold leading-[1.05] tracking-[-0.035em] sm:text-[48px]">
+          {greeting(now)}, {firstName}
+        </h1>
+        <p className="mt-2.5 text-[16px] text-text-dim sm:text-[17px]">
+          {todayCount ? `${todayCount} thing${todayCount === 1 ? "" : "s"} worth doing today` : "Nothing needs you right now"}
+          {toShip ? ` · ${toShip} order${toShip === 1 ? "" : "s"} to ship` : ""}
+          {needsAttention ? ` · ${needsAttention} to check` : ""}
+        </p>
+      </header>
 
-        {lab?.active && <GrowthPlanOverview plan={lab.active} currency={currency} />}
-
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
-          {/* Do next */}
-          <Card className="p-5 sm:p-6">
-            <div className="flex items-center justify-between">
-              <SectionLabel>Do next</SectionLabel>
-              {todos.length === 0 && (
-                <span className="inline-flex items-center gap-1.5 text-[12.5px] text-good">
-                  <CheckCircle2 className="h-4 w-4" /> You&apos;re all set
-                </span>
-              )}
-            </div>
-            {todos.length === 0 ? (
-              <p className="mt-4 text-[13.5px] text-text-dim">Nothing needs you right now. Ask your Orchestrator what to push this week.</p>
-            ) : (
-              <ul className="orbit-stagger mt-4 space-y-2">
-                {todos.slice(0, 6).map((t) => (
-                  <li key={t.title}>
-                    <Link href={t.href} className="group flex items-center gap-3 rounded-xl border border-transparent p-2.5 transition-all hover:border-border hover:bg-panel-2">
-                      <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${toneCls[t.tone]}`}>
-                        <t.icon className="h-4 w-4" />
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-[14px] font-medium">{t.title}</span>
-                        <span className="block truncate text-[12.5px] text-text-faint">{t.body}</span>
-                      </span>
-                      <ArrowRight className="h-4 w-4 shrink-0 text-text-faint transition-transform group-hover:translate-x-0.5 group-hover:text-text" />
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Card>
-
-          {/* Recent orders */}
-          <Card className="p-5 sm:p-6">
-            <div className="flex items-center justify-between">
-              <SectionLabel>Latest orders</SectionLabel>
-              <Link href="/dashboard/store" className="inline-flex items-center gap-1 text-[12.5px] text-text-faint hover:text-text">
-                All orders <ArrowUpRight className="h-3.5 w-3.5" />
-              </Link>
-            </div>
-            {recentOrders.length === 0 ? (
-              <div className="mt-6 flex flex-col items-center py-6 text-center">
-                <Package className="h-7 w-7 text-text-faint" />
-                <p className="mt-3 text-[13.5px] text-text-dim">No orders yet — they show up here the moment one comes in.</p>
-              </div>
-            ) : (
-              <ul className="orbit-stagger mt-3 divide-y divide-border">
-                {recentOrders.map((o) => (
-                  <li key={o.id} className="flex items-center gap-3 py-2.5">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-panel-2 text-[12px] font-semibold text-text-dim">
-                      {o.customerName.slice(0, 1).toUpperCase()}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-[13.5px] font-medium">{o.customerName}</div>
-                      <div className="text-[11.5px] text-text-faint">
-                        #{o.id.slice(-6).toUpperCase()} · {formatRelativeTime(o.createdAt, now)} · {o.paymentProvider === "cod" ? "COD" : paymentMethodLabel(o.paymentProvider)}
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-[13.5px] font-semibold">{money(o.total, currency)}</div>
-                      <span className={`mt-0.5 inline-block rounded-full px-2 py-0.5 text-[10.5px] font-medium ${STATUS_PILL[o.status] ?? "bg-panel-2 text-text-dim"}`}>
-                        {!o.verified && o.status === "pending" ? "awaiting customer" : o.status}
-                      </span>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Card>
-        </div>
-
-        {/* Quick actions */}
-        <div className="orbit-stagger grid grid-cols-2 gap-3 md:grid-cols-4">
-          {[
-            { href: "/dashboard/orchestrator", icon: Sparkles, label: "Ask the Orchestrator" },
-            { href: "/dashboard/content", icon: Clapperboard, label: "Make a photo or reel" },
-            { href: "/dashboard/ads", icon: Megaphone, label: "Create an ad" },
-            { href: "/dashboard/orbit-design", icon: Store, label: "Edit your store" },
-          ].map((a) => (
-            <Link key={a.href} href={a.href} className="hover-lift press group flex items-center gap-3 rounded-2xl border border-border bg-panel p-4">
-              <span className="flex h-9 w-9 items-center justify-center rounded-xl gradient-fill text-white transition-transform duration-300 group-hover:rotate-6">
-                <a.icon className="h-4 w-4" />
-              </span>
-              <span className="text-[13.5px] font-medium">{a.label}</span>
-            </Link>
-          ))}
-        </div>
-
-        {/* Agent activity — only once something has happened */}
-        {hasActivity ? (
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_300px]">
-            <Card className="p-5 sm:p-7">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <span className="relative flex h-2 w-2">
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-good opacity-60" />
-                    <span className="relative inline-flex h-2 w-2 rounded-full bg-good" />
-                  </span>
-                  <SectionLabel>Your AI team at work</SectionLabel>
-                </div>
-                <span className="hidden text-[12.5px] text-text-faint sm:block">Hover to preview, click to pin</span>
-              </div>
-              <div className="mt-6">
-                <AgentNetwork activity={activity} />
-              </div>
-            </Card>
-            <Card className="max-h-[560px] overflow-y-auto p-6">
-              <LiveFeed items={feedItems} />
-            </Card>
+      <div className="orbit-stagger grid grid-cols-1 gap-5 px-5 pt-6 sm:px-8 xl:grid-cols-12 xl:pl-2 xl:pr-10">
+        {/* ---- Sales this week ---- */}
+        <section className="app-card flex flex-col p-6 xl:col-span-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-[16px] font-medium text-text-dim">Sales this week</h2>
+            <span className="rounded-full border border-border px-3 py-1 text-[12.5px] font-medium text-text-dim">{currency.toUpperCase()}</span>
           </div>
-        ) : (
-          <Card className="flex items-center gap-4 p-5">
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-panel-2">
-              <Sparkles className="h-5 w-5 text-text-faint" />
-            </span>
-            <p className="text-[13.5px] text-text-dim">Your AI team&apos;s work will show up here — every call it makes, as it happens.</p>
-          </Card>
+          <div className="mt-3 text-[40px] font-semibold leading-none tracking-[-0.035em] sm:text-[44px]">
+            <CountUp value={orderGrowth.thisWeekRevenue} format="money" currency={currency} />
+          </div>
+          <div className="mt-3 flex items-center gap-2 text-[13.5px] text-text-faint">
+            {delta(revenueGrowth)}
+            <span>{revenueGrowth === null ? `${money(orderGrowth.lastWeekRevenue, currency)} last week` : "than last week"}</span>
+          </div>
+          <div className="mt-6 grid grid-cols-2 gap-2.5">
+            <Link href="/dashboard/store#orders" className="btn-primary">
+              <ShoppingBag className="h-4 w-4" /> Orders
+            </Link>
+            <Link href="/dashboard/orchestrator" className="btn-soft">
+              <Sparkles className="h-4 w-4" /> Ask Orbit
+            </Link>
+          </div>
+          <div className="app-tile mt-5 grid grid-cols-3 gap-2 p-2.5">
+            {[
+              { label: "To confirm", value: pendingCount, href: "/dashboard/store#orders" },
+              { label: "To ship", value: toShip, href: "/dashboard/store#orders" },
+              { label: "Low stock", value: lowStock.length, href: "/dashboard/store" },
+            ].map((t) => (
+              <Link key={t.label} href={t.href} className="hover-lift rounded-[14px] bg-panel p-3">
+                <div className="text-[12.5px] text-text-faint">{t.label}</div>
+                <div className="mt-1 text-[22px] font-semibold tracking-tight">{t.value}</div>
+              </Link>
+            ))}
+          </div>
+        </section>
+
+        {/* ---- four numbers ---- */}
+        <section className="app-card grid grid-cols-2 gap-3 p-3 xl:col-span-4">
+          <div className="hover-lift flex flex-col justify-between rounded-[20px] bg-tomato p-5 text-white shadow-[0_18px_40px_-18px_var(--tomato)]">
+            <div className="flex items-center justify-between">
+              <span className="text-[14px] font-medium text-white/85">Orders</span>
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20">
+                <ShoppingBag className="h-4 w-4" />
+              </span>
+            </div>
+            <div>
+              <div className="mt-4 text-[34px] font-semibold leading-none tracking-tight">
+                <CountUp value={orderGrowth.thisWeekOrders} />
+              </div>
+              <div className="mt-2 text-[13px] text-white/85">
+                {growth !== null ? `${growth >= 0 ? "↑" : "↓"} ${Math.abs(growth).toFixed(0)}% · ` : ""}this week
+              </div>
+            </div>
+          </div>
+          {[
+            { label: "Visitors", value: <CountUp value={visitors7} />, sub: "this week", icon: Eye },
+            { label: "Bought", value: conversion === null ? "—" : `${conversion.toFixed(1)}%`, sub: "of visitors", icon: TrendingUp },
+            { label: "To check", value: <CountUp value={needsAttention} />, sub: needsAttention ? `${flagged} flagged · ${unconfirmed} unconfirmed` : "all clear", icon: AlertTriangle, alert: needsAttention > 0 },
+          ].map((k) => (
+            <div key={k.label} className="hover-lift flex flex-col justify-between rounded-[20px] bg-panel-2 p-5">
+              <div className="flex items-center justify-between">
+                <span className="text-[14px] font-medium text-text-dim">{k.label}</span>
+                <span className={`flex h-8 w-8 items-center justify-center rounded-full ${k.alert ? "bg-tomato-soft text-tomato-strong" : "bg-panel text-text-faint"}`}>
+                  <k.icon className="h-4 w-4" />
+                </span>
+              </div>
+              <div>
+                <div className="mt-4 text-[30px] font-semibold leading-none tracking-tight">{k.value}</div>
+                <div className="mt-2 truncate text-[12.5px] text-text-faint">{k.sub}</div>
+              </div>
+            </div>
+          ))}
+        </section>
+
+        {/* ---- 8-week chart ---- */}
+        <section className="app-card flex flex-col p-6 xl:col-span-4">
+          <h2 className="text-[19px] font-semibold tracking-tight">Sales over time</h2>
+          <p className="mt-1 text-[14px] text-text-faint">The last 8 weeks, from your real orders</p>
+          <div className="app-tile mt-5 flex flex-1 flex-col p-4">
+            <div className="flex items-center justify-between text-[13px]">
+              <span className="font-medium">Weekly sales</span>
+              <span className="flex items-center gap-3 text-text-faint">
+                <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-[3px] bg-accent" />Confirmed</span>
+                <span className="flex items-center gap-1.5"><span className="hatch h-2.5 w-2.5 rounded-[3px]" />Pending</span>
+              </span>
+            </div>
+            <div className="mt-4 flex min-h-[150px] flex-1 items-end gap-2">
+              {weeks.map((w, i) => {
+                const total = w.settled + w.pending;
+                const h = total ? Math.max(6, (total / weekMax) * 100) : 3;
+                return (
+                  <div key={i} className="group flex h-full flex-1 flex-col items-center justify-end gap-2" title={`${w.label}: ${money(total, currency)}`}>
+                    <div className="grow-y flex w-full max-w-[30px] flex-col justify-end overflow-hidden rounded-[9px]" style={{ height: `${h}%`, animationDelay: `${i * 60}ms` }}>
+                      {w.pending > 0 && <div className="hatch w-full" style={{ height: `${(w.pending / (total || 1)) * 100}%` }} />}
+                      <div className={`w-full flex-1 ${total ? "bg-accent" : "bg-border-strong"} transition-opacity group-hover:opacity-80`} style={{ minHeight: w.settled ? 4 : 0 }} />
+                    </div>
+                    <span className="whitespace-nowrap text-[10.5px] text-text-faint">{w.label}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+
+        {/* ---- today ---- */}
+        <section className="app-card p-6 xl:col-span-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-[19px] font-semibold tracking-tight">Today</h2>
+            <Link href="/dashboard/orchestrator" className="text-[13.5px] font-medium text-text-dim hover:text-text">
+              Open chat →
+            </Link>
+          </div>
+          {briefTasks.length ? (
+            <ul className="orbit-stagger mt-4 space-y-2.5">
+              {briefTasks.map((t, i) => (
+                <li key={t.id}>
+                  <Link href="/dashboard/orchestrator" className="hover-lift group flex items-start gap-3 rounded-[18px] bg-panel-2 p-3.5">
+                    <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[12.5px] font-bold ${i === 0 ? "bg-tomato text-white" : "bg-panel text-text-dim"}`}>{i + 1}</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[14.5px] font-semibold leading-snug">{t.title}</span>
+                      <span className="mt-0.5 line-clamp-2 block text-[13px] leading-relaxed text-text-faint">{t.why}</span>
+                    </span>
+                    <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-text-faint transition-transform group-hover:translate-x-0.5" />
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          ) : todos.length ? (
+            <ul className="orbit-stagger mt-4 space-y-2.5">
+              {todos.slice(0, 4).map((t) => (
+                <li key={t.title}>
+                  <Link href={t.href} className="hover-lift group flex items-center gap-3 rounded-[18px] bg-panel-2 p-3.5">
+                    <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${toneCls[t.tone]}`}>
+                      <t.icon className="h-4 w-4" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[14.5px] font-semibold">{t.title}</span>
+                      <span className="block truncate text-[13px] text-text-faint">{t.body}</span>
+                    </span>
+                    <ArrowRight className="h-4 w-4 shrink-0 text-text-faint transition-transform group-hover:translate-x-0.5" />
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="mt-6 flex flex-col items-center py-6 text-center">
+              <CheckCircle2 className="h-8 w-8 text-good" />
+              <p className="mt-3 text-[14.5px] text-text-dim">All clear. Ask Orbit what to push this week.</p>
+            </div>
+          )}
+        </section>
+
+        {/* ---- recent orders ---- */}
+        <section className="app-card p-6 xl:col-span-8">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-[19px] font-semibold tracking-tight">Recent orders</h2>
+            <Link href="/dashboard/store#orders" className="btn-soft !py-2 text-[13.5px]">
+              All orders <ArrowUpRight className="h-4 w-4" />
+            </Link>
+          </div>
+          {recentOrders.length === 0 ? (
+            <div className="mt-6 flex flex-col items-center py-8 text-center">
+              <Package className="h-8 w-8 text-text-faint" />
+              <p className="mt-3 text-[14.5px] text-text-dim">No orders yet. They appear here the moment one comes in.</p>
+            </div>
+          ) : (
+            <div className="app-tile mt-4 overflow-x-auto p-1.5">
+              <table className="w-full min-w-[560px] text-left text-[14px]">
+                <thead>
+                  <tr className="text-[13px] text-text-faint">
+                    <th className="px-3.5 py-3 font-medium">Order</th>
+                    <th className="px-3.5 py-3 font-medium">Customer</th>
+                    <th className="px-3.5 py-3 font-medium">Total</th>
+                    <th className="px-3.5 py-3 font-medium">Payment</th>
+                    <th className="px-3.5 py-3 font-medium">Status</th>
+                    <th className="px-3.5 py-3 font-medium">When</th>
+                  </tr>
+                </thead>
+                <tbody className="orbit-stagger">
+                  {recentOrders.map((o) => {
+                    const label = !o.verified && o.status === "pending" ? "Awaiting customer" : o.status.charAt(0).toUpperCase() + o.status.slice(1);
+                    const dot =
+                      o.status === "fulfilled" ? "bg-good" : o.status === "cancelled" ? "bg-text-faint" : o.status === "pending" ? "bg-tomato" : "bg-accent";
+                    return (
+                      <tr key={o.id} className="rounded-[14px] transition-colors hover:bg-panel">
+                        <td className="whitespace-nowrap rounded-l-[14px] px-3.5 py-3 font-mono text-[13px] text-text-dim">#{o.id.slice(-6).toUpperCase()}</td>
+                        <td className="whitespace-nowrap px-3.5 py-3 font-medium">{o.customerName}</td>
+                        <td className="whitespace-nowrap px-3.5 py-3 font-semibold">{money(o.total, currency)}</td>
+                        <td className="whitespace-nowrap px-3.5 py-3 text-text-dim">{o.paymentProvider === "cod" ? "Cash on delivery" : paymentMethodLabel(o.paymentProvider)}</td>
+                        <td className="whitespace-nowrap px-3.5 py-3">
+                          <span className="inline-flex items-center gap-2 text-text-dim">
+                            <span className={`h-2 w-2 rounded-full ${dot}`} />
+                            {label}
+                          </span>
+                        </td>
+                        <td className="whitespace-nowrap rounded-r-[14px] px-3.5 py-3 text-text-faint">{formatRelativeTime(o.createdAt, now)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+
+        {lab?.active && (
+          <div className="xl:col-span-12">
+            <GrowthPlanOverview plan={lab.active} currency={currency} />
+          </div>
+        )}
+
+        {/* ---- the AI team: what it did lately ---- */}
+        {hasActivity && (
+          <section className="app-card p-6 xl:col-span-12">
+            <div className="flex items-center gap-2.5">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-good opacity-60" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-good" />
+              </span>
+              <h2 className="text-[19px] font-semibold tracking-tight">What your AI team did</h2>
+            </div>
+            <ul className="orbit-stagger mt-4 grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
+              {feedItems.map((f, i) => (
+                <li key={`${f.id}-${i}`} className="rounded-[16px] bg-panel-2 px-4 py-3">
+                  <div className="truncate text-[14px] font-medium">{f.agentLabel}</div>
+                  <div className="mt-0.5 text-[12.5px] text-text-faint">{f.when}</div>
+                </li>
+              ))}
+            </ul>
+          </section>
         )}
       </div>
     </div>

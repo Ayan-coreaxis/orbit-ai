@@ -236,3 +236,173 @@ body {
   to { transform: translateX(0); }
 }
 .orbit-slide-in { animation: orbit-slide-in 0.28s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+/* =====================================================================================
+   Orbit app theme (dashboard) — "Oat / Forest / Tomato".
+   60% oat milk (surfaces), 30% forest green (structure, primary actions, active states),
+   10% tomato red (the one thing that should catch the eye). Scoped to .orbit-app so the
+   landing page and the stores keep their own looks. Dark variant: html[data-app-theme="forest"].
+   ===================================================================================== */
+.orbit-app {
+  color-scheme: light;
+  --bg: #ece4d6;
+  --panel: #fbf8f2;
+  --panel-2: #f3ede2;
+  --border: rgba(28, 52, 40, 0.09);
+  --border-strong: rgba(28, 52, 40, 0.17);
+  --text: #18261e;
+  --text-dim: #48564d;
+  --text-faint: #6b7569;
+  --accent: #1f4a37;
+  --accent-soft: rgba(31, 74, 55, 0.1);
+  --accent-strong: #173829;
+  --accent-gradient: linear-gradient(135deg, #1f4a37, #1f4a37);
+  --tomato: #f2462e;
+  --tomato-soft: rgba(242, 70, 46, 0.12);
+  --tomato-strong: #c9301b;
+  --good: #23784a;
+  --good-soft: #e1efe4;
+  --warn: #9a6412;
+  --warn-soft: #f7ead2;
+  --bad: #c2321e;
+  --bad-soft: #fbe3de;
+  --glass: rgba(255, 252, 246, 0.55);
+  --glass-strong: rgba(255, 252, 246, 0.72);
+  --glass-border: rgba(255, 255, 255, 0.75);
+  --glass-shadow: 0 1px 0 rgba(255, 255, 255, 0.8) inset, 0 10px 34px -12px rgba(23, 56, 41, 0.22);
+  --card-shadow: 0 1px 2px rgba(23, 56, 41, 0.05), 0 12px 32px -18px rgba(23, 56, 41, 0.18);
+  --orb-a: rgba(31, 74, 55, 0.22);
+  --orb-b: rgba(242, 70, 46, 0.16);
+  --orb-c: rgba(214, 190, 150, 0.55);
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-app, var(--font-sans));
+  font-size: 15px;
+}
+html[data-app-theme="forest"] .orbit-app {
+  color-scheme: dark;
+  --bg: #0f1713;
+  --panel: #16211b;
+  --panel-2: #1c2a22;
+  --border: rgba(236, 228, 214, 0.08);
+  --border-strong: rgba(236, 228, 214, 0.16);
+  --text: #f1ebe0;
+  --text-dim: #c4bcae;
+  --text-faint: #958e81;
+  --accent: #e9dfcd;
+  --accent-soft: rgba(233, 223, 205, 0.1);
+  --accent-strong: #f6efe2;
+  --accent-gradient: linear-gradient(135deg, #2c6a4e, #2c6a4e);
+  --tomato: #ff5a40;
+  --tomato-soft: rgba(255, 90, 64, 0.15);
+  --tomato-strong: #ff7a63;
+  --good: #6cc08e;
+  --good-soft: rgba(108, 192, 142, 0.14);
+  --warn: #e0a84a;
+  --warn-soft: rgba(224, 168, 74, 0.14);
+  --bad: #ff7a63;
+  --bad-soft: rgba(255, 122, 99, 0.14);
+  --glass: rgba(28, 42, 34, 0.5);
+  --glass-strong: rgba(28, 42, 34, 0.72);
+  --glass-border: rgba(255, 255, 255, 0.09);
+  --glass-shadow: 0 1px 0 rgba(255, 255, 255, 0.06) inset, 0 12px 40px -14px rgba(0, 0, 0, 0.6);
+  --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 16px 40px -22px rgba(0, 0, 0, 0.7);
+  --orb-a: rgba(44, 106, 78, 0.35);
+  --orb-b: rgba(255, 90, 64, 0.14);
+  --orb-c: rgba(44, 106, 78, 0.18);
+}
+@theme inline {
+  --color-tomato: var(--tomato);
+  --color-tomato-soft: var(--tomato-soft);
+  --color-tomato-strong: var(--tomato-strong);
+  --color-glass: var(--glass);
+}
+.orbit-app ::selection { background: var(--tomato-soft); color: var(--text); }
+
+/* The soft light behind everything — what the glass refracts. Fixed, never scrolls. */
+.orbit-ambient {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.orbit-ambient::before,
+.orbit-ambient::after,
+.orbit-ambient span {
+  content: "";
+  position: absolute;
+  border-radius: 999px;
+  filter: blur(70px);
+}
+.orbit-ambient::before { width: 46vw; height: 46vw; left: -12vw; top: -18vw; background: var(--orb-a); animation: orbit-drift-a 26s ease-in-out infinite alternate; }
+.orbit-ambient::after { width: 34vw; height: 34vw; right: -8vw; top: 22vh; background: var(--orb-b); animation: orbit-drift-b 30s ease-in-out infinite alternate; }
+.orbit-ambient span { width: 40vw; height: 40vw; left: 30vw; bottom: -22vw; background: var(--orb-c); animation: orbit-drift-a 34s ease-in-out infinite alternate-reverse; }
+@keyframes orbit-drift-a { to { transform: translate(6vw, 4vw) scale(1.08); } }
+@keyframes orbit-drift-b { to { transform: translate(-5vw, 6vw) scale(0.94); } }
+
+/* Frosted glass — iOS-style: translucent, blurred, a bright top edge and a soft drop. */
+.glass {
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(22px) saturate(170%);
+  backdrop-filter: blur(22px) saturate(170%);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+}
+.glass-strong {
+  background: var(--glass-strong);
+  -webkit-backdrop-filter: blur(26px) saturate(180%);
+  backdrop-filter: blur(26px) saturate(180%);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+}
+
+/* App surfaces */
+.app-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 26px;
+  box-shadow: var(--card-shadow);
+}
+.app-tile {
+  background: var(--panel-2);
+  border-radius: 18px;
+}
+.btn-primary {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+  border-radius: 999px; padding: 0.7rem 1.3rem; font-weight: 600; font-size: 14.5px;
+  background: var(--accent); color: var(--panel);
+  transition: transform 0.15s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+.btn-primary:hover { box-shadow: 0 8px 22px -10px var(--accent); }
+.btn-primary:active { transform: scale(0.97); }
+.btn-soft {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+  border-radius: 999px; padding: 0.7rem 1.3rem; font-weight: 600; font-size: 14.5px;
+  background: var(--panel-2); color: var(--text);
+  transition: transform 0.15s ease, background 0.2s ease;
+}
+.btn-soft:hover { background: color-mix(in srgb, var(--panel-2) 80%, var(--text)); }
+.btn-soft:active { transform: scale(0.97); }
+
+/* Delta chips: ↑ 7% */
+.chip-up, .chip-down {
+  display: inline-flex; align-items: center; gap: 2px; border-radius: 8px;
+  padding: 2px 7px; font-size: 12px; font-weight: 600;
+}
+.chip-up { background: var(--good-soft); color: var(--good); }
+.chip-down { background: var(--bad-soft); color: var(--bad); }
+
+/* Hatched fill (the "pending" part of a bar) */
+.hatch {
+  background-image: repeating-linear-gradient(135deg, var(--tomato) 0 3px, transparent 3px 7px);
+  background-color: var(--tomato-soft);
+}
+
+/* Bars grow up from the baseline when the chart appears */
+@keyframes orbit-grow-y { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+.grow-y { transform-origin: bottom; animation: orbit-grow-y 0.7s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+/* Page content enters softly on every navigation */
+/* backwards (not both): a transform left behind would trap position:fixed children */
+.page-enter { animation: orbit-fade-up 0.45s cubic-bezier(0.22, 1, 0.36, 1) backwards; }

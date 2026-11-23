@@ -13,7 +13,7 @@ export function Card({
   return (
     <div
       className={cn(
-        "rounded-2xl border border-border bg-panel shadow-[0_1px_2px_rgba(30,28,24,0.04)]",
+        "rounded-[26px] border border-border bg-panel shadow-[var(--card-shadow,0_1px_2px_rgba(30,28,24,0.04))]",
         className,
       )}
       style={style}
@@ -25,7 +25,7 @@ export function Card({
 
 export function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <div className="text-[13px] font-semibold uppercase tracking-[0.04em] text-text-dim">
+    <div className="text-[16px] font-semibold tracking-tight text-text">
       {children}
     </div>
   );
@@ -103,7 +103,7 @@ export function Button({
   variant?: "primary" | "secondary" | "ghost";
 }) {
   const variants = {
-    primary: "gradient-fill text-white hover:opacity-90 shadow-sm",
+    primary: "bg-accent text-panel hover:opacity-90 shadow-sm",
     secondary:
       "bg-panel text-text border border-border-strong hover:border-accent/50",
     ghost: "text-text-dim hover:text-text hover:bg-panel-2",
@@ -111,7 +111,7 @@ export function Button({
   return (
     <button
       className={cn(
-        "inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-[14px] font-medium transition-colors",
+        "press inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-[14px] font-semibold transition-colors",
         variants[variant],
         className,
       )}
@@ -126,7 +126,7 @@ export function ProgressBar({ value }: { value: number }) {
   return (
     <div className="h-2 w-full overflow-hidden rounded-full bg-panel-2">
       <div
-        className="h-full rounded-full gradient-fill transition-all"
+        className="h-full rounded-full bg-tomato transition-all"
         style={{ width: `${Math.min(100, value)}%` }}
       />
     </div>

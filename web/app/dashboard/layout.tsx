@@ -1,7 +1,10 @@
 import { redirect } from "next/navigation";
-import { Sidebar } from "@/components/Sidebar";
+import { Geist } from "next/font/google";
+import { AppShell } from "@/components/dashboard/AppShell";
 import { getBusinessSummary } from "@/lib/get-business";
 import { getCurrentUser } from "@/lib/auth";
+
+const appFont = Geist({ subsets: ["latin"], variable: "--font-app", display: "swap" });
 
 export default async function DashboardLayout({
   children,
@@ -15,16 +18,15 @@ export default async function DashboardLayout({
   const talkBadge = !!real?.planWaiting; // a drafted growth plan is waiting to be discussed
 
   return (
-    <div className="flex h-dvh flex-col bg-bg lg:flex-row">
-      <Sidebar
-        businessName={real?.businessName}
-        planLabel={real ? "Growth plan" : "No business yet"}
-        talkBadge={talkBadge}
-        userEmail={user.email}
-      />
-      <main id="main" className="scrollbar-thin min-h-0 flex-1 overflow-y-auto">
-        {children}
-      </main>
+    <div className={`orbit-app ${appFont.variable} relative min-h-dvh`}>
+      <div className="orbit-ambient" aria-hidden>
+        <span />
+      </div>
+      <div className="relative z-10">
+        <AppShell businessName={real?.businessName} talkBadge={talkBadge} userEmail={user.email}>
+          {children}
+        </AppShell>
+      </div>
     </div>
   );
 }

@@ -24,6 +24,7 @@ const themeInitScript = `
 try {
   var t = localStorage.getItem('theme');
   if (t === 'light') document.documentElement.setAttribute('data-theme', 'light');
+  if (localStorage.getItem('appTheme') === 'forest') document.documentElement.setAttribute('data-app-theme', 'forest');
 } catch (e) {}
 `;
 
