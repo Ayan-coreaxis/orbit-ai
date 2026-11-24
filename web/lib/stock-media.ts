@@ -40,6 +40,17 @@ async function pexelsVideo(q: string, key: string, n: number): Promise<Found | n
   return files[0] ? { url: files[0].link, poster: v?.image } : null;
 }
 
+const TINTS = ["#e7dfd0", "#dfe3da", "#ead9cf", "#d9dee3"];
+/** A soft two-tone block, different per description so neighbouring placeholders don't look identical. */
+export function placeholderSrc(q: string): string {
+  let h = 0;
+  for (let i = 0; i < q.length; i++) h = (h * 31 + q.charCodeAt(i)) >>> 0;
+  const a = TINTS[h % TINTS.length];
+  const b = TINTS[(h >>> 3) % TINTS.length];
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="4" height="5" viewBox="0 0 4 5" preserveAspectRatio="none"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${a}"/><stop offset="1" stop-color="${b}"/></linearGradient></defs><rect width="4" height="5" fill="url(#g)"/></svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+
 /** Professional stock first (StockSnap, Rawpixel, Nappy), then the whole Openverse index. */
 const PRO_SOURCES = "stocksnap,rawpixel,nappy";
 
@@ -57,6 +68,9 @@ async function openversePhoto(q: string, n: number): Promise<Found | null> {
   let list = await openverseSearch(q, PRO_SOURCES);
   // a long, specific description often finds nothing — retry with its first few words
   if (list.length < 2) list = await openverseSearch(q.split(/[,;]/)[0].split(/\s+/).slice(0, 3).join(" "), PRO_SOURCES);
+  const words = q.split(/[,;]/)[0].split(/\s+/).filter(Boolean);
+  if (list.length < 2 && words.length > 2) list = [...list, ...(await openverseSearch(words.slice(0, 2).join(" "), PRO_SOURCES))];
+  if (list.length < 2 && words.length > 2) list = [...list, ...(await openverseSearch(words.slice(-2).join(" "), PRO_SOURCES))];
   if (list.length < 2) list = [...list, ...(await openverseSearch(q))];
   const url = list[n % Math.max(1, list.length)];
   return url ? { url } : null;
@@ -114,11 +128,9 @@ export async function resolveStockMedia(texts: string[]): Promise<string[]> {
         const f = next(imgs, q);
         const both = `${a}${b}`;
         if (!f) {
-          // Nothing matching found: a labelled placeholder the seller can replace — never a random landscape.
-          const alt = /alt="([^"]*)"/i.exec(both)?.[1] || q;
-          const cls = /class="[^"]*"/i.exec(both)?.[0] ?? "";
-          const ratio = /pcard|card|prod|thumb|tile/i.test(cls) ? "4/5" : "16/10";
-          return `<div ${cls} data-img-slot="${attr(alt)}" style="width:100%;aspect-ratio:${ratio}"></div>`;
+          // Nothing matching found: a quiet tinted block (still an <img>, so the designer's own CSS —
+          // object-fit, absolute hover-swap layers — keeps working). Never a random landscape.
+          return `<img${both.replace(/\ssrc="[^"]*"/i, "")} src="${placeholderSrc(q)}" data-img-query="${q}" data-placeholder>`;
         }
         const rest = both.replace(/\ssrc="[^"]*"/i, "");
         return `<img${rest} src="${attr(f.url)}" data-img-query="${q}">`;

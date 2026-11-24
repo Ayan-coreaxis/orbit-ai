@@ -69,6 +69,7 @@ const CONTRACT = `THIS IS THE DESIGN PHASE. You design the whole store freely �
 - Contact details and socials: {{contact.email}} {{contact.phone}} {{contact.address}} {{social.instagram}} {{social.facebook}} {{social.tiktok}} {{store.name}} {{store.year}} — nothing else between braces.
 - MEASURED AFTER THE BUILD in a real browser (failures get patched, so get them right first time): (1) the hero — headline, one-line intro and the main button — fits inside ONE screen at 1440×900 AND 390×844: headline at most clamp(2.2rem,5.5vw,5rem) and at most 4 lines, hero padding at most ~12vh; (2) every piece of text has at least 4.5:1 contrast against what is behind it — any card, button, chip or panel with its own background sets its OWN text colour (never inherit it from the coloured section around it), and header links get an explicit colour for the header's background; (3) no image taller than 75% of the screen except the hero; (4) a section may overlap its neighbour only by padding that holds no text; (5) product grids: 4 columns from 1100px, 3 from 800px, 2 on phones, card image ratio 4/5, a card never taller than ~70% of the screen; (6) one consistent section spacing scale and one left edge for headings.
 - CSS-only toggles (mobile menu, tabs, swatches): every toggle <input> gets its OWN unique id AND its own unique class (never share one class like "sc-menu-checkbox" between different toggles, never repeat an id on the page, header and footer included), and starts UNCHECKED unless the design really needs it open. A slide-in menu panel must be fully closed (off-screen, visibility:hidden) until its own checkbox is checked — a panel that is open on load blocks the entire page.
+- THE HEADER MUST WORK ON A PHONE: below 900px every page stays reachable — a burger button that opens a panel of all page links (CSS-only toggle), never links that simply disappear. The platform checks this on a 390px screen.
 - Honesty: never invent reviews, customer names, ratings, stats, years, press, policies (returns, open-before-you-pay, money-back) or delivery times. Only what the brief and store facts say.`;
 
 const DESIGN_TOOL: Anthropic.Tool = {
@@ -113,7 +114,7 @@ const DESIGN_TOOL: Anthropic.Tool = {
       tagline: { type: "string" },
       pages: {
         type: "array",
-        description: "What each page is for, one line each — home, shop, about, contact, faq (add one more only if the brief needs it).",
+        description: "What each page is for, one line each — home, shop, about, contact, faq (add one more only if the brief needs it). `title` is the header nav label: 1–2 words (Shop, Our story, Contact, FAQ).",
         items: {
           type: "object",
           properties: { slug: { type: "string" }, title: { type: "string" }, purpose: { type: "string" } },
@@ -216,6 +217,30 @@ function pageBrief(slug: string): string {
   if (slug === "faq")
     return "The FAQ page: questions a shopper of this store really asks, answered only with facts from the brief and store facts.";
   return "";
+}
+
+/** Page titles become the header's nav labels, so they must be short: "Our Story — Mehfil Mugs, Multan" runs off the header. */
+export function navTitle(slug: string, title: string | undefined): string {
+  const fixed: Record<string, string> = { home: "Home", shop: "Shop", about: "Our story", contact: "Contact", faq: "FAQ" };
+  const t = String(title || slug).split(/\s[—–-]\s/)[0].trim();
+  if (fixed[slug] && t.length > 14) return fixed[slug];
+  const words = t.split(/\s+/).slice(0, 2).join(" ");
+  return (t.length <= 16 ? t : words).slice(0, 24);
+}
+
+/** When a phone has no way to reach the other pages, the platform adds a small menu of its own. */
+export function withMobileMenu(doc: OrbitDesignDoc): OrbitDesignDoc {
+  if (doc.motion?.mobileMenu) return doc;
+  const css = `header details.od-qa-menu{position:fixed!important;left:12px!important;bottom:12px!important;top:auto!important;right:auto!important;z-index:70!important;display:block!important;margin:0!important;width:auto!important;font-family:var(--od-font-body)}
+header details.od-qa-menu>summary{list-style:none;cursor:pointer;display:flex!important;align-items:center;gap:10px;padding:12px 18px!important;border-radius:999px;background:#1a1a1a!important;color:#fff!important;font-weight:700;font-size:15px;box-shadow:0 6px 24px rgba(0,0,0,.28)}
+header details.od-qa-menu>summary::-webkit-details-marker{display:none}
+header details.od-qa-menu>summary::after{content:"Menu"}
+header details.od-qa-menu>summary span{width:16px;height:2px;background:currentColor;box-shadow:0 5px 0 currentColor,0 -5px 0 currentColor;border-radius:2px}
+header details.od-qa-menu .od-qa-panel{position:absolute!important;left:0!important;bottom:calc(100% + 10px)!important;display:flex!important;flex-direction:column;min-width:220px;padding:8px!important;border-radius:20px;background:#fff!important;border:1px solid rgba(0,0,0,.12);box-shadow:0 12px 40px rgba(0,0,0,.25)}
+header details.od-qa-menu .od-qa-panel a{display:block!important;padding:13px 16px!important;border-radius:12px;color:#1a1a1a!important;background:transparent!important;text-decoration:none!important;font-weight:600;font-size:16px;opacity:1!important}
+header details.od-qa-menu .od-qa-panel a:hover,header details.od-qa-menu .od-qa-panel a:active{background:#f0eee9!important}
+@media (min-width:901px){header details.od-qa-menu{display:none!important}}`;
+  return { ...doc, motion: { ...(doc.motion ?? {}), mobileMenu: true }, css: `${doc.css ?? ""}\n/* platform mobile menu */\n${css}` };
 }
 
 /** Classes used in the markup that no rule in the stylesheet defines. */
@@ -358,6 +383,10 @@ export async function polishStore(businessId: string, doc: OrbitDesignDoc, produ
   };
   const qa1 = await runStoreQa(cur, products, businessId);
   add(qa1.css, "qa");
+  if (qa1.issues.some((i) => i.kind === "no-mobile-nav")) {
+    cur = withMobileMenu(cur);
+    for (const i of qa1.issues) if (i.kind === "no-mobile-nav") i.fixed = true;
+  }
   const fixedCount = qa1.issues.filter((i) => i.fixed).length;
   const left = remainingIssues(qa1.issues);
   console.warn(`[site-craft-qa] ${qa1.issues.length} finding(s), ${fixedCount} patched automatically, ${left.length} need the designer`);
@@ -529,7 +558,7 @@ ${fix.css}`;
     if (out?.css) css += `\n/* ${pg.slug} */\n${out.css}`;
     pages.push({
       slug: pg.slug,
-      title: String(pg.title || pg.slug).slice(0, 60),
+      title: navTitle(pg.slug, pg.title),
       nav: pg.slug !== "home",
       sections: sections.map((s, i) => ({
         id: String(s.id || `s${i}`).replace(/[^a-z0-9-]/gi, "-").slice(0, 40),

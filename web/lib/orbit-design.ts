@@ -180,7 +180,7 @@ export interface OrbitDesignDoc {
   pages: DesignPage[];
   tweaks?: DesignTweak[];
   /** page-shell motion the generator opts into per brand */
-  motion?: { preloader?: boolean; splash?: "fade" | "counter" | "curtain" };
+  motion?: { preloader?: boolean; splash?: "fade" | "counter" | "curtain"; mobileMenu?: boolean };
   /** the art direction this store was last built to (lib/design-directions.ts) + the ones before it */
   direction?: string;
   directionHistory?: string[];
@@ -600,7 +600,15 @@ export function normalizeDoc(doc: OrbitDesignDoc, storeName: string, niche: stri
     components,
     pages,
     tweaks: normalizeTweaks(doc.tweaks),
-    motion: doc.motion?.preloader || doc.motion?.splash ? { preloader: true, ...(doc.motion?.splash === "counter" || doc.motion?.splash === "curtain" || doc.motion?.splash === "fade" ? { splash: doc.motion.splash } : {}) } : undefined,
+    motion: (() => {
+      const m = doc.motion;
+      if (!m) return undefined;
+      const out: NonNullable<OrbitDesignDoc["motion"]> = {};
+      if (m.preloader || m.splash) out.preloader = true;
+      if (m.splash === "counter" || m.splash === "curtain" || m.splash === "fade") out.splash = m.splash;
+      if (m.mobileMenu) out.mobileMenu = true;
+      return Object.keys(out).length ? out : undefined;
+    })(),
     direction: typeof doc.direction === "string" ? doc.direction.slice(0, 40) : undefined,
     css: typeof doc.css === "string" && doc.css.trim() ? doc.css.slice(0, 80_000) : undefined,
     directionHistory: Array.isArray(doc.directionHistory)
@@ -1177,6 +1185,20 @@ function navLinksHtml(doc: OrbitDesignDoc, businessId: string, preview: boolean,
       <svg class="od-burger-open" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
       <svg class="od-burger-close" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
     </label>`;
+}
+
+/**
+ * Safety net for a design whose header gives phones no way to reach the other pages (found by the
+ * store QA): a small platform-owned "Menu" button with the real page links, shown below 900px only.
+ * Built here, from the same links the nav uses — hand-written page links in a header are stripped.
+ */
+function addMobileMenu(header: string, doc: OrbitDesignDoc, businessId: string, preview: boolean, loggedIn: boolean): string {
+  if (/od-qa-menu/.test(header)) return header;
+  const hrefFor = navHrefFor(doc, businessId, preview);
+  const anchors = [...navLinksHtml(doc, businessId, preview, loggedIn, false).matchAll(/<a ([^>]*?)\sstyle="[^"]*">([^<]*)<\/a>/g)].map((m) => `<a ${m[1]}>${m[2]}</a>`);
+  if (!anchors.length) return header;
+  const menu = `<details class="od-qa-menu"><summary aria-label="Open menu"><span></span></summary><div class="od-qa-panel" role="navigation" aria-label="Pages">${anchors.join("")}<a ${hrefFor(CART_PAGE)}>Cart</a></div></details>`;
+  return /<\/header>/i.test(header) ? header.replace(/<\/header>/i, `${menu}</header>`) : `${header}${menu}`;
 }
 
 /** The account person-icon (or a "Sign in" link when navShow="afterLogin" and not signed in). "" when hidden. */
@@ -1903,7 +1925,8 @@ export function renderPageBody(doc: OrbitDesignDoc, opts: RenderOpts): { html: s
     );
 
   const wrap = (id: string, inner: string) => (preview ? `<div data-od-block="${escapeAttr(id)}">${inner}</div>` : inner);
-  const header = wrap("header", block(prepareHeader(doc, opts.businessId, preview, !!opts.loggedIn)));
+  const preparedHeader = prepareHeader(doc, opts.businessId, preview, !!opts.loggedIn);
+  const header = wrap("header", block(doc.motion?.mobileMenu ? addMobileMenu(preparedHeader, doc, opts.businessId, preview, !!opts.loggedIn) : preparedHeader));
   const footer = wrap("footer", block(prepareFooter(doc, opts.businessId, preview)));
 
   const rctx = {

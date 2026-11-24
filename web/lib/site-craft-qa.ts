@@ -13,7 +13,7 @@ import { guardBrowserPage } from "@/lib/safe-fetch";
 import { renderPageDocument, type OrbitDesignDoc, type StorefrontProduct } from "@/lib/orbit-design";
 
 export interface QaIssue {
-  kind: "contrast" | "hero-fit" | "tall-image" | "overlap" | "overflow" | "broken-image" | "big-card";
+  kind: "contrast" | "no-mobile-nav" | "hero-fit" | "tall-image" | "overlap" | "overflow" | "broken-image" | "big-card";
   page: string;
   viewport: "desktop" | "mobile";
   detail: string;
@@ -95,8 +95,10 @@ async function measure(page: Page, vp: Viewport, isHome: boolean): Promise<Measu
       const esc = (s: string) => (window.CSS && CSS.escape ? CSS.escape(s) : s.replace(/[^\w-]/g, "\\$&"));
       const classes = (e: Element) => [...e.classList].filter((c) => !/^(od-|data-)/.test(c)).slice(0, 2);
       const self = (e: Element) => e.tagName.toLowerCase() + classes(e).map((c) => "." + esc(c)).join("");
+      // Most specific first (nearest ancestor + the element): the stylesheet is shared by every page, so a
+      // rule must only hit the context that failed — `span.sc-num` alone can be right on cream and wrong on dark.
       const candidates = (e: Element): string[] => {
-        const out = [self(e)];
+        const out: string[] = [];
         let p = e.parentElement;
         let d = 0;
         while (p && p !== document.body && d < 3) {
@@ -104,20 +106,24 @@ async function measure(page: Page, vp: Viewport, isHome: boolean): Promise<Measu
           p = p.parentElement;
           d++;
         }
+        out.push(self(e));
         return out;
       };
-      /** exact address of one element: climbs to the nearest classed ancestor, then nth-child down */
+      /** exact address of one element: climbs (with nth-child at every level) until it is unique on the page */
       const pathSel = (e: Element): string => {
         const parts: string[] = [];
         let cur: Element | null = e;
-        for (let d = 0; cur && cur !== document.body && d < 8; d++) {
+        for (let d = 0; cur && cur !== document.body && d < 14; d++) {
           const par: Element | null = cur.parentElement;
           if (!par) break;
-          if (d > 0 && classes(cur).length) {
-            parts.unshift(self(cur));
-            break;
+          const idx = Array.from(par.children).indexOf(cur) + 1;
+          parts.unshift((d === 0 ? cur.tagName.toLowerCase() : self(cur)) + ":nth-child(" + idx + ")");
+          const sel = parts.join(" > ");
+          try {
+            if (d >= 1 && document.querySelectorAll(sel).length === 1) return sel;
+          } catch {
+            /* keep climbing */
           }
-          parts.unshift(cur.tagName.toLowerCase() + ":nth-child(" + (Array.from(par.children).indexOf(cur) + 1) + ")");
           cur = par;
         }
         return parts.join(" > ");
@@ -231,7 +237,7 @@ async function measure(page: Page, vp: Viewport, isHome: boolean): Promise<Measu
 
       // ---- 4. text hidden under something (ask the browser who is on top at the text's own point) ----
       const padFix = new Map<string, number>();
-      const coverBy = new Map<string, { count: number; sample: string; fixedPos: boolean }>();
+      const coverBy = new Map<string, { count: number; sample: string; fixedPos: boolean; big: boolean }>();
       /** text that sits in a collapsed / clipped container (closed accordion, off-canvas panel) isn't "covered" */
       const clippedAway = (t: Element): boolean => {
         const r = t.getBoundingClientRect();
@@ -259,6 +265,7 @@ async function measure(page: Page, vp: Viewport, isHome: boolean): Promise<Measu
         const pts = [
           [r.left + Math.min(r.width / 2, 40), r.top + 3],
           [r.left + r.width / 2, r.top + r.height / 2],
+          [r.right - 6, r.top + r.height / 2],
         ];
         for (const [x, y] of pts) {
           const top = document.elementFromPoint(x, y);
@@ -285,7 +292,7 @@ async function measure(page: Page, vp: Viewport, isHome: boolean): Promise<Measu
           const prev = coverBy.get(key);
           let fixedPos = false;
           for (let q: Element | null = top; q && q !== document.body; q = q.parentElement) if (getComputedStyle(q).position === "fixed") fixedPos = true;
-          coverBy.set(key, { count: (prev?.count ?? 0) + 1, sample: prev?.sample ?? (t.textContent || "").trim().slice(0, 30), fixedPos: prev?.fixedPos || fixedPos });
+          coverBy.set(key, { count: (prev?.count ?? 0) + 1, sample: prev?.sample ?? (t.textContent || "").trim().slice(0, 30), fixedPos: prev?.fixedPos || fixedPos, big: prev?.big || parseFloat(getComputedStyle(t).fontSize) >= 28 });
           break;
         }
       }
@@ -299,7 +306,7 @@ async function measure(page: Page, vp: Viewport, isHome: boolean): Promise<Measu
             detail: `a fixed overlay <${key}> sits on top of the page at load and hides ${v.count}+ text elements (e.g. "${v.sample}") — it must be CLOSED until the visitor opens it. Its closed state (transform/visibility/opacity) is being overridden: look for a ':checked ~ ${key}' rule whose checkbox shares a class with other checkboxes, or a checkbox that is checked by default. Every toggle input needs its own unique class and id and must start unchecked`,
             fixed: false,
           });
-        else if (v.count >= 4) issues.push({ kind: "overlap", detail: `text "${v.sample}" (${v.count} element(s)) is covered by <${key}>`, fixed: false });
+        else if (v.count >= 4 || v.big) issues.push({ kind: "overlap", detail: `text "${v.sample}" (${v.count} element(s)) is covered by <${key}>`, fixed: false });
       }
       const dupIds = new Map<string, number>();
       document.querySelectorAll("[id]").forEach((e) => dupIds.set(e.id, (dupIds.get(e.id) ?? 0) + 1));
@@ -316,6 +323,22 @@ async function measure(page: Page, vp: Viewport, isHome: boolean): Promise<Measu
       const broken = [...document.querySelectorAll("img")].filter((i) => (i as HTMLImageElement).complete && (i as HTMLImageElement).naturalWidth === 0);
       if (broken.length) issues.push({ kind: "broken-image", detail: `${broken.length} image(s) failed to load`, fixed: false });
 
+      // ---- 6b. can a phone visitor reach the other pages? (home, phone only) -----------------
+      if (isHome && vp.name === "mobile") {
+        const header = document.querySelector("header");
+        if (header) {
+          const shown = (e: Element) => {
+            const r = e.getBoundingClientRect();
+            const cs = getComputedStyle(e);
+            return r.width > 6 && r.height > 6 && cs.visibility !== "hidden" && cs.display !== "none";
+          };
+          const hrefs = new Set([...header.querySelectorAll("a[href]")].filter((a) => shown(a) && (a.textContent || "").trim().length > 1).map((a) => a.getAttribute("href")));
+          const burger = [...header.querySelectorAll("button,label,summary,[role=button]")].some((b) => shown(b) && /menu|nav|burger|toggle/i.test(`${b.getAttribute("aria-label") ?? ""} ${b.className} ${b.textContent ?? ""}`));
+          if (hrefs.size < 3 && !burger)
+            issues.push({ kind: "no-mobile-nav", detail: "the header has no way to reach the other pages on a phone (no visible links and no menu button)", fixed: false });
+        }
+      }
+
       // ---- 7. does the hero fit the first screen? (home only) --------------------------------
       if (isHome) {
         const h1 = document.querySelector("h1") as HTMLElement | null;
@@ -325,7 +348,11 @@ async function measure(page: Page, vp: Viewport, isHome: boolean): Promise<Measu
             const t = (x.textContent || "").trim();
             return t.length > 1 && x.getBoundingClientRect().top >= h1.getBoundingClientRect().top && !x.closest("header");
           }) as HTMLElement | undefined;
-          const fits = () => (cta ? cta.getBoundingClientRect().bottom <= vp.height - 16 : hero.getBoundingClientRect().bottom <= vp.height * 1.1);
+          const fits = () => {
+            if (!cta) return hero.getBoundingClientRect().bottom <= vp.height * 1.1;
+            const r = cta.getBoundingClientRect();
+            return r.top + r.height * 0.7 <= vp.height - 6; // at least ~70% of the button is on the first screen
+          };
           if (!fits()) {
             const startFont = parseFloat(getComputedStyle(h1).fontSize);
             const cs = getComputedStyle(hero);
@@ -389,6 +416,7 @@ const PAGES: { slug: string; vps: Viewport[] }[] = [
 /** Run the whole QA over a store. Never throws — returns an empty result when no browser is available. */
 export async function runStoreQa(doc: OrbitDesignDoc, products: StorefrontProduct[], businessId: string): Promise<QaResult> {
   const rules = new Set<string>();
+  const colours = new Map<string, string>();
   const issues: QaIssue[] = [];
   let browser: import("playwright").Browser | null = null;
   try {
@@ -405,7 +433,18 @@ export async function runStoreQa(doc: OrbitDesignDoc, products: StorefrontProduc
         try {
           const m = await qaHtml(html, vp, pg.slug === "home", page);
           // contrast / image / overlap rules apply at every size; hero rules were already media-scoped
-          m.rules.forEach((r) => rules.add(r));
+          for (const r of m.rules) {
+            const c = /^(.*)\{color:(#[0-9a-f]{6})!important\}$/.exec(r);
+            if (c) {
+              const known = colours.get(c[1]);
+              if (known && known !== c[2]) {
+                issues.push({ kind: "contrast", page: pg.slug, viewport: vp.name, detail: `"${c[1]}" needs different text colours on different pages — scope it to its section`, fixed: false });
+                continue;
+              }
+              colours.set(c[1], c[2]);
+            }
+            rules.add(r);
+          }
           m.issues.forEach((i) => issues.push({ ...i, page: pg.slug, viewport: vp.name }));
         } catch (e) {
           console.warn(`[site-craft-qa] ${pg.slug}/${vp.name} skipped`, String(e).slice(0, 120));

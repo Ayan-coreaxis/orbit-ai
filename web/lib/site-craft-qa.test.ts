@@ -89,3 +89,39 @@ ${extra}</style></head><body>
     expect(list).toEqual(["[shop · desktop] big-card: cards are huge"]);
   });
 });
+
+describe("fallback mobile menu", () => {
+  it("opens and shows readable links even when the designer's CSS hides every header nav on phones", async () => {
+    const { withMobileMenu } = await import("@/lib/site-craft-build");
+    const { defaultDoc, renderPageDocument } = await import("@/lib/orbit-design");
+    const base = defaultDoc("Mehfil Mugs", "mugs");
+    const doc = withMobileMenu({
+      ...base,
+      components: { ...base.components, header: '<header class="sc-h"><a href="#page:home" class="logo">Mehfil</a></header>' },
+      css: "header nav{display:none!important} header a{color:#fff;padding:0} header div{display:none!important} @media(max-width:700px){.sc-h *{opacity:.9}}",
+      pages: [
+        ...base.pages.map((p) => ({ ...p, nav: p.slug === "home" ? false : p.nav })),
+        { slug: "shop", title: "Shop", nav: true, sections: [] },
+        { slug: "about", title: "Our story", nav: true, sections: [] },
+        { slug: "contact", title: "Contact", nav: true, sections: [] },
+      ],
+    });
+    expect(doc.motion?.mobileMenu).toBe(true);
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    const page = await ctx.newPage();
+    await page.setContent(renderPageDocument(doc, { products: [], businessId: "b", pageSlug: "home" }), { waitUntil: "load" });
+    await page.locator("details.od-qa-menu > summary").click();
+    const links = await page.locator(".od-qa-panel a").evaluateAll((as) => as.map((a) => ({ t: (a as HTMLElement).innerText.trim(), c: getComputedStyle(a).color, w: a.getBoundingClientRect().width, h: a.getBoundingClientRect().height })));
+    expect(links.length).toBeGreaterThanOrEqual(2);
+    for (const l of links) {
+      expect(l.t.length).toBeGreaterThan(0);
+      expect(l.w).toBeGreaterThan(100);
+      expect(l.h).toBeGreaterThan(30);
+      expect(l.c).toBe("rgb(26, 26, 26)"); // dark ink on the white panel, not the designer's white
+    }
+    // and it is gone on desktop
+    await page.setViewportSize({ width: 1200, height: 800 });
+    expect(await page.locator("details.od-qa-menu").isVisible()).toBe(false);
+    await ctx.close();
+  }, 60000);
+});
