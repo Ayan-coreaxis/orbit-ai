@@ -40,16 +40,26 @@ async function pexelsVideo(q: string, key: string, n: number): Promise<Found | n
   return files[0] ? { url: files[0].link, poster: v?.image } : null;
 }
 
-async function openversePhoto(q: string, n: number): Promise<Found | null> {
+/** Professional stock first (StockSnap, Rawpixel, Nappy), then the whole Openverse index. */
+const PRO_SOURCES = "stocksnap,rawpixel,nappy";
+
+async function openverseSearch(q: string, sources?: string): Promise<string[]> {
   const r = await fetch(
-    `https://api.openverse.org/v1/images/?q=${encodeURIComponent(q)}&page_size=10&license_type=commercial&mature=false`,
+    `https://api.openverse.org/v1/images/?q=${encodeURIComponent(q)}&page_size=12&license_type=commercial&mature=false${sources ? `&source=${sources}` : ""}`,
     { signal: AbortSignal.timeout(8000), headers: { "User-Agent": "OrbitStoreBuilder/1.0" } },
   ).catch(() => null);
-  if (!r?.ok) return null;
+  if (!r?.ok) return [];
   const j = (await r.json().catch(() => null)) as { results?: { url?: string; width?: number }[] } | null;
-  const list = (j?.results ?? []).filter((x) => x.url && /^https:/.test(x.url) && (x.width ?? 1000) >= 700);
-  const p = list[n % Math.max(1, list.length)];
-  return p?.url ? { url: p.url } : null;
+  return (j?.results ?? []).filter((x) => x.url && /^https:/.test(x.url) && (x.width ?? 1000) >= 700).map((x) => x.url!);
+}
+
+async function openversePhoto(q: string, n: number): Promise<Found | null> {
+  let list = await openverseSearch(q, PRO_SOURCES);
+  // a long, specific description often finds nothing — retry with its first few words
+  if (list.length < 2) list = await openverseSearch(q.split(/[,;]/)[0].split(/\s+/).slice(0, 3).join(" "), PRO_SOURCES);
+  if (list.length < 2) list = [...list, ...(await openverseSearch(q))];
+  const url = list[n % Math.max(1, list.length)];
+  return url ? { url } : null;
 }
 
 const attr = (s: string) => s.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
