@@ -339,6 +339,7 @@ model ChatMessage {
   customerRef String // real visitor cookie id (website) or real phone number (whatsapp) — groups messages into one conversation
   role        String // user | assistant
   content     String
+  sender      String? // assistant messages only: null/"bot" = Orbit's chatbot, "owner" = the seller typed it from the Inbox
   createdAt   DateTime @default(now())
 
   @@index([businessId, channel, customerRef])

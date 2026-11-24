@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { AlertTriangle, Check, Clapperboard, Copy, Download, ImagePlus, Loader2, Mic, Music, RefreshCw, Sparkles, Upload, Wand2, X } from "lucide-react";
 import { Button, Pill } from "@/components/ui";
 import { MediaPicker } from "@/components/media/MediaPicker";
@@ -9,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { CHOICES, missingNeeds, type Aspect, type Need, type StudioFormat, type StudioInput } from "@/lib/studio/formats";
 import { WORKING, type StudioData, type StudioJobView } from "@/components/studio/types";
 import { ShareBox } from "@/components/studio/ShareBox";
+import { DemoBody, DemoFooter, type DemoStage } from "@/components/studio/DemoFlow";
 
 const ASPECT_LABEL: Record<Aspect, string> = { "1:1": "Square 1:1", "4:5": "Portrait 4:5", "9:16": "Reel 9:16", "16:9": "Wide 16:9" };
 
@@ -39,6 +41,14 @@ export function Composer({
   const [err, setErr] = useState<string | null>(null);
   const [change, setChange] = useState("");
   const [showChange, setShowChange] = useState(false);
+  // Free offline walk-through (sample media, no AI, nothing charged) - works without a plan or a key.
+  const [demo, setDemo] = useState<DemoStage | null>(null);
+  // The drawer is mounted inside the themed app root, not inside the animated page: a transformed
+  // ancestor would trap `position:fixed` underneath the top bar.
+  const [mount, setMount] = useState<Element | null>(null);
+  useEffect(() => {
+    setMount(document.querySelector(".orbit-app") ?? document.body);
+  }, []);
 
   const kind = format.kind;
   const left = kind === "image" ? data.status.left.images : data.status.left.videos;
@@ -133,8 +143,8 @@ export function Composer({
 
   const step = !job ? 1 : job.status === "draft" ? 2 : 3;
 
-  return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/50" onClick={onClose}>
+  const ui = (
+    <div className="fixed inset-0 z-[70] flex justify-end bg-black/50 backdrop-blur-[2px]" onClick={onClose}>
       <div
         className="flex h-full w-full max-w-[640px] flex-col border-l border-border bg-panel shadow-2xl"
         onClick={(e) => e.stopPropagation()}
@@ -148,16 +158,17 @@ export function Composer({
               {kind === "video" ? <Clapperboard className="h-4 w-4 text-accent" /> : <ImagePlus className="h-4 w-4 text-accent" />}
               <h2 className="truncate text-[16px] font-semibold">{job?.brief?.title && step > 1 ? job.brief.title : format.name}</h2>
             </div>
-            <p className="mt-0.5 text-[12.5px] text-text-faint">{format.tagline}</p>
+            <p className="mt-0.5 text-[13.5px] text-text-faint">{format.tagline}</p>
           </div>
           <button onClick={onClose} className="rounded-md p-1 text-text-faint hover:text-text" aria-label="Close">
             <X className="h-5 w-5" />
           </button>
         </div>
-        <Steps step={step} />
+        <Steps step={demo ? (demo === "plan" ? 2 : 3) : step} />
 
         <div className="scrollbar-thin flex-1 overflow-y-auto px-6 py-5">
-          {step === 1 && (
+          {demo && <DemoBody format={format} stage={demo} onDone={() => setDemo("done")} />}
+          {!demo && step === 1 && (
             <div className="grid gap-5">
               <Look format={format} />
               {format.needs.map((n) =>
@@ -185,13 +196,13 @@ export function Composer({
                   </div>
                 </Field>
               )}
-              {format.tip && <p className="rounded-lg bg-panel-2 px-3 py-2 text-[12.5px] text-text-dim">💡 {format.tip}</p>}
+              {format.tip && <p className="rounded-lg bg-panel-2 px-3 py-2 text-[13.5px] text-text-dim">💡 {format.tip}</p>}
             </div>
           )}
 
-          {step >= 2 && job?.brief && <Plan job={job} format={format} />}
+          {!demo && step >= 2 && job?.brief && <Plan job={job} format={format} />}
 
-          {step === 3 && job && <Progress job={job} format={format} />}
+          {!demo && step === 3 && job && <Progress job={job} format={format} />}
 
           {err && (
             <div className="mt-4">
@@ -202,7 +213,8 @@ export function Composer({
 
         {/* Footer actions */}
         <div className="border-t border-border px-6 py-4">
-          {step === 1 && (
+          {demo && <DemoFooter stage={demo} onGenerate={() => setDemo("making")} onExit={() => setDemo(null)} onClose={onClose} />}
+          {!demo && step === 1 && (
             <>
               {!data.status.allowed ? (
                 <Warn>Orbit Studio comes with the Growth ($75) and Scale ($150) plans — upgrade in Settings &amp; Billing to make this.</Warn>
@@ -211,18 +223,21 @@ export function Composer({
               ) : left <= 0 ? (
                 <Warn>This month&apos;s {limit} {kind === "video" ? "reels" : "images"} are used up — they reset on the 1st.</Warn>
               ) : missing.length ? (
-                <p className="mb-3 text-[12.5px] text-text-faint">Still needed: {missing.join(" · ")}</p>
+                <p className="mb-3 text-[13.5px] text-text-faint">Still needed: {missing.join(" · ")}</p>
               ) : (
-                <p className="mb-3 text-[12.5px] text-text-faint">Next the director shows you the plan — nothing is used from your allowance until you press Generate.</p>
+                <p className="mb-3 text-[13.5px] text-text-faint">Next the director shows you the plan — nothing is used from your allowance until you press Generate.</p>
               )}
               <Button className="w-full" disabled={!data.status.allowed || !ready || left <= 0 || missing.length > 0 || brandMissing || busy === "plan"} onClick={plan}>
                 {busy === "plan" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
                 {busy === "plan" ? "The director is planning… (about 15 seconds)" : "Plan it with the director"}
               </Button>
+              <Button variant="secondary" className="mt-2.5 w-full" onClick={() => setDemo("plan")}>
+                <Sparkles className="h-4 w-4" /> Try a free demo
+              </Button>
             </>
           )}
 
-          {step === 2 && job && (
+          {!demo && step === 2 && job && (
             <div className="grid gap-3">
               {showChange ? (
                 <div className="grid gap-2">
@@ -263,7 +278,7 @@ export function Composer({
             </div>
           )}
 
-          {step === 3 && job && (
+          {!demo && step === 3 && job && (
             <div className="flex gap-2">
               {job.status === "failed" ? (
                 <>
@@ -290,7 +305,7 @@ export function Composer({
               )}
             </div>
           )}
-          {step === 3 && job?.status === "failed" && showChange && (
+          {!demo && step === 3 && job?.status === "failed" && showChange && (
             <div className="mt-3 grid gap-2">
               <textarea
                 value={change}
@@ -305,11 +320,13 @@ export function Composer({
               </Button>
             </div>
           )}
-          {working && <p className="mt-2 text-center text-[11.5px] text-text-faint">Checking every few seconds…</p>}
+          {working && <p className="mt-2 text-center text-[13px] text-text-faint">Checking every few seconds…</p>}
         </div>
       </div>
     </div>
   );
+  if (!mount) return null;
+  return createPortal(ui, mount);
 }
 
 function Steps({ step }: { step: number }) {
@@ -320,13 +337,13 @@ function Steps({ step }: { step: number }) {
         <div key={label} className="flex items-center gap-2">
           <span
             className={cn(
-              "flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-semibold",
+              "flex h-5 w-5 items-center justify-center rounded-full text-[12.5px] font-semibold",
               step > i + 1 ? "bg-good text-white" : step === i + 1 ? "gradient-fill text-white" : "bg-panel-2 text-text-faint",
             )}
           >
             {step > i + 1 ? <Check className="h-3 w-3" /> : i + 1}
           </span>
-          <span className={cn("text-[12px]", step === i + 1 ? "font-medium text-text" : "text-text-faint")}>{label}</span>
+          <span className={cn("text-[13px]", step === i + 1 ? "font-medium text-text" : "text-text-faint")}>{label}</span>
           {i < items.length - 1 && <span className="mx-1 h-px w-6 bg-border" />}
         </div>
       ))}
@@ -337,7 +354,7 @@ function Steps({ step }: { step: number }) {
 function Look({ format }: { format: StudioFormat }) {
   return (
     <div className="rounded-xl border border-accent-strong/40 bg-accent-soft/50 p-4">
-      <div className="text-[11.5px] font-semibold uppercase tracking-[0.05em] text-accent-strong">What you&apos;ll get</div>
+      <div className="text-[15px] font-semibold text-text">What you&apos;ll get</div>
       <ul className="mt-2 grid gap-1.5">
         {format.look.map((l) => (
           <li key={l} className="flex gap-2 text-[13px] leading-relaxed text-text-dim">
@@ -362,8 +379,8 @@ function Field({ label, hint, required, children }: { label: string; hint?: stri
     <div className="grid gap-1.5">
       <div>
         <span className="text-[13px] font-medium">{label}</span>
-        {required ? <span className="ml-1 text-[12px] text-accent">*</span> : <span className="ml-1.5 text-[11.5px] text-text-faint">optional</span>}
-        {hint && <p className="text-[12px] text-text-faint">{hint}</p>}
+        {required ? <span className="ml-1 text-[13px] text-accent">*</span> : <span className="ml-1.5 text-[13px] text-text-faint">optional</span>}
+        {hint && <p className="text-[13px] text-text-faint">{hint}</p>}
       </div>
       {children}
     </div>
@@ -376,7 +393,7 @@ function Chip({ on, onClick, children }: { on: boolean; onClick: () => void; chi
       type="button"
       onClick={onClick}
       className={cn(
-        "rounded-full border px-3 py-1.5 text-[12.5px] transition-colors",
+        "rounded-full border px-3 py-1.5 text-[13.5px] transition-colors",
         on ? "border-accent bg-accent-soft font-medium text-accent-strong" : "border-border bg-panel-2 text-text-dim hover:border-accent/50",
       )}
     >
@@ -387,7 +404,7 @@ function Chip({ on, onClick, children }: { on: boolean; onClick: () => void; chi
 
 function Warn({ children, tone = "warn" }: { children: React.ReactNode; tone?: "warn" | "bad" }) {
   return (
-    <div className={cn("flex gap-2 rounded-lg px-3 py-2.5 text-[12.5px] leading-relaxed", tone === "bad" ? "bg-bad-soft text-bad" : "bg-warn-soft text-warn")}>
+    <div className={cn("flex gap-2 rounded-lg px-3 py-2.5 text-[13.5px] leading-relaxed", tone === "bad" ? "bg-bad-soft text-bad" : "bg-warn-soft text-warn")}>
       <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
       <div>{children}</div>
     </div>
@@ -427,7 +444,7 @@ function NeedField({
             {data.products.length > 8 && (
               <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search products" className="rounded-lg border border-border bg-panel-2 px-3 py-2 text-[13px] outline-none focus:border-accent/60" />
             )}
-            <div className="grid max-h-[220px] grid-cols-3 gap-2 overflow-y-auto sm:grid-cols-4">
+            <div className="grid max-h-[260px] auto-rows-max grid-cols-3 gap-2.5 overflow-y-auto sm:grid-cols-4">
               {list.map((p) => (
                 <button
                   key={p.id}
@@ -439,9 +456,9 @@ function NeedField({
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={p.imageUrl} alt="" className="aspect-square w-full bg-panel-2 object-cover" />
                   ) : (
-                    <div className="flex aspect-square w-full items-center justify-center bg-panel-2 px-2 text-center text-[11px] text-text-faint">No photo</div>
+                    <div className="flex aspect-square w-full items-center justify-center bg-panel-2 px-2 text-center text-[12.5px] text-text-faint">No photo</div>
                   )}
-                  <div className="truncate px-2 py-1 text-[11.5px]">{p.name}</div>
+                  <div className="truncate px-2 py-1 text-[13px]">{p.name}</div>
                 </button>
               ))}
             </div>
@@ -506,7 +523,7 @@ function NeedField({
                 type="button"
                 onClick={() => fileRef.current?.click()}
                 disabled={uploading}
-                className="flex h-20 w-20 flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-border-strong text-[11px] text-text-faint hover:border-accent/60 hover:text-text"
+                className="flex h-20 w-20 flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-border-strong text-[12.5px] text-text-faint hover:border-accent/60 hover:text-text"
               >
                 {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
                 Upload
@@ -514,7 +531,7 @@ function NeedField({
               <button
                 type="button"
                 onClick={() => setPicker(true)}
-                className="flex h-20 w-20 flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-border-strong text-[11px] text-text-faint hover:border-accent/60 hover:text-text"
+                className="flex h-20 w-20 flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-border-strong text-[12.5px] text-text-faint hover:border-accent/60 hover:text-text"
               >
                 <ImagePlus className="h-4 w-4" />
                 From media
@@ -523,7 +540,7 @@ function NeedField({
           )}
           <input ref={fileRef} type="file" accept="image/*" multiple={need.max > 1} hidden onChange={(e) => onFiles(e.target.files).finally(() => (e.target.value = ""))} />
         </div>
-        {upErr && <p className="text-[12px] text-bad">{upErr}</p>}
+        {upErr && <p className="text-[13px] text-bad">{upErr}</p>}
         <MediaPicker open={picker} onClose={() => setPicker(false)} onPick={(m) => addOne({ id: m.id, url: m.url })} />
       </Field>
     );
@@ -569,7 +586,7 @@ function NeedField({
       <input type="checkbox" checked={!!input.consent} onChange={(e) => setInput((x) => ({ ...x, consent: e.target.checked }))} className="mt-0.5 accent-[var(--accent)]" />
       <span>
         {need.label}
-        <span className="block text-[12px] text-text-faint">Never use someone&apos;s face without their permission.</span>
+        <span className="block text-[13px] text-text-faint">Never use someone&apos;s face without their permission.</span>
       </span>
     </label>
   );
@@ -581,21 +598,21 @@ function Plan({ job, format }: { job: StudioJobView; format: StudioFormat }) {
   return (
     <div className="grid gap-4">
       <div>
-        <div className="text-[11.5px] font-semibold uppercase tracking-[0.05em] text-text-faint">The director&apos;s idea</div>
+        <div className="text-[13px] font-semibold uppercase tracking-[0.05em] text-text-faint">The director&apos;s idea</div>
         <p className="mt-1 text-[14px] leading-relaxed">{b.concept}</p>
       </div>
       {b.shots.length > 0 && (
         <div>
-          <div className="text-[11.5px] font-semibold uppercase tracking-[0.05em] text-text-faint">{format.kind === "video" ? "Storyboard" : "How it will look"}</div>
+          <div className="text-[13px] font-semibold uppercase tracking-[0.05em] text-text-faint">{format.kind === "video" ? "Storyboard" : "How it will look"}</div>
           <ol className="mt-2 grid gap-2">
             {b.shots.map((s, i) => (
               <li key={i} className="rounded-lg border border-border bg-panel-2 px-3 py-2.5">
                 <div className="flex items-baseline gap-2">
-                  {format.kind === "video" && <span className="shrink-0 rounded bg-accent-soft px-1.5 py-0.5 text-[11px] font-semibold text-accent-strong">{s.time || `Shot ${i + 1}`}</span>}
+                  {format.kind === "video" && <span className="shrink-0 rounded bg-accent-soft px-1.5 py-0.5 text-[12.5px] font-semibold text-accent-strong">{s.time || `Shot ${i + 1}`}</span>}
                   <span className="text-[13px] leading-relaxed">{s.what}</span>
                 </div>
                 {(s.camera || s.sound) && (
-                  <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-text-faint">
+                  <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-[13px] text-text-faint">
                     {s.camera && <span>🎥 {s.camera}</span>}
                     {s.sound && (
                       <span className="inline-flex items-center gap-1">
@@ -611,7 +628,7 @@ function Plan({ job, format }: { job: StudioJobView; format: StudioFormat }) {
       )}
       {b.script && (
         <div className="rounded-lg border border-border bg-panel-2 px-3 py-2.5">
-          <div className="flex items-center gap-1.5 text-[11.5px] font-semibold uppercase tracking-[0.05em] text-text-faint">
+          <div className="flex items-center gap-1.5 text-[13px] font-semibold uppercase tracking-[0.05em] text-text-faint">
             <Mic className="h-3 w-3" /> What they&apos;ll say
           </div>
           <p className="mt-1 text-[13.5px] italic leading-relaxed">&ldquo;{b.script}&rdquo;</p>
@@ -620,7 +637,7 @@ function Plan({ job, format }: { job: StudioJobView; format: StudioFormat }) {
       {b.caption && (
         <div>
           <div className="flex items-center justify-between">
-            <div className="text-[11.5px] font-semibold uppercase tracking-[0.05em] text-text-faint">Caption for your post</div>
+            <div className="text-[13px] font-semibold uppercase tracking-[0.05em] text-text-faint">Caption for your post</div>
             <button
               type="button"
               onClick={() => {
@@ -629,7 +646,7 @@ function Plan({ job, format }: { job: StudioJobView; format: StudioFormat }) {
                   setTimeout(() => setCopied(false), 1500);
                 });
               }}
-              className="inline-flex items-center gap-1 text-[12px] text-accent hover:underline"
+              className="inline-flex items-center gap-1 text-[13px] text-accent hover:underline"
             >
               {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />} {copied ? "Copied" : "Copy"}
             </button>
@@ -639,7 +656,7 @@ function Plan({ job, format }: { job: StudioJobView; format: StudioFormat }) {
       )}
       {b.headsUp && <Warn>{b.headsUp}</Warn>}
       {job.status === "draft" && (
-        <p className="text-[12px] text-text-faint">
+        <p className="text-[13px] text-text-faint">
           Size {b.aspect}
           {b.seconds ? ` · ${b.seconds} seconds` : ""} · nothing has been used from your allowance yet.
         </p>
@@ -652,7 +669,7 @@ function Progress({ job, format }: { job: StudioJobView; format: StudioFormat })
   if (job.status === "done" && job.result) {
     return (
       <div className="mt-5 grid gap-3">
-        <div className="text-[11.5px] font-semibold uppercase tracking-[0.05em] text-good">Ready</div>
+        <div className="text-[13px] font-semibold uppercase tracking-[0.05em] text-good">Ready</div>
         <div className="overflow-hidden rounded-xl border border-border bg-black/80">
           {job.result.kind === "video" ? (
             <video src={job.result.url} poster={job.result.poster ?? undefined} controls playsInline className="mx-auto max-h-[60vh] w-full" />
@@ -670,7 +687,7 @@ function Progress({ job, format }: { job: StudioJobView; format: StudioFormat })
           </a>
         </div>
         <ShareBox mediaId={job.result.id} kind={job.result.kind} caption={job.brief?.caption ?? ""} title={job.brief?.title ?? ""} />
-        <p className="text-[12px] text-text-faint">Tip: ask your Orchestrator to use it — e.g. &quot;set this as the product photo&quot; or &quot;put it on my home page&quot;.</p>
+        <p className="text-[13px] text-text-faint">Tip: ask your Orchestrator to use it — e.g. &quot;set this as the product photo&quot; or &quot;put it on my home page&quot;.</p>
       </div>
     );
   }
@@ -678,7 +695,7 @@ function Progress({ job, format }: { job: StudioJobView; format: StudioFormat })
     return (
       <div className="mt-5">
         <Warn tone="bad">
-          {job.error ?? "This couldn't be made."} <span className="block pt-1 text-[12px] opacity-80">Nothing was used from your allowance.</span>
+          {job.error ?? "This couldn't be made."} <span className="block pt-1 text-[13px] opacity-80">Nothing was used from your allowance.</span>
         </Warn>
       </div>
     );
@@ -695,7 +712,7 @@ function Progress({ job, format }: { job: StudioJobView; format: StudioFormat })
   const at = Math.max(0, stages.findIndex((s) => s.id === current));
   return (
     <div className="mt-5 grid gap-4">
-      <div className="text-[11.5px] font-semibold uppercase tracking-[0.05em] text-text-faint">Being made</div>
+      <div className="text-[13px] font-semibold uppercase tracking-[0.05em] text-text-faint">Being made</div>
       <ol className="grid gap-2">
         {stages.map((s, i) => (
           <li key={s.id} className="flex items-center gap-2.5 text-[13px]">
@@ -706,12 +723,12 @@ function Progress({ job, format }: { job: StudioJobView; format: StudioFormat })
       </ol>
       {job.keyframeUrl && video && (
         <div>
-          <div className="mb-1.5 text-[12px] text-text-faint">First frame</div>
+          <div className="mb-1.5 text-[13px] text-text-faint">First frame</div>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={job.keyframeUrl} alt="" className="max-h-[260px] rounded-lg border border-border object-contain" />
         </div>
       )}
-      <p className="text-[12.5px] text-text-faint">You can close this — it keeps going, and shows up in My creations when it&apos;s ready.</p>
+      <p className="text-[13.5px] text-text-faint">You can close this — it keeps going, and shows up in My creations when it&apos;s ready.</p>
     </div>
   );
 }

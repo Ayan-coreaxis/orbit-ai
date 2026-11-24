@@ -69,7 +69,7 @@ export async function pageSubscribed(pageId: string, pageToken: string, f: Fetch
   }
 }
 
-async function sendDm(pageToken: string, recipientId: string, text: string, f: Fetch): Promise<{ sent: boolean; error?: string }> {
+export async function sendDm(pageToken: string, recipientId: string, text: string, f: Fetch): Promise<{ sent: boolean; error?: string }> {
   // Messenger allows 2000 characters; Instagram 1000.
   const res = await f(`${GRAPH_BASE}/me/messages?access_token=${encodeURIComponent(pageToken)}`, {
     method: "POST",

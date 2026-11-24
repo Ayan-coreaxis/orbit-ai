@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Clapperboard, ImagePlus, Loader2, Lock, Mic, Music, Play, Sparkles } from "lucide-react";
 import { Card, Pill } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { FORMATS, GROUPS, getFormat, type FormatGroup, type StudioFormat, type StudioKind } from "@/lib/studio/formats";
 import { Composer } from "@/components/studio/Composer";
+import { DEMO_VIDEO, previewImage } from "@/lib/studio/previews";
 import { WORKING, type StudioData, type StudioJobView } from "@/components/studio/types";
 
 type Tab = StudioKind | "mine";
@@ -102,7 +103,7 @@ export function Studio() {
             <div className="grid min-w-[220px] gap-2.5">
               <Meter label="Images" used={s.used.images} limit={s.limit.images} />
               <Meter label="Reels & videos" used={s.used.videos} limit={s.limit.videos} />
-              <p className="text-[11.5px] text-text-faint">Resets on {new Date(s.resetsOn).toLocaleDateString(undefined, { day: "numeric", month: "short" })}</p>
+              <p className="text-[13px] text-text-faint">Resets on {new Date(s.resetsOn).toLocaleDateString(undefined, { day: "numeric", month: "short" })}</p>
             </div>
           )}
         </div>
@@ -110,7 +111,7 @@ export function Studio() {
           <div className="flex flex-wrap items-center gap-3 border-t border-border bg-panel-2 px-6 py-4">
             <Lock className="h-4 w-4 shrink-0 text-text-faint" />
             <div className="min-w-0 flex-1 text-[14.5px] text-text-dim">
-              Studio is on the <b className="text-text">Growth</b> and <b className="text-text">Scale</b> plans. Look around below — upgrade to start making.
+              Making real photos and reels is on the <b className="text-text">Growth</b> and <b className="text-text">Scale</b> plans. Open any card and press <b className="text-text">Try a free demo</b> to see exactly how it works.
             </div>
             <a href="/dashboard/settings/plan" className="btn-primary !py-2 text-[13.5px]">
               See plans
@@ -125,7 +126,7 @@ export function Studio() {
         ) : null}
       </Card>
 
-      <div className="flex gap-1 rounded-xl border border-border bg-panel p-1">
+      <div className="glass flex gap-1 rounded-full p-1.5">
         <TabBtn on={tab === "image"} onClick={() => setTab("image")} icon={<ImagePlus className="h-4 w-4" />}>
           Images
         </TabBtn>
@@ -145,8 +146,8 @@ export function Studio() {
           .filter((g) => GROUPS[g].kind === tab)
           .map((g) => (
             <section key={g}>
-              <h3 className="mb-2.5 text-[12px] font-semibold uppercase tracking-[0.05em] text-text-faint">{GROUPS[g].label}</h3>
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <h3 className="mb-3 text-[18px] font-semibold tracking-tight">{GROUPS[g].label}</h3>
+              <div className="orbit-stagger grid grid-cols-[repeat(auto-fill,minmax(290px,1fr))] gap-4">
                 {FORMATS.filter((f) => f.group === g).map((f) => (
                   <FormatCard key={f.id} format={f} locked={!s.allowed} onOpen={() => setOpen({ format: f, job: null })} />
                 ))}
@@ -164,7 +165,7 @@ function Meter({ label, used, limit }: { label: string; used: number; limit: num
   const pct = limit ? Math.min(100, (used / limit) * 100) : 100;
   return (
     <div>
-      <div className="flex justify-between text-[12px]">
+      <div className="flex justify-between text-[13px]">
         <span className="text-text-dim">{label}</span>
         <span className={cn("font-medium", used >= limit ? "text-bad" : "text-text")}>
           {used} / {limit}
@@ -185,7 +186,7 @@ function TabBtn({ on, onClick, icon, children }: { on: boolean; onClick: () => v
   return (
     <button
       onClick={onClick}
-      className={cn("flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-[13px] transition-colors", on ? "bg-panel-2 font-medium text-text" : "text-text-faint hover:text-text")}
+      className={cn("flex flex-1 items-center justify-center gap-2 rounded-full px-4 py-2.5 text-[14.5px] font-medium transition-colors", on ? "bg-accent text-white" : "text-text-dim hover:text-text")}
     >
       {icon}
       {children}
@@ -194,27 +195,49 @@ function TabBtn({ on, onClick, icon, children }: { on: boolean; onClick: () => v
 }
 
 function FormatCard({ format, locked, onOpen }: { format: StudioFormat; locked: boolean; onOpen: () => void }) {
+  const vid = useRef<HTMLVideoElement>(null);
+  const isVideo = format.kind === "video";
   return (
-    <button onClick={onOpen} className="group flex h-full flex-col rounded-xl border border-border bg-panel p-4 text-left transition-colors hover:border-accent/50">
-      <div className="flex items-start justify-between gap-2">
-        <div className="text-[14px] font-semibold">{format.name}</div>
-        {locked && <Lock className="h-3.5 w-3.5 shrink-0 text-text-faint" />}
+    <button
+      onClick={onOpen}
+      onMouseEnter={() => void vid.current?.play().catch(() => {})}
+      onMouseLeave={() => {
+        const v = vid.current;
+        if (v) {
+          v.pause();
+          v.currentTime = 0;
+        }
+      }}
+      className="group hover-lift app-card flex h-full flex-col overflow-hidden p-0 text-left"
+    >
+      <div className="relative aspect-[4/3] w-full overflow-hidden bg-panel-2">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={previewImage(format.id)} alt="" loading="lazy" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]" />
+        {isVideo && (
+          <video ref={vid} src={DEMO_VIDEO} muted loop playsInline preload="none" className="absolute inset-0 h-full w-full object-cover opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+        )}
+        <span className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-black/70 px-3 py-1 text-[13px] font-medium text-white backdrop-blur-sm">
+          {isVideo ? <Play className="h-3.5 w-3.5" /> : <ImagePlus className="h-3.5 w-3.5" />}
+          {isVideo ? `${format.seconds}s reel` : "Image"}
+        </span>
+        {locked && (
+          <span className="absolute right-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-white/90 px-3 py-1 text-[13px] font-medium text-[#1a2a21]">
+            <Lock className="h-3.5 w-3.5" /> Growth plan
+          </span>
+        )}
       </div>
-      <p className="mt-0.5 text-[12.5px] text-text-faint">{format.tagline}</p>
-      <p className="mt-2.5 flex-1 text-[12.5px] leading-relaxed text-text-dim">{format.look[0]}</p>
-      <div className="mt-3 flex flex-wrap items-center gap-1.5">
-        {format.kind === "video" ? (
-          <>
-            <Pill tone="neutral">{format.seconds}s</Pill>
+      <div className="flex flex-1 flex-col p-5">
+        <div className="text-[17px] font-semibold tracking-tight">{format.name}</div>
+        <p className="mt-1 text-[14.5px] leading-relaxed text-text-dim">{format.tagline}</p>
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          {isVideo && (
             <Pill tone="neutral">
               {format.audio === "voice" ? <Mic className="mr-1 h-3 w-3" /> : <Music className="mr-1 h-3 w-3" />}
               {format.audio === "voice" ? "Voice" : "Music"}
             </Pill>
-          </>
-        ) : (
-          <Pill tone="neutral">1 image</Pill>
-        )}
-        <span className="ml-auto text-[12px] font-medium text-accent opacity-0 transition-opacity group-hover:opacity-100">Start →</span>
+          )}
+          <span className="ml-auto text-[14px] font-medium text-accent">{locked ? "See a demo →" : "Start →"}</span>
+        </div>
       </div>
     </button>
   );
@@ -265,14 +288,14 @@ function Creations({ jobs, onOpen }: { jobs: StudioJobView[]; onOpen: (j: Studio
                 </span>
               )}
               {/* Solid backdrop so the status reads on any picture. */}
-              <span className="absolute left-2 top-2 inline-flex items-center gap-1.5 rounded-full bg-black/70 px-2.5 py-1 text-[11.5px] font-medium text-white backdrop-blur-sm">
+              <span className="absolute left-2 top-2 inline-flex items-center gap-1.5 rounded-full bg-black/70 px-2.5 py-1 text-[13px] font-medium text-white backdrop-blur-sm">
                 <span className={cn("h-1.5 w-1.5 rounded-full", DOT[st.tone])} />
                 {st.label}
               </span>
             </div>
             <div className="px-3 py-2">
               <div className="truncate text-[13px] font-medium">{j.brief?.title ?? f?.name ?? "Untitled"}</div>
-              <div className="truncate text-[11.5px] text-text-faint">
+              <div className="truncate text-[13px] text-text-faint">
                 {f?.name}
                 {j.source === "orchestrator" ? " · by Orchestrator" : ""}
               </div>
