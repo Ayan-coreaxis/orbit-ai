@@ -27,6 +27,6 @@ export async function POST(req: NextRequest) {
     ? images.slice(0, 4).map(parseDataUrl).filter((x): x is DesignRef => x !== null)
     : [];
 
-  const plan = await runDesignPlan(businessId, message.trim().slice(0, 4000), refImages);
+  const plan = await runDesignPlan(businessId, message.trim().slice(0, 12000), refImages);
   return NextResponse.json(plan);
 }

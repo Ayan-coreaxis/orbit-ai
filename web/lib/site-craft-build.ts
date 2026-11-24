@@ -18,6 +18,7 @@ import { SITE_CRAFT_SKILL } from "@/lib/site-craft-skill";
 import { defaultTokens, normalizeDoc, renderPageDocument, type DesignPage, type OrbitDesignDoc, type StorefrontProduct } from "@/lib/orbit-design";
 import { renderDocShots } from "@/lib/screenshot";
 import { resolveStockMedia } from "@/lib/stock-media";
+import { remainingIssues, runStoreQa } from "@/lib/site-craft-qa";
 import { toStorefrontProducts } from "@/lib/storefront-products";
 import {
   DESIGN_PRODUCT_SELECT,
@@ -64,6 +65,8 @@ const CONTRACT = `THIS IS THE DESIGN PHASE. You design the whole store freely �
 - Links: href="#page:home", "#page:shop", "#page:about", "#page:contact", "#page:faq"; cart href="#cart" (add data-od-cart-count to the element that should show the count); one product href="#product:<id>".
 - Optional hooks if they suit the design: data-od-accordion > data-od-acc-item > (button data-od-acc-trigger + div data-od-acc-panel); data-od-carousel > data-od-track > data-od-slide (+ data-od-prev / data-od-next, data-od-dots); data-od-marquee="28"; data-od-reveal="up|fade|scale"; data-od-shrink on a sticky header; forms <form data-od-form="newsletter"> (input name="email") and <form data-od-form="contact"> (name, email, textarea name="message").
 - Contact details and socials: {{contact.email}} {{contact.phone}} {{contact.address}} {{social.instagram}} {{social.facebook}} {{social.tiktok}} {{store.name}} {{store.year}} — nothing else between braces.
+- MEASURED AFTER THE BUILD in a real browser (failures get patched, so get them right first time): (1) the hero — headline, one-line intro and the main button — fits inside ONE screen at 1440×900 AND 390×844: headline at most clamp(2.2rem,5.5vw,5rem) and at most 4 lines, hero padding at most ~12vh; (2) every piece of text has at least 4.5:1 contrast against what is behind it — any card, button, chip or panel with its own background sets its OWN text colour (never inherit it from the coloured section around it), and header links get an explicit colour for the header's background; (3) no image taller than 75% of the screen except the hero; (4) a section may overlap its neighbour only by padding that holds no text; (5) product grids: 4 columns from 1100px, 3 from 800px, 2 on phones, card image ratio 4/5, a card never taller than ~70% of the screen; (6) one consistent section spacing scale and one left edge for headings.
+- CSS-only toggles (mobile menu, tabs, swatches): every toggle <input> gets its OWN unique id AND its own unique class (never share one class like "sc-menu-checkbox" between different toggles, never repeat an id on the page, header and footer included), and starts UNCHECKED unless the design really needs it open. A slide-in menu panel must be fully closed (off-screen, visibility:hidden) until its own checkbox is checked — a panel that is open on load blocks the entire page.
 - Honesty: never invent reviews, customer names, ratings, stats, years, press, policies (returns, open-before-you-pay, money-back) or delivery times. Only what the brief and store facts say.`;
 
 const DESIGN_TOOL: Anthropic.Tool = {
@@ -243,15 +246,14 @@ export async function fixBrokenImages(texts: string[], keep: Set<string>): Promi
   const urls = new Set<string>();
   for (const t of texts) for (const m of t.matchAll(/(?:src|data-img-src)="(https:\/\/[^"]+)"/g)) if (!keep.has(m[1])) urls.add(m[1]);
   const swap = new Map<string, string>();
-  let n = 0;
   await Promise.all(
     [...urls].slice(0, 60).map(async (u) => {
       const ok = await fetch(u, { method: "GET", redirect: "follow", signal: AbortSignal.timeout(6000) })
         .then((r) => r.ok && /^image\//.test(r.headers.get("content-type") || ""))
         .catch(() => false);
       if (!ok) {
-        const w = Number(/[?&]w=(\d+)/.exec(u)?.[1]) || 900;
-        swap.set(u, `https://picsum.photos/seed/orbit${++n}/${w}/${Math.round(w * 1.2)}`);
+        // a quiet tinted block — never a random landscape
+        swap.set(u, "data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='5'%3E%3Crect width='4' height='5' fill='%23d9d4cc'/%3E%3C/svg%3E");
       }
     }),
   );
@@ -332,6 +334,51 @@ ${markup}`,
   if (out.css) next.css = `${next.css ?? ""}\n/* self-check */\n${out.css}`;
   console.warn(`[site-craft] self-check: ${changed} sections changed, css +${out.css?.length ?? 0} — ${String(out.verdict ?? "").slice(0, 200)}`);
   return { doc: next, verdict: out.verdict };
+}
+
+/**
+ * The QA step: measure the finished store in a real browser, patch what the measurements prove is
+ * wrong (free), and — only if something measurable is still wrong — one text-only repair call.
+ * `ORBIT_SITECRAFT_QA_AI=0` turns the repair call off; the free patches always run.
+ */
+export async function polishStore(businessId: string, doc: OrbitDesignDoc, products: StorefrontProduct[], concept: string): Promise<OrbitDesignDoc> {
+  let cur: OrbitDesignDoc = { ...doc };
+  const add = (css: string, label: string) => {
+    if (css.trim()) cur = { ...cur, css: `${cur.css ?? ""}\n/* ${label} */\n${css}` };
+  };
+  const qa1 = await runStoreQa(cur, products, businessId);
+  add(qa1.css, "qa");
+  const fixedCount = qa1.issues.filter((i) => i.fixed).length;
+  const left = remainingIssues(qa1.issues);
+  console.warn(`[site-craft-qa] ${qa1.issues.length} finding(s), ${fixedCount} patched automatically, ${left.length} need the designer`);
+  if (!left.length || process.env.ORBIT_SITECRAFT_QA_AI === "0") return cur;
+
+  try {
+    const fix = await callTool<{ css?: string }>(
+      businessId,
+      FIX_CSS_TOOL,
+      `You built this store; it was opened in a real browser and MEASURED. These problems remain (the measurable ones were already patched):
+
+${left.map((l) => `- ${l}`).join("\n")}
+
+ART DIRECTION: ${concept}
+
+CURRENT STYLESHEET (tail):
+${(cur.css ?? "").slice(-24000)}
+
+Write ONLY the extra CSS that fixes exactly these problems — it is appended after the stylesheet, so match the selectors' specificity or use !important. Keep the design's look; mobile-first with breakpoints; no new decoration.`,
+      8000,
+    );
+    if (fix?.css) {
+      add(fix.css, "qa-repair");
+      const qa2 = await runStoreQa(cur, products, businessId);
+      add(qa2.css, "qa-2");
+      console.warn(`[site-craft-qa] after repair: ${remainingIssues(qa2.issues).length} still open`);
+    }
+  } catch (e) {
+    console.warn("[site-craft-qa] repair skipped", String(e).slice(0, 120));
+  }
+  return cur;
 }
 
 export async function runSiteCraftBuild(businessId: string, message: string): Promise<TurnResult> {
@@ -535,6 +582,13 @@ ${fix.css}`;
   );
   next = normalizeDoc(next, storeName, business.niche);
   await saveDoc(businessId, next);
+  // QA in a real browser: measure, patch for free, one cheap text-only repair for what's left.
+  try {
+    next = normalizeDoc(await polishStore(businessId, next, products, d.concept), storeName, business.niche);
+    await saveDoc(businessId, next);
+  } catch (e) {
+    console.warn("[site-craft-qa] skipped", e);
+  }
   // The screenshot self-check is one more large vision call — opt in with ORBIT_SITECRAFT_SELFCHECK=1.
   if (process.env.ORBIT_SITECRAFT_SELFCHECK === "1") try {
     const checked = await selfCheck(businessId, next, products, d.concept);

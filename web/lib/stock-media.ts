@@ -100,7 +100,6 @@ export async function resolveStockMedia(texts: string[]): Promise<string[]> {
   ]);
 
   const used = new Map<string, number>();
-  let seed = 0;
   const next = (map: Map<string, Found[]>, q: string): Found | undefined => {
     const list = map.get(q) ?? [];
     const i = used.get(q) ?? 0;
@@ -113,9 +112,16 @@ export async function resolveStockMedia(texts: string[]): Promise<string[]> {
       // <img ... data-img-query="..."> → real src (any existing src is replaced)
       .replace(/<img\b([^>]*?)data-img-query="([^"]+)"([^>]*)>/gi, (_m, a: string, q: string, b: string) => {
         const f = next(imgs, q);
-        const src = f?.url ?? `https://picsum.photos/seed/orbit${++seed}/900/1100`;
-        const rest = `${a}${b}`.replace(/\ssrc="[^"]*"/i, "");
-        return `<img${rest} src="${attr(src)}" data-img-query="${q}">`;
+        const both = `${a}${b}`;
+        if (!f) {
+          // Nothing matching found: a labelled placeholder the seller can replace — never a random landscape.
+          const alt = /alt="([^"]*)"/i.exec(both)?.[1] || q;
+          const cls = /class="[^"]*"/i.exec(both)?.[0] ?? "";
+          const ratio = /pcard|card|prod|thumb|tile/i.test(cls) ? "4/5" : "16/10";
+          return `<div ${cls} data-img-slot="${attr(alt)}" style="width:100%;aspect-ratio:${ratio}"></div>`;
+        }
+        const rest = both.replace(/\ssrc="[^"]*"/i, "");
+        return `<img${rest} src="${attr(f.url)}" data-img-query="${q}">`;
       })
       // <video data-video-query="..."> → real mp4, or a labelled slot when no library/key
       .replace(/<video\b([^>]*?)data-video-query="([^"]+)"([^>]*)>([\s\S]*?)<\/video>/gi, (_m, a: string, q: string, b: string) => {

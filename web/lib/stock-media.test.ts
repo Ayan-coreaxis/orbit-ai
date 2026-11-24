@@ -14,10 +14,11 @@ describe("resolveStockMedia", () => {
     expect(out).toContain('class="sc-hero-img"');
   });
 
-  it("falls back to a stand-in photo and a video slot when nothing is found", async () => {
+  it("falls back to a labelled placeholder (never a random photo) and a video slot when nothing is found", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { status: 500 })));
     const [img, vid] = await resolveStockMedia(['<img data-img-query="x y">', '<video class="sc-v" data-video-query="bees" autoplay muted></video>']);
-    expect(img).toMatch(/src="https:\/\/picsum\.photos\/seed\//);
+    expect(img).toContain('data-img-slot="x y"');
+    expect(img).not.toContain("picsum");
     expect(vid).toBe('<div data-video-slot="bees" class="sc-v"></div>');
   });
 });

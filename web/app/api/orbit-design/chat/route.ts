@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
 
   // The opening brief (after the design questions) is always a whole-store build, however it's worded.
   const refs = { images: refImages, siteUrl, siteHint };
-  const text = message.trim().slice(0, 4000);
+  const text = message.trim().slice(0, 12000);
   const result = fullBuild ? await runWholeStoreBuild(businessId, text, refs) : await runDesignEdit(businessId, text, refs);
   return NextResponse.json(result);
 }
