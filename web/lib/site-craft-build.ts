@@ -19,6 +19,7 @@ import { defaultTokens, normalizeDoc, renderPageDocument, type DesignPage, type 
 import { renderDocShots } from "@/lib/screenshot";
 import { resolveStockMedia } from "@/lib/stock-media";
 import { remainingIssues, runStoreQa } from "@/lib/site-craft-qa";
+import { splashFrom } from "@/lib/design-intake";
 import { toStorefrontProducts } from "@/lib/storefront-products";
 import {
   DESIGN_PRODUCT_SELECT,
@@ -28,6 +29,7 @@ import {
   honestAnnouncement,
   loadDoc,
   realReviewsNote,
+  type DesignRef,
   safeShell,
   saveDoc,
   type TurnResult,
@@ -56,7 +58,7 @@ const CONTRACT = `THIS IS THE DESIGN PHASE. You design the whole store freely �
 - Products: design them as you would on any shop. Use the store's real products listed below when there are any (real name, price, id). With none (or too few for a rail), add realistic sample products for this niche and put data-od-sample on their cards. If the seller's brief is clearly about a different brand or kind of product than the catalogue below (they are trying a new idea), the BRIEF wins: ignore the catalogue and design with sample products that fit the brief, marked data-od-sample. Put data-od-product="<product name>" on every product card and data-od-buy="<product id, if known>" on its add-to-cart button, and link cards to href="#product:<id>" — that is how the backend finds them later.
 - Images: never guess photo URLs. Describe the photo and the platform fills a real matching stock photo: <img class="sc-..." data-img-query="raw honey dripping from wooden dipper, warm light" alt="what it shows" loading="lazy"> — write the query like a photo search (subject, setting, light, mood), specific to this store. A real product photo from the list below always wins for that product (use src="<that url>" instead). Every product card needs a photo: a product marked "no photo" (or a sample product) gets <img data-img-query="..."> describing that product (e.g. "jar of dark raw honey with wooden dipper, studio light") — never a flat coloured box with the name written on it. Never draw products or people with SVG/CSS.
 - Video: <video class="sc-..." data-video-query="beekeeper lifting a honeycomb frame, slow motion"></video> — the platform fills a real stock clip (muted, looping, inline) or a placeholder the seller replaces. Put it in a positioned container sized by your CSS.
-- THE SELLER'S DESIGN ANSWERS in the brief (hero type, header style, media, sections, feel) are binding — build exactly what they chose; your craft decides how it looks.
+- THE SELLER'S DESIGN DECISIONS in the brief (hero, header, product cards, home sections, feel) are binding — build exactly what they chose; your craft decides how it looks. REFERENCE IMAGES (attached, labelled in the brief): follow each for the part it is labelled for — layout, spacing, type and colour mood, never its text or logos. The SPLASH SCREEN is run by the platform: do NOT build one.
 - Output: HTML + one stylesheet. No <script>, no <style> inside the HTML, no on* handlers (behaviour is added in the backend step). Build interactive parts with HTML + CSS (<details>/<summary>, :target, :has(), a checkbox toggle for the mobile menu, CSS scroll-snap for rails) or the hooks below.
 - There is no wrapper element of yours around the page: put shared custom properties on :root, never on an invented wrapper class, and name your own ones --sc-* (the --od-* names belong to the tokens).
 - Every class you write starts with "sc-" so it never clashes with the platform. All rules go in the stylesheet: media queries, :hover, :focus-visible, @keyframes, prefers-reduced-motion.
@@ -165,7 +167,7 @@ type DesignOut = {
 
 type PageOut = { sections?: { id: string; label: string; html: string }[]; css?: string };
 
-async function callTool<T>(businessId: string, tool: Anthropic.Tool, prompt: string, maxTokens: number): Promise<T | null> {
+async function callTool<T>(businessId: string, tool: Anthropic.Tool, prompt: string, maxTokens: number, images: DesignRef[] = []): Promise<T | null> {
   const msg = await anthropic.messages
     .stream({
       model: MODEL,
@@ -173,7 +175,15 @@ async function callTool<T>(businessId: string, tool: Anthropic.Tool, prompt: str
       system: SYSTEM,
       tools: [tool],
       tool_choice: { type: "tool", name: tool.name },
-      messages: [{ role: "user", content: prompt }],
+      messages: [
+        {
+          role: "user",
+          content: [
+            ...images.map((im): Anthropic.ImageBlockParam => ({ type: "image", source: { type: "base64", media_type: im.mediaType, data: im.data } })),
+            { type: "text", text: prompt },
+          ],
+        },
+      ],
     })
     .finalMessage();
   prisma.agentUsage
@@ -381,7 +391,7 @@ Write ONLY the extra CSS that fixes exactly these problems — it is appended af
   return cur;
 }
 
-export async function runSiteCraftBuild(businessId: string, message: string): Promise<TurnResult> {
+export async function runSiteCraftBuild(businessId: string, message: string, refs: { images?: DesignRef[] } = {}): Promise<TurnResult> {
   await ensureModelConfigLoaded();
   const business = await prisma.business.findUnique({
     where: { id: businessId },
@@ -421,6 +431,7 @@ ${productList}
 
 ${reviews}`;
 
+  const refImages = (refs.images ?? []).slice(0, 8);
   let design: DesignOut | null = null;
   try {
     design = await callTool<DesignOut>(
@@ -432,6 +443,7 @@ ${CONTRACT}
 
 Step 1 of 2: decide the art direction (the skill's "Choose direction" step) and build the design system — tokens, the shared stylesheet, header and footer — and list the pages. The pages are built next, against exactly this system.`,
       24000,
+      refImages,
     );
   } catch (e) {
     console.warn("[site-craft] design call failed", e);
@@ -470,6 +482,7 @@ ${systemNote}
 Step 2: build the "${pg.title}" page (/${pg.slug}) — ${pg.purpose}. ${pageBrief(pg.slug)}
 Finished sections only: real copy from the brief, every interactive thing with its states, mobile-first. The header and footer are already on the page — don't repeat them.`,
           20000,
+          pg.slug === "home" || pg.slug === "shop" ? refImages : [],
         );
         if (!out || !Array.isArray(out.sections) || !out.sections.length) {
           console.warn(`[site-craft] page ${pg.slug} came back empty (attempt ${attempt + 1})`);
@@ -573,6 +586,7 @@ ${fix.css}`;
       },
       pages,
       tweaks: [{ key: "accent", label: "Accent colour", type: "color", cssVar: "--tw-accent", value: String(d.tokens.accent ?? "#1f3a2e") }],
+      motion: splashFrom(message) && splashFrom(message) !== "none" ? { preloader: true, splash: splashFrom(message) as "fade" | "counter" | "curtain" } : undefined,
       direction: "site-craft",
       directionHistory: [...(doc.directionHistory ?? []), ...(doc.direction ? [doc.direction] : [])].slice(-6),
       css,

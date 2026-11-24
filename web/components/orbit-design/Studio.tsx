@@ -16,6 +16,7 @@ import { BlockInspector } from "./BlockInspector";
 import { CommentComposer } from "./CommentComposer";
 import type { CommentTarget, PickTarget } from "./PreviewPane";
 import { useImageAttachments } from "./useImageAttachments";
+import { DesignIntake } from "./DesignIntake";
 import { AttachButton, AttachmentTray } from "./Attachments";
 
 interface Msg {
@@ -85,6 +86,8 @@ export function Studio({
     answers: Record<string, string>;
   } | null>(null);
   const [planning, setPlanning] = useState(false);
+  // The designer's intake (static choices + reference images) — shown after the opening brief; no AI call.
+  const [intake, setIntake] = useState<{ brief: string; images: string[] } | null>(null);
 
   const attach = useImageAttachments();
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -104,8 +107,9 @@ export function Studio({
   const hasDesign = useMemo(
     () =>
       !plan &&
+      !intake &&
       ((!cleared && history.length > 0) || messages.some((m) => m.role === "assistant" && !m.pending && !m.errored)),
-    [history.length, messages, plan, cleared],
+    [history.length, messages, plan, intake, cleared],
   );
 
   const flash = useCallback((m: string) => {
@@ -117,8 +121,31 @@ export function Studio({
 
   /** Entry point for the composer: the very first brief goes through the questions step. */
   async function submitBrief(text: string, images: string[] = []) {
-    if (isOpeningBrief && !plan) return startPlan(text, images);
+    if (isOpeningBrief && !plan && !intake) return startIntake(text, images);
     return send(text, images);
+  }
+
+  /** The opening brief opens the designer's intake: choices + reference images, decided before any build. */
+  function startIntake(text: string, images: string[]) {
+    const message = text.trim();
+    if ((!message && !images.length) || sending) return;
+    setMode("studio");
+    setInput("");
+    attach.clear();
+    setMessages([
+      { role: "user", content: message, images: images.length ? images : undefined },
+      { role: "assistant", content: "Choose what you want on the right — or hit “Decide for me”. For any part you can upload a picture of what you like and I'll follow it." },
+    ]);
+    setIntake({ brief: message || "Design my store.", images });
+    setMobileTab("preview");
+  }
+
+  function buildFromIntake(message: string, extra: string[]) {
+    if (!intake) return;
+    const imgs = [...intake.images, ...extra].slice(0, 8);
+    setIntake(null);
+    setMessages([]);
+    void send(message, imgs, true);
   }
 
   async function startPlan(text: string, images: string[]) {
@@ -881,7 +908,11 @@ export function Studio({
           )}
 
           <div className="flex min-h-0 flex-1">
-            {plan ? (
+            {intake ? (
+              <div className="flex-1 overflow-y-auto p-5 sm:p-8">
+                <DesignIntake brief={intake.brief} onBuild={buildFromIntake} onSkip={() => buildFromIntake(intake.brief, [])} />
+              </div>
+            ) : plan ? (
               <div className="flex-1 overflow-y-auto p-6 sm:p-10">
                 <div className="mx-auto max-w-xl">
                   {plan.summary && <p className="mb-6 text-[15px] leading-relaxed text-text-dim">{plan.summary}</p>}

@@ -2893,7 +2893,7 @@ export async function runWholeStoreBuild(businessId: string, message: string, re
   }
 
   // The simple builder: one prompt + the site-craft skill (ORBIT_STORE_BUILDER=classic for the old pipeline).
-  if (useSiteCraftBuilder()) return runSiteCraftBuild(businessId, message);
+  if (useSiteCraftBuilder()) return runSiteCraftBuild(businessId, message, { images: refs.images });
 
   const products: StorefrontProduct[] = toStorefrontProducts(business.products);
   const images = (refs.images ?? []).slice(0, 4);

@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
   if (!message || !message.trim()) return NextResponse.json({ error: "Say what you'd like to change." }, { status: 400 });
 
   const refImages: DesignRef[] = Array.isArray(images)
-    ? images.slice(0, 4).map(parseDataUrl).filter((x): x is DesignRef => x !== null)
+    ? images.slice(0, 8).map(parseDataUrl).filter((x): x is DesignRef => x !== null)
     : [];
 
   // If the seller pasted a URL, render it so the model can actually see the site they mean.

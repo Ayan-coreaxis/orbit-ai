@@ -180,7 +180,7 @@ export interface OrbitDesignDoc {
   pages: DesignPage[];
   tweaks?: DesignTweak[];
   /** page-shell motion the generator opts into per brand */
-  motion?: { preloader?: boolean };
+  motion?: { preloader?: boolean; splash?: "fade" | "counter" | "curtain" };
   /** the art direction this store was last built to (lib/design-directions.ts) + the ones before it */
   direction?: string;
   directionHistory?: string[];
@@ -600,7 +600,7 @@ export function normalizeDoc(doc: OrbitDesignDoc, storeName: string, niche: stri
     components,
     pages,
     tweaks: normalizeTweaks(doc.tweaks),
-    motion: doc.motion?.preloader ? { preloader: true } : undefined,
+    motion: doc.motion?.preloader || doc.motion?.splash ? { preloader: true, ...(doc.motion?.splash === "counter" || doc.motion?.splash === "curtain" || doc.motion?.splash === "fade" ? { splash: doc.motion.splash } : {}) } : undefined,
     direction: typeof doc.direction === "string" ? doc.direction.slice(0, 40) : undefined,
     css: typeof doc.css === "string" && doc.css.trim() ? doc.css.slice(0, 80_000) : undefined,
     directionHistory: Array.isArray(doc.directionHistory)
@@ -2587,14 +2587,31 @@ ${preloader ? preloaderCss() : ""}`,
  *  OUTSIDE #od-store so it must carry its own colour/type values inline. */
 function preloaderHtml(doc: OrbitDesignDoc): string {
   const t = doc.tokens;
-  const style = `background:${cssColor(t.bg)};--od-mark:${cssColor(t.text)};--od-mark-font:${escapeAttr(t.fontHeading)};--od-mark-weight:${Number(t.headingWeight) || 600}`;
-  return `<div id="od-preload" aria-hidden="true" style="${style}"><span class="od-preload-mark">${escapeHtml(doc.storeName)}</span></div>
-<script>(function(){var el=document.getElementById('od-preload');if(!el)return;var done=function(){el.setAttribute('data-od-gone','');setTimeout(function(){el.remove()},650)};if(window.matchMedia&&window.matchMedia('(prefers-reduced-motion:reduce)').matches){el.remove();return}window.addEventListener('load',function(){setTimeout(done,220)});setTimeout(done,1400)})();</script>`;
+  const kind = doc.motion?.splash ?? "fade";
+  const style = `background:${cssColor(t.bg)};--od-mark:${cssColor(t.text)};--od-mark-font:${escapeAttr(t.fontHeading)};--od-mark-weight:${Number(t.headingWeight) || 600};--od-curtain-a:${cssColor(t.accent)};--od-curtain-b:${cssColor(t.text)}`;
+  const mark = `<span class="od-preload-mark">${escapeHtml(doc.storeName)}</span>`;
+  const inner = kind === "counter" ? `${mark}<span class="od-preload-count" aria-hidden="true">0</span>` : kind === "curtain" ? `<i class="od-curtain od-curtain-l"></i><i class="od-curtain od-curtain-r"></i>${mark}` : mark;
+  // One small platform-owned script: runs the counter, then lifts the splash once the page has loaded
+  // (never later than ~2.2 s), and is skipped entirely for people who prefer reduced motion.
+  const script = `(function(){var el=document.getElementById('od-preload');if(!el)return;var kind='${kind}';var gone=false;var done=function(){if(gone)return;gone=true;el.setAttribute('data-od-gone','');setTimeout(function(){el.remove()},1300)};if(window.matchMedia&&window.matchMedia('(prefers-reduced-motion:reduce)').matches){el.remove();return}var loaded=document.readyState==='complete';window.addEventListener('load',function(){loaded=true});if(kind==='counter'){var c=el.querySelector('.od-preload-count'),t0=Date.now(),dur=1300;(function tick(){var p=Math.min(1,(Date.now()-t0)/dur);if(c)c.textContent=String(Math.round(p*100));if(p<1||!loaded){if(Date.now()-t0<2200)return requestAnimationFrame(tick)}if(c)c.textContent='100';setTimeout(done,250)})()}else{window.addEventListener('load',function(){setTimeout(done,kind==='curtain'?500:220)});setTimeout(done,kind==='curtain'?1500:1400)}})();`;
+  return `<div id="od-preload" data-splash="${kind}" aria-hidden="true" style="${style}">${inner}</div>
+<script>${script}</script>`;
 }
 function preloaderCss(): string {
   return `#od-preload{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;transition:opacity .5s ease,visibility .5s}
-#od-preload .od-preload-mark{font-family:var(--od-mark-font,var(--od-font-heading));font-weight:var(--od-mark-weight,600);font-size:clamp(20px,4vw,30px);letter-spacing:.02em;color:var(--od-mark,#111);opacity:0;animation:od-preload-in .5s ease forwards}
+#od-preload .od-preload-mark{position:relative;z-index:2;font-family:var(--od-mark-font,var(--od-font-heading));font-weight:var(--od-mark-weight,600);font-size:clamp(20px,4vw,30px);letter-spacing:.02em;color:var(--od-mark,#111);opacity:0;animation:od-preload-in .5s ease forwards}
 #od-preload[data-od-gone]{opacity:0;visibility:hidden;pointer-events:none}
+#od-preload[data-splash=counter] .od-preload-mark{position:absolute;left:5vw;top:5vh}
+#od-preload .od-preload-count{position:absolute;right:5vw;bottom:3vh;font-family:var(--od-mark-font,var(--od-font-heading));font-weight:var(--od-mark-weight,700);font-size:clamp(5rem,22vw,16rem);line-height:.9;color:var(--od-mark,#111);font-variant-numeric:tabular-nums}
+#od-preload[data-splash=curtain]{background:transparent!important}
+#od-preload .od-curtain{position:absolute;top:0;bottom:0;width:50.2%;transition:transform .9s cubic-bezier(.7,0,.2,1)}
+#od-preload .od-curtain-l{left:0;background:var(--od-curtain-a)}
+#od-preload .od-curtain-r{right:0;background:var(--od-curtain-b)}
+#od-preload[data-splash=curtain] .od-preload-mark{color:#fff;mix-blend-mode:difference}
+#od-preload[data-splash=curtain][data-od-gone]{opacity:1;visibility:visible;transition:opacity .2s 1s,visibility 0s 1.2s}
+#od-preload[data-splash=curtain][data-od-gone] .od-curtain-l{transform:translateX(-101%)}
+#od-preload[data-splash=curtain][data-od-gone] .od-curtain-r{transform:translateX(101%)}
+#od-preload[data-splash=curtain][data-od-gone] .od-preload-mark{opacity:0;transition:opacity .3s}
 @keyframes od-preload-in{to{opacity:.9}}`;
 }
 
