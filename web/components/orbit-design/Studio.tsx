@@ -218,7 +218,9 @@ export function Studio({
         latestTokens.current = data.doc.tokens;
         // A fresh whole-store build is exactly the case Audit Design exists for — run it
         // automatically once the build lands, instead of waiting for the seller to remember to.
-        if (heavy) void runAudit(true);
+        // The audit's rules belong to the old pipeline — on a site-craft design it would "fix" a free
+        // design back into a template (it deleted a hero once). Run it only on request there.
+        if (heavy && data.doc.direction !== "site-craft") void runAudit(true);
       }
       // Post-handoff: Orbit Code reacts to a new interactive part the seller just designed.
       const oc = data.orbitCode as { questions?: { id: string; q: string; options?: string[] }[]; rewired?: string } | undefined;
