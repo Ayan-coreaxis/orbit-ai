@@ -29,10 +29,11 @@ import { DEFAULT_WIDGET_COPY, parseWidgetCopy, type WidgetCopyKey } from "@/lib/
 import { toStorefrontProducts } from "@/lib/storefront-products";
 import { DESIGN_SKILLS, ALWAYS_SKILLS, getSkill, skillCatalogue, skillsForBuilders } from "@/lib/design-skills";
 import { pickDirection, directionPrompt, type PickedDirection } from "@/lib/design-directions";
+import { runSiteCraftBuild, useSiteCraftBuilder } from "@/lib/site-craft-build";
 import { STYLE_OPTIONS, normalizeStyle, describeStyle, mergeStyle } from "@/lib/design-style";
 
 /** Products as the storefront renders them — variant stock and "from" prices included, so the design QA and audit never see a variant product as sold out. */
-const DESIGN_PRODUCT_SELECT = {
+export const DESIGN_PRODUCT_SELECT = {
   id: true,
   name: true,
   price: true,
@@ -48,7 +49,7 @@ const DESIGN_PRODUCT_SELECT = {
  * The store's real, published customer reviews for the design prompts — the only thing a
  * testimonial may quote. With none, the model is told so and builds a promise section instead.
  */
-async function realReviewsNote(businessId: string): Promise<string> {
+export async function realReviewsNote(businessId: string): Promise<string> {
   const reviews = await prisma.review
     .findMany({
       where: { businessId, published: true, rating: { gte: 4 }, comment: { not: null } },
@@ -421,7 +422,7 @@ const PLAN_TOOL = {
       intro: { type: "string", description: "one short friendly line to the seller, before the questions — e.g. 'A few things before I build — pick them on the right, or let me decide.' — in the seller's own language and script" },
       questions: {
         type: "array",
-        description: "0 to 4 short questions whose answers would most change the design. Return an EMPTY array when the brief already specifies the pages, the visual direction (palette/fonts/mood) and the key content — a detailed brief needs no questions. Otherwise ask only what's genuinely missing.",
+        description: "Short questions whose answers would most change the design — follow the instructions on when to ask and how many.",
         items: {
           type: "object",
           properties: {
@@ -446,6 +447,17 @@ const PLAN_TOOL = {
     required: ["summary", "questions"],
   },
 };
+
+const INTAKE_SYSTEM = `You are Orbit Design — a senior store designer meeting a new client before designing their storefront from scratch. Like a real designer's intake, ask the questions whose answers decide what gets built, so the store is THEIRS and never a template. Always ask (even for a detailed brief, skip only what the brief already answers exactly):
+
+1. HERO — what the first screen shows. type "select", options tailored to this business, covering e.g.: one big product photo · a photo carousel / slider · one full-screen background video · several short videos · bold typography only, no photo · split photo + text.
+2. HEADER — e.g. logo left + menu right · centred logo with menu below · transparent over the hero · minimal with a slide-in side menu · announcement strip + bold bar.
+3. HOME SECTIONS — type "multi": the sections they want on the home page, from options that fit this niche (bestsellers rail, shop by category, featured product, brand story, how it's made / sourcing, video section, Instagram-style gallery, reviews, FAQ, newsletter…).
+4. FEEL — type "select": 4-5 distinct, named looks that suit THIS niche and price point (concrete: "warm earthy & handmade", "dark luxurious & glossy", "bright playful pop", "clean editorial & minimal"…). Never the same list for every business.
+5. COLOURS & REFERENCES — type "text": brand colours to keep, or a site they love (and what they love about it).
+Add at most 2 more only if this business clearly needs them (e.g. product photography style, a lookbook, a size guide, Urdu text).
+
+Each question gets a short 'why' line saying what it changes. Write the summary, intro, questions, why lines and options in the seller's own language and script — Roman Urdu if they wrote Roman Urdu, English if English. Give a one or two sentence summary of the store you're about to design. Call propose_plan.`;
 
 export interface DesignPlan {
   summary: string;
@@ -494,7 +506,7 @@ export async function runDesignPlan(
     const msg = await anthropic.messages.create({
       model: MODEL,
       max_tokens: 2000,
-      system: `You are Orbit Design, about to build a real seller's whole storefront. BEFORE building, ask ONLY the clarifying questions whose answers would genuinely change the design. If the brief already gives the pages, the visual direction (palette/fonts/mood) and the key content, return an EMPTY questions array — do not invent questions for a complete brief. When the brief IS vague, good candidates: brand wordmark, copy tone, catalogue size, visual direction / dark mode, imagery approach, what to prioritise for a first pass.
+      system: useSiteCraftBuilder() ? INTAKE_SYSTEM : `You are Orbit Design, about to build a real seller's whole storefront. BEFORE building, ask ONLY the clarifying questions whose answers would genuinely change the design. If the brief already gives the pages, the visual direction (palette/fonts/mood) and the key content, return an EMPTY questions array — do not invent questions for a complete brief. When the brief IS vague, good candidates: brand wordmark, copy tone, catalogue size, visual direction / dark mode, imagery approach, what to prioritise for a first pass.
 
 Make the questions feel like a sharp designer's intake form, not a quiz:
 - Each question gets a short 'why' line saying what the answer changes ("Sets the logo wordmark and product copy").
@@ -520,7 +532,7 @@ Never lecture about the seller's previous/existing brand; the brief is what matt
     const questions = Array.isArray(input.questions)
       ? input.questions
           .filter((q) => q && q.question && q.key)
-          .slice(0, 5)
+          .slice(0, useSiteCraftBuilder() ? 7 : 5)
           .map((q) => {
             const type = (["select", "toggle", "multi", "text"] as const).includes(q.type as never)
               ? (q.type as "select" | "toggle" | "multi" | "text")
@@ -1870,7 +1882,7 @@ type StorePlan = {
 
 /** The model sometimes returns a NOTE ("Header renders fine — keep as is") instead of markup. Reject
  *  anything that isn't a real <header>/<footer> element and fall back to the default shell. */
-function safeShell(kind: "header" | "footer", v: string | undefined, storeName: string, niche: string): string {
+export function safeShell(kind: "header" | "footer", v: string | undefined, storeName: string, niche: string): string {
   if (typeof v === "string" && new RegExp(`<${kind}[\\s>]`, "i").test(v)) return v;
   return defaultComponents(storeName, niche)[kind];
 }
@@ -1887,7 +1899,7 @@ export function honestAnnouncement(text: string, freeShippingOver: number | null
 }
 
 /** Apply a plan's announcement choice onto the seller's Content (default bar stays if the plan is silent). */
-function contentWithAnnounce(base: OrbitDesignDoc["content"], a?: Announce): OrbitDesignDoc["content"] {
+export function contentWithAnnounce(base: OrbitDesignDoc["content"], a?: Announce): OrbitDesignDoc["content"] {
   if (!a || a.show === undefined) return base;
   return {
     ...base,
@@ -2610,7 +2622,7 @@ function kitSection(id: string, kind: string, variant: string, props: Record<str
  * a Shop page, and backfills any still-missing core page with on-brand kit sections. Mutates `pages`.
  * Works for both the bespoke-HTML path and the kit path (a page may end up mixed html + block).
  */
-function ensureCoreContentPages(
+export function ensureCoreContentPages(
   pages: DesignPage[],
   business: { name: string; niche: string },
   storeName: string,
@@ -2879,6 +2891,9 @@ export async function runWholeStoreBuild(businessId: string, message: string, re
     if (e instanceof UsageCapExceededError) return { reply: "You've hit this month's AI usage cap — try again next cycle.", doc, error: "cap" };
     throw e;
   }
+
+  // The simple builder: one prompt + the site-craft skill (ORBIT_STORE_BUILDER=classic for the old pipeline).
+  if (useSiteCraftBuilder()) return runSiteCraftBuild(businessId, message);
 
   const products: StorefrontProduct[] = toStorefrontProducts(business.products);
   const images = (refs.images ?? []).slice(0, 4);

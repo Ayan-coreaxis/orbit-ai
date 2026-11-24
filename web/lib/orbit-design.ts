@@ -184,6 +184,9 @@ export interface OrbitDesignDoc {
   /** the art direction this store was last built to (lib/design-directions.ts) + the ones before it */
   direction?: string;
   directionHistory?: string[];
+  /** a store-wide stylesheet the site-craft builder writes (classes prefixed sc-) — hover states,
+   *  media queries, keyframes that inline styles can't hold. Sanitised by storeCss() on render. */
+  css?: string;
 }
 
 export interface StorefrontProduct {
@@ -486,7 +489,7 @@ export function normalizeDoc(doc: OrbitDesignDoc, storeName: string, niche: stri
   if (!Array.isArray(tokens.googleFonts)) tokens.googleFonts = [];
   // The generator sets fontHeading / fontBody but often forgets to list those families in googleFonts,
   // so the page loads the wrong (default) fonts. Derive the families from the font stacks and merge.
-  const GENERIC = /^(serif|sans-serif|monospace|system-ui|ui-serif|ui-sans-serif|cursive|fantasy|-apple-system|blinkmacsystemfont)$/i;
+  const GENERIC = /^(serif|sans-serif|monospace|system-ui|ui-serif|ui-sans-serif|cursive|fantasy|-apple-system|blinkmacsystemfont|georgia|times|times new roman|arial|helvetica|helvetica neue|segoe ui|roboto|courier|courier new|menlo|consolas|sfmono-regular)$/i;
   const famsFromStack = (s: unknown): string[] =>
     typeof s === "string"
       ? s.split(",").map((f) => f.trim().replace(/^['"]|['"]$/g, "")).filter((f) => f && !GENERIC.test(f))
@@ -497,12 +500,20 @@ export function normalizeDoc(doc: OrbitDesignDoc, storeName: string, niche: stri
   const pal = normalizePalette(tokens.palette);
   tokens.palette = pal.length ? pal : undefined;
   tokens.style = normalizeStyle(tokens.style);
-  ensureReadableTokens(tokens);
+  // A site-craft store is designed whole by the designer (its own header, nav, cards, colours) —
+  // the platform doesn't second-guess its tokens or slip its own nav into the header.
+  const freeDesign = doc.direction === "site-craft";
+  if (!freeDesign) ensureReadableTokens(tokens);
 
   const base = defaultComponents(doc.storeName ?? storeName, doc.tagline ?? niche);
   const legacyAnnouncement = (doc.components as { announcement?: string } | undefined)?.announcement;
   const components: DesignComponents = {
-    header: injectNavMarker(typeof doc.components?.header === "string" && doc.components.header.trim() ? doc.components.header : base.header),
+    header:
+      typeof doc.components?.header === "string" && doc.components.header.trim()
+        ? freeDesign
+          ? doc.components.header
+          : injectNavMarker(doc.components.header)
+        : injectNavMarker(base.header),
     footer: typeof doc.components?.footer === "string" && doc.components.footer.trim() ? doc.components.footer : base.footer,
   };
 
@@ -591,6 +602,7 @@ export function normalizeDoc(doc: OrbitDesignDoc, storeName: string, niche: stri
     tweaks: normalizeTweaks(doc.tweaks),
     motion: doc.motion?.preloader ? { preloader: true } : undefined,
     direction: typeof doc.direction === "string" ? doc.direction.slice(0, 40) : undefined,
+    css: typeof doc.css === "string" && doc.css.trim() ? doc.css.slice(0, 80_000) : undefined,
     directionHistory: Array.isArray(doc.directionHistory)
       ? doc.directionHistory.filter((d): d is string => typeof d === "string").slice(-6)
       : undefined,
@@ -2530,6 +2542,23 @@ ${scope} [data-od-dropdown]:hover [data-od-panel],${scope} [data-od-dropdown]:fo
 const STORE_WRAPPER = "od-store";
 
 /**
+ * The builder's store-wide stylesheet, made safe to inline: no way out of the <style> element, no
+ * @import, no legacy script-in-CSS (expression/behavior/-moz-binding), and url() only for https
+ * images/fonts or data: images.
+ */
+export function storeCss(css: string | undefined): string {
+  if (!css) return "";
+  let c = css.slice(0, 80_000);
+  c = c.replace(/<\/?\s*style/gi, "").replace(/<!--|-->/g, "");
+  c = c.replace(/@import[^;]*;?/gi, "").replace(/@charset[^;]*;?/gi, "");
+  c = c.replace(/expression\s*\(|behavior\s*:|-moz-binding|javascript:/gi, "");
+  c = c.replace(/url\(\s*['"]?([^'")]*)['"]?\s*\)/gi, (m, u: string) =>
+    /^https:\/\//i.test(u) || /^data:image\/(png|jpe?g|gif|webp|svg\+xml)/i.test(u) ? m : "none",
+  );
+  return c;
+}
+
+/**
  * Everything the real /store route needs, split so the React page can render `<link>` / `<style>`
  * as proper JSX elements (which React 19 hoists to <head> without a hydration mismatch) and keep
  * only the body markup in a `dangerouslySetInnerHTML` div.
@@ -2547,6 +2576,7 @@ export function renderPageParts(
 ${tweaksCss(doc.tweaks, `#${STORE_WRAPPER}`)}
 html,body{background:${cssColor(doc.tokens.bg)}}
 ${shellCss(`#${STORE_WRAPPER}`, doc.tokens.style)}
+${storeCss(doc.css)}
 ${preloader ? preloaderCss() : ""}`,
     bodyHtml: `${preloader}<div id="${STORE_WRAPPER}">${html}</div>`,
     widgets,
@@ -2581,6 +2611,7 @@ ${googleFontsLink(doc.tokens.googleFonts)}
 <style>${tokenCss(doc.tokens)}
 ${tweaksCss(doc.tweaks)}
 ${shellCss("body", doc.tokens.style)}
+${storeCss(doc.css)}
 body{margin:0}</style>
 </head>
 <body>

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getActiveBusinessId } from "@/lib/get-active-business-id";
-import type { DesignRef } from "@/lib/orbit-design-generate";
+import { runWholeStoreBuild, type DesignRef } from "@/lib/orbit-design-generate";
 import { runDesignEdit } from "@/lib/design-ops";
 import { screenshotSite, firstSiteUrl } from "@/lib/screenshot";
 
@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
   const businessId = await getActiveBusinessId();
   if (!businessId) return NextResponse.json({ error: "No active business." }, { status: 400 });
 
-  const { message, images } = (await req.json()) as { message?: string; images?: string[] };
+  const { message, images, fullBuild } = (await req.json()) as { message?: string; images?: string[]; fullBuild?: boolean };
   if (!message || !message.trim()) return NextResponse.json({ error: "Say what you'd like to change." }, { status: 400 });
 
   const refImages: DesignRef[] = Array.isArray(images)
@@ -43,6 +43,9 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const result = await runDesignEdit(businessId, message.trim().slice(0, 4000), { images: refImages, siteUrl, siteHint });
+  // The opening brief (after the design questions) is always a whole-store build, however it's worded.
+  const refs = { images: refImages, siteUrl, siteHint };
+  const text = message.trim().slice(0, 4000);
+  const result = fullBuild ? await runWholeStoreBuild(businessId, text, refs) : await runDesignEdit(businessId, text, refs);
   return NextResponse.json(result);
 }

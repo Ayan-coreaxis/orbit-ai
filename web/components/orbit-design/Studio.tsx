@@ -198,7 +198,7 @@ export function Studio({
       const res = await fetch("/api/orbit-design/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: message || "Match this reference.", images }),
+        body: JSON.stringify({ message: message || "Match this reference.", images, fullBuild: forceHeavy }),
       });
       const data = await res.json();
       const failed = !!data.error || !data.doc;
