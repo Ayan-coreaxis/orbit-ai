@@ -31,6 +31,8 @@ export interface StoreAgentOpts {
   /** the site so far; with `edit` the agent changes it instead of building a new one */
   site?: StoreSite;
   edit?: boolean;
+  /** `site` is a half-finished build: finish it instead of starting over */
+  resume?: boolean;
   references?: AgentRef[];
   budgetUsd: number;
   maxTurns?: number;
@@ -121,7 +123,7 @@ Libraries on this server (nothing else loads):
 
 # Order of work
 1. Decide the art direction and the page list. Find and look at photos. 2. Write site.json, site.css, site.js and pages/home.html; screenshot and get the home page right. 3. Write the other pages and the five shop pages. 4. Look at every page at desktop and phone width; add to the bag, open it, open the phone menu, play the splash, and look at cart, checkout, login and thanks at both widths (they open with two products in the bag). 5. Fix, then stop.
-Be economical: several tool calls in one turn, "both" viewports, edit_file for fixes instead of rewriting files. The platform runs an automatic check on every page when you finish and sends you anything it finds.
+Be quick and economical: at most two rounds of photo searching, with all the searches in one turn; write several files in one turn; several tool calls in one turn, "both" viewports, edit_file for fixes instead of rewriting files. The platform runs an automatic check on every page when you finish and sends you anything it finds.
 Never invent reviews, ratings, customer numbers, press, or policies the brief doesn't give. Every photo must be one you have looked at and judged right for this shop. Avoid close-ups of identifiable faces. Write real copy for this shop, in the language the seller uses for their customers (English unless told otherwise).`;
 
 const PHOTO_HOSTS = /^https:\/\/(images\.unsplash\.com|images\.pexels\.com|cdn\.stocksnap\.io|images\.rawpixel\.com|live\.staticflickr\.com|upload\.wikimedia\.org)\//;
@@ -178,7 +180,7 @@ async function searchPhotos(query: string): Promise<string[]> {
 
 /** One browser for the whole run; answers the store's own origin from memory, everything else must be public. */
 class Viewer {
-  private browser: Browser | null = null;
+  private browser: Promise<Browser> | null = null;
   shots = 0;
   constructor(
     private site: () => StoreSite,
@@ -187,8 +189,8 @@ class Viewer {
 
   private async open(mobile: boolean): Promise<{ ctx: BrowserContext; page: Page; errors: string[] }> {
     const { chromium } = await import("playwright");
-    this.browser ??= await chromium.launch({ args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"] });
-    const ctx = await this.browser.newContext({ viewport: mobile ? { width: 390, height: 844 } : { width: 1440, height: 900 }, isMobile: mobile, hasTouch: mobile });
+    this.browser ??= chromium.launch({ args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"] });
+    const ctx = await (await this.browser).newContext({ viewport: mobile ? { width: 390, height: 844 } : { width: 1440, height: 900 }, isMobile: mobile, hasTouch: mobile });
     const page = await ctx.newPage();
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(String(e).slice(0, 200)));
@@ -367,7 +369,7 @@ class Viewer {
   }
 
   async close() {
-    await this.browser?.close().catch(() => {});
+    await (await this.browser?.catch(() => null))?.close().catch(() => {});
   }
 }
 
@@ -382,11 +384,28 @@ const SAY: Record<string, (i: Record<string, unknown>) => string> = {
 };
 
 function storeFacts(d: SiteData): string {
-  const list = d.products.slice(0, 60).map((p) => `- ${p.name} (id ${p.id}) ${p.price} ${d.store.currency.toUpperCase()}${p.category ? ` · ${p.category}` : ""}${p.image ? " · has photo" : " · NO PHOTO"}${p.variants.length ? ` · variants: ${p.variants.map((v) => v.label).slice(0, 8).join(", ")}` : ""}${p.stock <= 0 ? " · sold out" : ""}${p.description ? ` — ${p.description.replace(/<[^>]+>/g, " ").slice(0, 120)}` : ""}`);
-  return `STORE FACTS\nName: ${d.store.name}\nCurrency: ${d.store.currency}\nContact on the store: ${[d.store.email, d.store.phone, d.store.address].filter(Boolean).join(" · ") || "none yet"}\nSocials: ${Object.entries(d.store.socials).map(([k, v]) => `${k} ${v}`).join(", ") || "none"}\n${(d.media ?? []).length ? `THE SELLER'S OWN PHOTOS (use these before any stock photo; look at them with check_photos):
-${d.media!.map((m) => `- ${m.url} — ${m.name}`).join("
-")}
-` : ""}Products in ORBIT.products${list.length ? ` (${d.products.length}):\n${list.join("\n")}` : ": none yet"}`;
+  const list = d.products.slice(0, 60).map((p) => `- ${p.name} (id ${p.id}) ${p.price} ${d.store.currency.toUpperCase()}${p.category ? ` · ${p.category}` : ""}${p.image ? ` · photo ${p.image}` : " · NO PHOTO"}${p.variants.length ? ` · variants: ${p.variants.map((v) => v.label).slice(0, 8).join(", ")}` : ""}${p.stock <= 0 ? " · sold out" : ""}${p.description ? ` — ${p.description.replace(/<[^>]+>/g, " ").slice(0, 120)}` : ""}`);
+  const media = (d.media ?? []).map((m) => `- ${m.url} — ${m.name}`);
+  return [
+    "STORE FACTS",
+    `Name: ${d.store.name}`,
+    `Currency: ${d.store.currency}`,
+    `Contact on the store: ${[d.store.email, d.store.phone, d.store.address].filter(Boolean).join(" · ") || "none yet"}`,
+    `Socials: ${Object.entries(d.store.socials).map(([k, v]) => `${k} ${v}`).join(", ") || "none"}`,
+    ...(media.length ? ["THE SELLER'S OWN PHOTOS (use these before any stock photo; look at them with check_photos):", ...media] : []),
+    list.length ? `Products in ORBIT.products (${d.products.length}); check_photos can show you their photos:` : "Products in ORBIT.products: none yet",
+    ...list,
+  ].join("\n");
+}
+
+/** The automatic check on its own (no model). */
+export async function checkSite(site: StoreSite, data: SiteData): Promise<string[]> {
+  const v = new Viewer(() => site, data);
+  try {
+    return await v.check();
+  } finally {
+    await v.close();
+  }
 }
 
 export async function runStoreAgent(opts: StoreAgentOpts): Promise<StoreAgentResult> {
@@ -470,7 +489,9 @@ export async function runStoreAgent(opts: StoreAgentOpts): Promise<StoreAgentRes
   }
 
   const files = Object.entries(site.files).map(([n, b]) => `- ${n} (${b.length} chars)`).join("\n");
-  const task = opts.edit
+  const task = opts.resume
+    ? `${opts.brief}\n\nYOU HAVE ALREADY STARTED THIS STORE and were interrupted. These files exist:\n${files}\nDo not start over. Read what you need (site.json and site.css first), keep the design, write whatever is still missing, look at each page, fix what is wrong, and finish.`
+    : opts.edit
     ? `THE STORE IS ALREADY BUILT. Make exactly the change the seller asks for below, in the store's existing style, and leave everything else alone. Read only what you need (read_file with find), edit, look at the result at both widths, and stop. Files:\n${files}\n\nTHE SELLER SAYS:\n${opts.brief}`
     : opts.brief;
   const messages: Anthropic.MessageParam[] = [
@@ -522,11 +543,19 @@ export async function runStoreAgent(opts: StoreAgentOpts): Promise<StoreAgentRes
         continue;
       }
       const results: Anthropic.ToolResultBlockParam[] = [];
-      for (const call of calls) {
+      const runCall = async (call: Anthropic.ToolUseBlock): Promise<Anthropic.ToolResultBlockParam> => {
         const inp = (call.input ?? {}) as Record<string, unknown>;
         await opts.progress?.(SAY[call.name]?.(inp) ?? call.name);
         const r = await run(call.name, inp).catch((e) => ({ content: [text(`Failed: ${String(e).slice(0, 200)}`)], isError: true }));
-        results.push({ type: "tool_result", tool_use_id: call.id, content: r.content, is_error: r.isError });
+        return { type: "tool_result", tool_use_id: call.id, content: r.content, is_error: r.isError };
+      };
+      // looking is done side by side, writing strictly in order
+      const isLook = (n: string) => n === "search_photos" || n === "check_photos" || n === "screenshot" || n === "read_file";
+      for (let k = 0; k < calls.length; ) {
+        let end = k + 1;
+        if (isLook(calls[k].name)) while (end < calls.length && end - k < 5 && isLook(calls[end].name)) end++;
+        results.push(...(await Promise.all(calls.slice(k, end).map(runCall))));
+        k = end;
       }
       if (cost >= opts.budgetUsd) {
         issues = [...lintSite(site, ids), ...(await viewer.check())];

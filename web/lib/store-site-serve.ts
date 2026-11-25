@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { composePage, siteHeaders, type StoreSite } from "@/lib/store-site";
+import { composePage, siteEdits, siteHeaders, type StoreSite } from "@/lib/store-site";
 import { mediaOrigin, siteData, siteOrder } from "@/lib/store-site-data";
 
 /** The address the shopper's browser is really using (a seller's own domain sits behind a proxy). */
@@ -19,7 +19,34 @@ export async function serveSite(req: Request, businessId: string, site: StoreSit
   const orderId = slug === "thanks" && !preview ? q.get("order") : null;
   const order = orderId ? await siteOrder(businessId, orderId) : null;
   const origin = requestOrigin(req);
-  const html = composePage(site, { slug, productId, order, data, origin, mediaOrigin: mediaOrigin(), preview, firstVisit: q.get("seen") !== "1" });
+  const html = composePage(site, { slug, productId, order, data, origin, mediaOrigin: mediaOrigin(), preview, next: q.get("next"), firstVisit: q.get("seen") !== "1" });
   if (!html) return new NextResponse("Not found", { status: 404 });
   return new NextResponse(html, { headers: siteHeaders(origin, mediaOrigin()) });
+}
+
+const clean = (x: string) =>
+  x
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&#39;|&rsquo;/g, "'")
+    .replace(/&quot;/g, '"')
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&mdash;/g, "—")
+    .replace(/\s+/g, " ")
+    .trim();
+
+/** The words of a page (with the seller's own edits), for search engines: headings and paragraphs, in order. */
+export function pageWords(site: StoreSite, slug: string): { tag: "h1" | "h2" | "p"; text: string }[] {
+  const html = (site.files[`pages/${slug}.html`] ?? "").replace(/<(script|style|noscript|svg)\b[\s\S]*?<\/\1>/gi, "");
+  const edits = new Map<string, string>();
+  for (const e of siteEdits(site)) if (e.kind === "text" && (e.page === "*" || e.page === slug)) edits.set(e.from, e.to);
+  const out: { tag: "h1" | "h2" | "p"; text: string }[] = [];
+  for (const m of html.matchAll(/<(h1|h2|h3|p|li|blockquote)\b[^>]*>([\s\S]*?)<\/\1>/gi)) {
+    const t = clean(m[2]);
+    const text = edits.get(t) ?? t;
+    if (text.length > 1 && !out.some((x) => x.text === text)) out.push({ tag: /h1/i.test(m[1]) ? "h1" : /h[23]/i.test(m[1]) ? "h2" : "p", text: text.slice(0, 600) });
+  }
+  return out.slice(0, 80);
 }

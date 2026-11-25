@@ -222,7 +222,7 @@ export function SiteFrame({
 
 /** The live store: full-window frame, with real addresses and back/forward. */
 export function LiveSite({ businessId, storeName, slug, productId, orderId = null, pages, products, bg }: { businessId: string; storeName: string; slug: string; productId: string | null; orderId?: string | null; pages: string[]; products: SiteProduct[]; bg: string }) {
-  const [at, setAt] = useState({ slug, productId, orderId, seen: false });
+  const [at, setAt] = useState({ slug, productId, orderId, next: "", seen: false });
   const base = `/store/${businessId}`;
 
   useEffect(() => {
@@ -232,7 +232,7 @@ export function LiveSite({ businessId, storeName, slug, productId, orderId = nul
       const id = /^\/product\/([A-Za-z0-9_-]+)/.exec(path)?.[1] ?? null;
       const order = /^\/order\/([A-Za-z0-9_-]+)/.exec(path)?.[1] ?? null;
       const sys = ({ "/cart": "cart", "/checkout": "checkout", "/account": "account", "/account/login": "login" } as Record<string, string>)[path];
-      setAt({ slug: id ? "product" : order ? "thanks" : (sys ?? p ?? "home"), productId: id, orderId: order, seen: true });
+      setAt({ slug: id ? "product" : order ? "thanks" : (sys ?? p ?? "home"), productId: id, orderId: order, next: "", seen: true });
     }
     window.addEventListener("popstate", read);
     return () => window.removeEventListener("popstate", read);
@@ -249,7 +249,7 @@ export function LiveSite({ businessId, storeName, slug, productId, orderId = nul
       const url = order ? `${base}/order/${order}` : to === "home" ? base : to === "product" && id ? `${base}/product/${id}` : to === "login" ? `${base}/account/login` : isSystemPage(to) ? `${base}/${to}` : `${base}/p/${to}`;
       if (order) return leave(url); // the server settles the order (pixel, payment) before it is shown
       history.pushState(null, "", url);
-      setAt({ slug: to, productId: to === "product" ? id : null, orderId: null, seen: true });
+      setAt({ slug: to, productId: to === "product" ? id : null, orderId: null, next: to === "login" && id === "checkout" ? "checkout" : "", seen: true });
     },
     [base, pages],
   );
@@ -257,6 +257,7 @@ export function LiveSite({ businessId, storeName, slug, productId, orderId = nul
   const q = new URLSearchParams({ page: at.slug });
   if (at.productId) q.set("product", at.productId);
   if (at.orderId) q.set("order", at.orderId);
+  if (at.next) q.set("next", at.next);
   if (at.seen) q.set("seen", "1");
   return (
     <div style={{ position: "fixed", inset: 0, background: bg }}>

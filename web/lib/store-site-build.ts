@@ -1,6 +1,8 @@
 /** Running the store agent for a seller: one job at a time, saved as it goes, with undo and publish. */
 import { randomUUID } from "node:crypto";
+import sharp from "sharp";
 import { prisma } from "@/lib/prisma";
+import { putFile, readStoredFile } from "@/lib/storage";
 import { runStoreAgent, STORE_AGENT_MODEL, type AgentRef, type StoreAgentResult } from "@/lib/store-agent";
 import { loadDoc } from "@/lib/orbit-design-generate";
 import { defaultDoc, type OrbitDesignDoc } from "@/lib/orbit-design";
@@ -35,9 +37,10 @@ async function keepVersion(businessId: string, site: StoreSite, note: string) {
   if (old.length) await prisma.storeSiteVersion.deleteMany({ where: { id: { in: old.map((o) => o.id) } } });
 }
 
-export async function runBuild(businessId: string, b: SiteBuild, brief: string, references: AgentRef[]): Promise<{ reply: string; error?: string }> {
+export async function runBuild(businessId: string, b: SiteBuild, brief: string, references: AgentRef[], resumeFrom: StoreSite | null = null): Promise<{ reply: string; error?: string }> {
   const edit = b.kind === "edit";
   const before = (await loadSite(businessId)).draft;
+  b.brief = brief.slice(0, 14000);
   let stop = false;
   // Beat while a long model call is in flight, and pick up the seller's Stop.
   let chain: Promise<unknown> = Promise.resolve();
@@ -80,8 +83,9 @@ export async function runBuild(businessId: string, b: SiteBuild, brief: string, 
     const result = await runStoreAgent({
       brief,
       data,
-      site: edit ? (before ?? undefined) : undefined,
+      site: resumeFrom ?? (edit ? (before ?? undefined) : undefined),
       edit,
+      resume: !!resumeFrom,
       references,
       budgetUsd: budget,
       progress: async (line) => {
@@ -96,7 +100,9 @@ export async function runBuild(businessId: string, b: SiteBuild, brief: string, 
       },
       // A new build shows itself as it grows; an edit only replaces the draft once it is finished.
       onSite: async (site) => {
-        if (!edit && !before && owns()) await prisma.storeDesign.update({ where: { businessId }, data: { site: JSON.stringify(site) } });
+        if (!owns()) return;
+        const json = JSON.stringify(site);
+        await prisma.storeDesign.update({ where: { businessId }, data: { siteWip: json, ...(!edit && !before ? { site: json } : {}) } });
       },
       shouldStop: () => stop,
     });
@@ -104,14 +110,14 @@ export async function runBuild(businessId: string, b: SiteBuild, brief: string, 
     const usable = !!result.site.files["pages/home.html"];
     const hardFaults = lintSite(result.site, data.products.map((p) => p.id)).filter((x) => /cut off|home\.html is missing|site\.css is missing/.test(x));
     const changed = JSON.stringify(result.site) !== JSON.stringify(before ?? { files: {} });
-    const keep = usable && changed && owns() && !(edit && (hardFaults.length > 0 || result.stopped === "stopped"));
+    const keep = usable && changed && owns() && !(before && !edit && result.stopped !== "done") && !(edit && (hardFaults.length > 0 || result.stopped === "stopped"));
     if (keep) {
       if (before) await keepVersion(businessId, before, edit ? brief : "Before the new build");
-      await prisma.storeDesign.update({ where: { businessId }, data: { site: JSON.stringify(result.site), doc: JSON.stringify(await shellDoc(businessId, result.site)) } });
-    }
+      await prisma.storeDesign.update({ where: { businessId }, data: { site: JSON.stringify(result.site), ...(result.stopped === "done" ? { siteWip: null } : {}) } });
+    } else if (owns() && result.stopped === "done") await prisma.storeDesign.update({ where: { businessId }, data: { siteWip: null } });
     const open = result.issues.length ? ` ${result.issues.length} small thing${result.issues.length === 1 ? "" : "s"} still need attention: ${result.issues.slice(0, 3).join("; ")}.` : "";
     if (result.stopped === "stopped") {
-      await finish("stopped", keep ? "Stopped. What was built so far is in the preview." : "Stopped. Nothing was changed.", result);
+      await finish("stopped", keep ? "Stopped. What was built so far is in the preview. Press Continue to finish it." : "Stopped. Your store hasn't changed. Press Continue to finish the work.", result);
       return { reply: "Stopped." };
     }
     if (!usable || (edit && !changed) || (edit && hardFaults.length)) {
@@ -119,18 +125,63 @@ export async function runBuild(businessId: string, b: SiteBuild, brief: string, 
       await finish("failed", reply, result);
       return { reply, error: reply };
     }
-    const cut = result.stopped === "budget" || result.stopped === "turns" || result.stopped === "max_tokens" ? " I reached the working limit, so check the pages and tell me what to finish." : "";
-    const reply = (result.summary || (edit ? "Done. The change is in the preview." : "Your store is ready in the preview.")) + cut + open;
-    await finish("done", reply, result);
+    const cut = result.stopped === "budget" || result.stopped === "turns" || result.stopped === "max_tokens" ? " I reached the working limit before finishing. Press Continue to finish it." : "";
+    const limit = cut !== "";
+    const reply = (result.summary || (limit && !keep ? "" : edit ? "Done. The change is in the preview." : "Your store is ready in the preview.")) + cut + (limit ? "" : open);
+    await finish(limit ? "stopped" : "done", reply.trim(), result);
     return { reply };
   } catch (e) {
     console.error("[store-agent]", e);
-    const reply = "The build stopped because of a technical problem. Your last version is safe; please try again.";
+    const reply = "The work stopped because of a technical problem. Your last version is safe. Press Continue to carry on.";
     await finish("failed", reply).catch(() => {});
     return { reply, error: reply };
   } finally {
     clearInterval(timer);
   }
+}
+
+/** Carry on with an interrupted, stopped or cut-off build. Null when there is nothing to continue. */
+export async function continueBuild(businessId: string): Promise<(() => Promise<unknown>) | null> {
+  const { build, wip } = await loadSite(businessId);
+  if (!build || !wip || buildRunning(build) || build.status === "done") return null;
+  const b = await startBuild(businessId, build.kind);
+  if (!b) return null;
+  b.refs = build.refs;
+  b.log = ["Carrying on from where it stopped"];
+  return async () => {
+    const refs: AgentRef[] = [];
+    for (const u of build.refs ?? []) {
+      const buf = await readStoredFile(u).catch(() => null);
+      if (buf) refs.push({ mediaType: "image/webp", data: buf.toString("base64") });
+    }
+    await runBuild(businessId, b, build.brief ?? "Finish this store.", refs, wip);
+  };
+}
+
+/** Keep the seller's reference pictures so a continued build can still see them. */
+export async function keepRefs(businessId: string, b: SiteBuild, refs: AgentRef[]) {
+  const urls: string[] = [];
+  for (const r of refs.slice(0, 8)) {
+    try {
+      const webp = await sharp(Buffer.from(r.data, "base64")).resize({ width: 1600, height: 1600, fit: "inside", withoutEnlargement: true }).webp({ quality: 80 }).toBuffer();
+      urls.push(await putFile(`uploads/${businessId}/refs/${randomUUID()}.webp`, webp, "image/webp"));
+    } catch {
+      /* the build itself still has the picture */
+    }
+  }
+  b.refs = urls;
+}
+
+/** Throw the unpublished new design away and keep the older, live one. */
+export async function discardSite(businessId: string): Promise<string | null> {
+  const { live, build } = await loadSite(businessId);
+  if (live) return "This store already runs on the new design.";
+  if (buildRunning(build)) return "Wait for the current work to finish, or stop it.";
+  await prisma.$transaction([
+    prisma.storeSiteVersion.deleteMany({ where: { businessId } }),
+    prisma.storeDesign.update({ where: { businessId }, data: { site: null, siteWip: null, siteBuild: null } }),
+  ]);
+  return null;
 }
 
 /** One edit, start to finish (the Orchestrator's route). */
@@ -278,7 +329,7 @@ export async function saveCustomise(businessId: string, body: { menu?: unknown; 
   }
   await keepVersion(businessId, draft, "Your settings");
   const next: StoreSite = { files: { ...draft.files, "site.json": JSON.stringify(json) } };
-  await prisma.storeDesign.update({ where: { businessId }, data: { site: JSON.stringify(next), doc: JSON.stringify(await shellDoc(businessId, next)) } });
+  await prisma.storeDesign.update({ where: { businessId }, data: { site: JSON.stringify(next) } });
   return null;
 }
 
@@ -286,7 +337,7 @@ export async function undoSite(businessId: string): Promise<{ left: number } | n
   const v = await prisma.storeSiteVersion.findFirst({ where: { businessId }, orderBy: { createdAt: "desc" } });
   const site = parseSite(v?.site);
   if (!v || !site) return null;
-  await prisma.storeDesign.update({ where: { businessId }, data: { site: v.site, doc: JSON.stringify(await shellDoc(businessId, site)) } });
+  await prisma.storeDesign.update({ where: { businessId }, data: { site: v.site } });
   await prisma.storeSiteVersion.delete({ where: { id: v.id } });
   return { left: await prisma.storeSiteVersion.count({ where: { businessId } }) };
 }

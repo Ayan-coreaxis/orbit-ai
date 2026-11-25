@@ -13,6 +13,10 @@ export interface SiteState {
   lists: SiteList[];
   hidden: Extract<SiteEdit, { kind: "hide" }>[];
   published: boolean;
+  /** an unfinished build that can carry on */
+  canContinue: boolean;
+  /** the live store is still the older design */
+  legacy: boolean;
   dirty: boolean;
   undo: number;
   /** changes whenever the draft does — reloads the preview */
@@ -28,7 +32,7 @@ const hash = (s: string) => {
 };
 
 export async function siteState(businessId: string): Promise<SiteState> {
-  const [{ draft, build, published, dirty }, undo, turns, data] = await Promise.all([
+  const [{ draft, live, build, wip, published, dirty }, undo, turns, data] = await Promise.all([
     loadSite(businessId),
     prisma.storeSiteVersion.count({ where: { businessId } }),
     prisma.orbitDesignTurn.findMany({ where: { businessId }, orderBy: { createdAt: "desc" }, take: 40 }),
@@ -38,7 +42,7 @@ export async function siteState(businessId: string): Promise<SiteState> {
   return {
     has: !!draft?.files["pages/home.html"],
     running: buildRunning(build),
-    build,
+    build: build ? { ...build, brief: undefined, refs: undefined } : null,
     pages: m?.pages ?? [],
     shopPages: SYSTEM_PAGES,
     menu: m?.menu ?? [],
@@ -46,6 +50,8 @@ export async function siteState(businessId: string): Promise<SiteState> {
     lists: m?.lists ?? [],
     hidden: draft ? siteEdits(draft).filter((e): e is Extract<SiteEdit, { kind: "hide" }> => e.kind === "hide") : [],
     published,
+    canContinue: !!build && !!wip && !buildRunning(build) && build.status !== "done",
+    legacy: published && !live && !!draft,
     dirty,
     undo,
     rev: draft ? hash(JSON.stringify(draft)) : "0",

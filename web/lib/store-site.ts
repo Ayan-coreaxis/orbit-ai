@@ -87,6 +87,9 @@ export interface SiteBuild {
   startedAt: string;
   beatAt: string;
   costUsd: number;
+  /** what was asked, so an interrupted build can be continued */
+  brief?: string;
+  refs?: string[];
   stop?: boolean;
   summary?: string;
 }
@@ -273,7 +276,7 @@ addEventListener("click",function(e){
  if(m=/^#page:([a-z0-9-]+)/.exec(h)){e.preventDefault();O.go(m[1])}
  else if(m=/^#product:(.+)/.exec(h)){e.preventDefault();O.go("product",m[1])}
  else if(m=/^#order:(.+)/.exec(h)){e.preventDefault();O.go("order",m[1])}
- else if(m=/^#(cart|checkout|account|login)$/.exec(h)){e.preventDefault();O.go(m[1])}
+ else if(m=/^#(cart|checkout|account|login)(?::([a-z]+))?$/.exec(h)){e.preventDefault();O.go(m[1],m[2])}
  else if(embedded&&/^(https?:|mailto:|tel:)/.test(h)){e.preventDefault();window.open(h,"_blank","noopener")}
  else if(embedded&&!/^#/.test(h)&&!/^javascript:/i.test(h)){e.preventDefault()}
 },false);
@@ -318,6 +321,8 @@ export interface ComposeOpts {
   preview?: boolean;
   /** where uploaded media is served from, when it isn't `origin` */
   mediaOrigin?: string;
+  /** where to go after signing in */
+  next?: string | null;
   /** false after the first page of a visit — a splash plays once */
   firstVisit?: boolean;
   /** put two products in the bag (the automatic test) */
@@ -370,7 +375,7 @@ export function composePage(site: StoreSite, o: ComposeOpts): string | null {
     lists: Object.fromEntries(m.lists.map((x) => [x.key, x.items])),
     checkout: { fields: o.data.checkoutFields ?? [] },
     order: o.order ?? null,
-    page: { slug: o.slug, productId: o.productId ?? null },
+    page: { slug: o.slug, productId: o.productId ?? null, next: o.next === "checkout" ? "checkout" : null },
     hasPage: Object.fromEntries(m.pages.map((p) => [p.slug, true])),
     preview: !!o.preview,
     firstVisit: o.firstVisit !== false && !isSystemPage(o.slug),

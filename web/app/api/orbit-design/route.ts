@@ -227,7 +227,7 @@ export async function DELETE() {
     prisma.storeDesign.upsert({
       where: { businessId },
       create: { businessId, doc: JSON.stringify(fresh), published: false },
-      update: { doc: JSON.stringify(fresh), wired: null, wiredAt: null, backend: null, backendWiredAt: null, published: false, site: null, siteLive: null, siteBuild: null },
+      update: { doc: JSON.stringify(fresh), wired: null, wiredAt: null, backend: null, backendWiredAt: null, published: false, site: null, siteLive: null, siteWip: null, siteBuild: null },
     }),
   ]);
 

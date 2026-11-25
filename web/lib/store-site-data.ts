@@ -96,8 +96,8 @@ export async function siteOrder(businessId: string, orderId: string): Promise<Si
 }
 
 export async function loadSite(businessId: string) {
-  const d = await prisma.storeDesign.findUnique({ where: { businessId }, select: { site: true, siteLive: true, siteBuild: true, published: true } });
-  return { draft: parseSite(d?.site), live: parseSite(d?.siteLive), build: parseBuild(d?.siteBuild), published: d?.published ?? false, dirty: !!d?.site && d.site !== d.siteLive };
+  const d = await prisma.storeDesign.findUnique({ where: { businessId }, select: { site: true, siteLive: true, siteBuild: true, siteWip: true, published: true } });
+  return { draft: parseSite(d?.site), live: parseSite(d?.siteLive), wip: parseSite(d?.siteWip), build: parseBuild(d?.siteBuild), published: d?.published ?? false, dirty: !!d?.site && d.site !== d.siteLive };
 }
 
 /** Where uploaded media is served from, when it isn't this server. */

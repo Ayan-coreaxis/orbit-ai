@@ -625,6 +625,11 @@ export function Studio({
         </div>
 
         <div className="flex items-center gap-2">
+          {agentBuilder && hasDesign && (
+            <button onClick={() => { setMobileTab("preview"); setIntake({ brief: `Redesign my store, ${doc.storeName}. ${doc.tagline}`, images: [] }); }} disabled={sending} title="Design the store again with the new designer. Your live store stays as it is until you publish." className="flex items-center gap-1.5 rounded-lg border border-accent/40 bg-accent-soft px-2.5 py-2 text-[12.5px] font-medium text-accent-strong disabled:opacity-60">
+              <Sparkles className="h-3.5 w-3.5" /> New designer
+            </button>
+          )}
           <button onClick={extractFromSite} className="hidden items-center gap-1.5 rounded-lg border border-border px-2.5 py-2 text-[12.5px] font-medium text-text-dim hover:text-text sm:flex">
             <Globe className="h-3.5 w-3.5" /> From my site
           </button>

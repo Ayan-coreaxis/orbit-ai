@@ -15,7 +15,7 @@ const btn = "flex items-center gap-1.5 rounded-lg border border-border px-2.5 py
 /** Orbit Design for an agent-built store: chat on the left, the real store on the right. */
 export function SiteStudio({ businessId, storeName, initial }: { businessId: string; storeName: string; initial: SiteState }) {
   const [st, setSt] = useState(initial);
-  const [at, setAt] = useState<{ slug: string; productId: string | null }>({ slug: "home", productId: null });
+  const [at, setAt] = useState<{ slug: string; productId: string | null; next?: string }>({ slug: "home", productId: null });
   const [view, setView] = useState<"desktop" | "mobile">("desktop");
   const [tab, setTab] = useState<"chat" | "preview">("chat");
   const [input, setInput] = useState("");
@@ -109,7 +109,7 @@ export function SiteStudio({ businessId, storeName, initial }: { businessId: str
     (to: string, id: string | null) => {
       if (to === "account-more") return flash("Addresses, returns and rewards open on your live store.");
       if (to === "order") flash("This is a demo order. Nothing was saved.");
-      setAt({ slug: to === "order" ? "thanks" : to, productId: to === "product" ? id : null });
+      setAt({ slug: to === "order" ? "thanks" : to, productId: to === "product" ? id : null, next: to === "login" && id === "checkout" ? "checkout" : undefined });
     },
     [flash],
   );
@@ -117,6 +117,7 @@ export function SiteStudio({ businessId, storeName, initial }: { businessId: str
   const slug = [...st.pages, ...st.shopPages].some((p) => p.slug === at.slug) ? at.slug : "home";
   const q = new URLSearchParams({ page: slug, rev: st.rev });
   if (at.productId && slug === "product") q.set("product", at.productId);
+  if (at.next && slug === "login") q.set("next", at.next);
   const b = st.build;
   const live = `/store/${businessId}${slug === "home" || slug === "product" || slug === "thanks" ? "" : slug === "login" ? "/account/login" : st.shopPages.some((p) => p.slug === slug) ? `/${slug}` : `/p/${slug}`}`;
 
@@ -137,6 +138,11 @@ export function SiteStudio({ businessId, storeName, initial }: { businessId: str
           <button className={`${btn} hover:text-bad`} onClick={startOver} disabled={busy || st.running} aria-label="Start over">
             <Trash2 className="h-3.5 w-3.5" /> <span className="hidden md:inline">Start over</span>
           </button>
+          {st.legacy && (
+            <button className={btn} onClick={async () => { if (confirm("Go back to your previous design? The new one is deleted. Your live store hasn't changed.") && (await call("PATCH", { action: "discard" }))) location.reload(); }} disabled={busy || st.running}>
+              Keep old design
+            </button>
+          )}
           {st.published && (
             <button className={btn} onClick={() => publish(false)} disabled={busy}>
               Take offline
@@ -194,7 +200,12 @@ export function SiteStudio({ businessId, storeName, initial }: { businessId: str
                 </ul>
               </div>
             )}
-            {!st.running && b?.status === "running" && <p className="rounded-2xl border border-border bg-panel p-4 text-[14px]">The last change was interrupted by a restart. What was finished is in the preview; send it again to continue.</p>}
+            {st.canContinue && (
+              <div className="rounded-2xl border border-border bg-panel p-4 text-[14px]">
+                <p>{b?.status === "running" ? "The work was interrupted." : "The store isn't finished yet."} It can carry on from where it stopped.</p>
+                <button type="button" onClick={() => call("PATCH", { action: "continue" })} disabled={busy} className="btn-primary mt-3 !px-4 !py-2 text-[13.5px] disabled:opacity-50">Continue</button>
+              </div>
+            )}
           </div>
           <form
             className="border-t border-border p-3"

@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getActiveBusinessId } from "@/lib/get-active-business-id";
 import { siteState } from "@/lib/store-site-state";
 import { assertUnderUsageCap, UsageCapExceededError } from "@/lib/usage-limit";
-import { runBuild, saveCustomise, saveEdits, startBuild, undoSite } from "@/lib/store-site-build";
+import { continueBuild, discardSite, keepRefs, runBuild, saveCustomise, saveEdits, startBuild, undoSite } from "@/lib/store-site-build";
 import { loadSite } from "@/lib/store-site-data";
 import { buildRunning } from "@/lib/store-site";
 import { screenshotSite, firstSiteUrl } from "@/lib/screenshot";
@@ -44,6 +44,7 @@ export async function POST(req: NextRequest) {
   if (!b) return NextResponse.json({ error: "Your store is being worked on right now. Wait for it to finish, or stop it." }, { status: 409 });
   await prisma.orbitDesignTurn.create({ data: { businessId, role: "user", content: message || "Follow this picture." } });
   after(async () => {
+    await keepRefs(businessId, b, refs);
     const url = firstSiteUrl(message);
     const shot = url ? await screenshotSite(url).catch(() => null) : null;
     if (shot) refs.push({ data: shot.data, mediaType: shot.mediaType as AgentRef["mediaType"] });
@@ -65,6 +66,19 @@ export async function PATCH(req: NextRequest) {
   } else if (action === "undo") {
     if (buildRunning(build)) return NextResponse.json({ error: "Wait for the current change to finish." }, { status: 409 });
     if (!(await undoSite(businessId))) return NextResponse.json({ error: "Nothing to undo." }, { status: 404 });
+  } else if (action === "continue") {
+    try {
+      await assertUnderUsageCap(businessId);
+    } catch (e) {
+      if (e instanceof UsageCapExceededError) return NextResponse.json({ error: e.message }, { status: 402 });
+      throw e;
+    }
+    const go = await continueBuild(businessId);
+    if (!go) return NextResponse.json({ error: "There is nothing to continue." }, { status: 409 });
+    after(go);
+  } else if (action === "discard") {
+    const error = await discardSite(businessId);
+    if (error) return NextResponse.json({ error }, { status: 409 });
   } else if (action === "edit" || action === "customise") {
     const error = action === "edit" ? await saveEdits(businessId, body.edits) : await saveCustomise(businessId, body);
     if (error) return NextResponse.json({ error }, { status: 400 });

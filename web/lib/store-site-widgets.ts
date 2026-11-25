@@ -96,7 +96,7 @@ W.cart=function(box){
 };
 
 W.checkout=function(box){
- var st={code:"",gift:"",points:0,quote:null,pay:"cod",busy:false,loy:null},drawn=false,form,sum,lines=[];
+ var st={code:"",gift:"",points:0,quote:null,pay:"cod",busy:false,loy:null},drawn=false,form,sum,foot,btn,note2,lines=[];
  function data(){var d={};if(form)new FormData(form).forEach(function(v,k){d[k]=String(v).trim()});return d}
  function quote(note){var d=data();return O.api("quote",{code:st.code,giftCardCode:st.gift,phone:d.phone||"",city:d.city||"",points:st.points}).then(function(q){if(q&&q.ok)st.quote=q;summary(note);return q})}
  function summary(note){
@@ -108,8 +108,9 @@ W.checkout=function(box){
   if(st.loy&&st.loy.enabled&&st.loy.signedIn&&st.loy.points>=st.loy.minRedeem&&st.loy.points>0)sum.append(h("label",{cls:"ob-check"},h("input",{type:"checkbox",checked:st.points>0,onchange:function(e){st.points=e.target.checked?st.loy.points:0;quote()}}),"Use my "+st.loy.points+" points"));
   var minus=function(n){return n>0?"− "+O.money(n):null};
   rows(sum,[["Subtotal",O.money(q.subtotal)],["Discount",minus((q.discount||0)+(q.bundleDiscount||0))],["Gift card",minus(q.giftCardDiscount)],["Points",minus(q.loyaltyDiscount)],[q.taxLabel||"Tax",q.tax>0?O.money(q.tax):null],["Delivery",st.quote?(q.shipping>0?O.money(q.shipping):"Free"):"…"],["Total",O.money(q.total),1]]);
-  sum.append(h("button",{cls:"ob-btn ob-primary",type:"submit",form:"ob-checkout",disabled:st.busy,text:st.busy?"Placing your order…":"Place order"}));
-  sum.append(h("p",{cls:"ob-dim ob-note",text:st.pay==="cod"?"Cash on delivery: pay when it reaches you.":"You will be taken to a secure payment page."}));
+  /* the button is never rebuilt: a total that arrives mid-click must not swallow the click */
+  btn.disabled=st.busy;var bt=st.busy?"Placing your order…":"Place order";if(btn.textContent!==bt)btn.textContent=bt;
+  note2.textContent=st.pay==="cod"?"Cash on delivery: pay when it reaches you.":"You will be taken to a secure payment page.";
  }
  function apply(v){if(!v){st.code=st.gift="";quote();return}
   st.code=v;st.gift="";quote().then(function(q){if(q&&q.ok&&q.couponCode){summary("Applied: "+(q.couponLabel||v));return}
@@ -133,13 +134,13 @@ W.checkout=function(box){
   var contact=h("section",{cls:"ob-card"},h("h2",{cls:"ob-h",text:"Delivery details"}),h("p",{cls:"ob-dim ob-signin"}),field("Full name","name",{req:1,ac:"name"}),h("div",{cls:"ob-two"},field("Phone","phone",{req:1,type:"tel",im:"tel",ac:"tel",max:30}),field("Email","email",{type:"email",ac:"email"})),field("Address (house and street)","line1",{req:1,area:1,ac:"address-line1"}),h("div",{cls:"ob-two"},field("City","city",{req:1,ac:"address-level2",list:"ob-cities"}),field("Area","area",{})),field("Postal code","postal",{ac:"postal-code",max:20}),cities);
   (O.checkout.fields||[]).forEach(function(f){contact.append(f.type==="checkbox"?h("label",{cls:"ob-check"},h("input",{type:"checkbox",name:"cf_"+f.key}),f.label):field(f.label,"cf_"+f.key,{req:f.required,area:f.type==="textarea",max:500}))});
   var pay=h("section",{cls:"ob-card",style:"margin-top:20px"},h("h2",{cls:"ob-h",text:"Payment"}));
-  form.append(contact,pay);sum=h("aside",{cls:"ob-card ob-summary"});
-  box.replaceChildren(h("div",{cls:"ob-grid"},form,sum));summary();
+  form.append(contact,pay);sum=h("div",{});btn=h("button",{cls:"ob-btn ob-primary",type:"submit",form:"ob-checkout",text:"Place order"});note2=h("p",{cls:"ob-dim ob-note"});
+  box.replaceChildren(h("div",{cls:"ob-grid"},form,h("aside",{cls:"ob-card ob-summary"},sum,btn,note2)));summary();
   var NAMES={cod:"Cash on delivery",stripe:"Card",jazzcash:"JazzCash",easypaisa:"Easypaisa"};
   O.api("options").then(function(r){var list=(r&&r.options&&r.options.length)?r.options:["cod"];st.pay=list[0];list.forEach(function(k,i){pay.append(h("label",{cls:"ob-pay"},h("input",{type:"radio",name:"pay",value:k,checked:i===0,onchange:function(){st.pay=k;summary()}}),h("span",{text:NAMES[k]||k})))});summary()});
   O.api("cities").then(function(r){((r&&r.cities)||[]).forEach(function(c){cities.append(h("option",{value:c}))})});
   O.api("me").then(function(r){var c=r&&r.customer,slot=box.querySelector(".ob-signin");if(!slot)return;
-   if(!c){if(r&&r.methods&&r.methods.enabled!==false)slot.append("Have an account? ",h("a",{href:"#account",text:"Sign in",style:"color:inherit"}),". You can also order as a guest.");else slot.remove();return}
+   if(!c){if(r&&r.methods&&r.methods.enabled!==false)slot.append("Have an account? ",h("a",{href:"#login:checkout",text:"Sign in",style:"color:inherit"}),". You can also order as a guest.");else slot.remove();return}
    slot.textContent="Signed in as "+c.name;var set=function(k,v){if(v&&form.elements[k]&&!form.elements[k].value)form.elements[k].value=v};
    set("name",c.name);set("phone",c.phone);set("email",c.email);
    O.api("loyalty").then(function(l){st.loy=l;summary()});
@@ -153,7 +154,7 @@ W.checkout=function(box){
 
 W.login=function(box){
  O.api("me").then(function(r){
-  if(r.customer){go("account");return}
+  if(r.customer){go(O.page.next||"account");return}
   var mode=r.authMode||"none";if(mode==="none"){box.replaceChildren(h("div",{cls:"ob-card ob-narrow"},h("p",{text:"This store doesn't use customer accounts. You can order as a guest."}),h("a",{cls:"ob-btn",href:"#page:home",text:"Continue shopping"})));return}
   var tab="in",way=mode==="otp"?"otp":"password",step="form",phone="",name="";
   function draw(dev){
@@ -172,7 +173,7 @@ W.login=function(box){
    if(step==="code"){d.phone=phone;d.name=name}
    O.api(op,d).then(function(r){b.disabled=false;if(r.error||!r.ok){say(f,r.error||"That didn't work. Please try again.");return}
     if(way==="otp"&&step==="form"){phone=d.phone;name=d.name||"";step="code";draw(r.devCode);return}
-    go("account")})}
+    go(O.page.next||"account")})}
   draw();
  });
 };
