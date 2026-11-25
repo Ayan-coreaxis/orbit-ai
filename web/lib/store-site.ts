@@ -467,6 +467,6 @@ export function lintSite(site: StoreSite, productIds: string[] = []): string[] {
   const all = Object.entries(f).filter(([n]) => n.endsWith(".html") || n === "site.js").map(([, b]) => b).join("\n");
   if (!/["'`]#account["'`]/.test(all)) out.push('The header has no login link (href="#account").');
   if (!/["'`]#cart["'`]|ORBIT\.cart\./.test(all)) out.push('The header has no bag / cart link (href="#cart").');
-  if (f["site.js"] && !/ORBIT\.menu/.test(all)) out.push("The header menu must be rendered from ORBIT.menu so the seller can edit it.");
+  if (f["site.js"] && !/\.menu\b/.test(all)) out.push("The header menu must be rendered from ORBIT.menu so the seller can edit it.");
   return [...new Set(out)];
 }

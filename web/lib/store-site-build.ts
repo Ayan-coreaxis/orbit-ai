@@ -113,7 +113,7 @@ export async function runBuild(businessId: string, b: SiteBuild, brief: string, 
     const usable = !!result.site.files["pages/home.html"];
     const hardFaults = lintSite(result.site, data.products.map((p) => p.id)).filter((x) => /cut off|home\.html is missing|site\.css is missing/.test(x));
     const changed = JSON.stringify(result.site) !== JSON.stringify(before ?? { files: {} });
-    const keep = usable && changed && owns() && !(before && !edit && result.stopped !== "done") && !(edit && (hardFaults.length > 0 || result.stopped === "stopped"));
+    const keep = usable && changed && owns() && !(before && !edit && !resumeFrom && result.stopped !== "done") && !(edit && (hardFaults.length > 0 || result.stopped === "stopped"));
     if (keep) {
       if (before) await keepVersion(businessId, before, edit ? brief : "Before the new build");
       await prisma.storeDesign.update({ where: { businessId }, data: { site: JSON.stringify(result.site), ...(result.stopped === "done" ? { siteWip: null } : {}) } });
