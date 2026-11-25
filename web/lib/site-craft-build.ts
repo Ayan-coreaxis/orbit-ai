@@ -35,7 +35,7 @@ import {
   type TurnResult,
 } from "@/lib/orbit-design-generate";
 
-export function useSiteCraftBuilder(): boolean {
+export function siteCraftBuilderOn(): boolean {
   return (process.env.ORBIT_STORE_BUILDER || "site-craft").toLowerCase() !== "classic";
 }
 

@@ -29,7 +29,7 @@ import { DEFAULT_WIDGET_COPY, parseWidgetCopy, type WidgetCopyKey } from "@/lib/
 import { toStorefrontProducts } from "@/lib/storefront-products";
 import { DESIGN_SKILLS, ALWAYS_SKILLS, getSkill, skillCatalogue, skillsForBuilders } from "@/lib/design-skills";
 import { pickDirection, directionPrompt, type PickedDirection } from "@/lib/design-directions";
-import { runSiteCraftBuild, useSiteCraftBuilder } from "@/lib/site-craft-build";
+import { runSiteCraftBuild, siteCraftBuilderOn } from "@/lib/site-craft-build";
 import { STYLE_OPTIONS, normalizeStyle, describeStyle, mergeStyle } from "@/lib/design-style";
 
 /** Products as the storefront renders them — variant stock and "from" prices included, so the design QA and audit never see a variant product as sold out. */
@@ -506,7 +506,7 @@ export async function runDesignPlan(
     const msg = await anthropic.messages.create({
       model: MODEL,
       max_tokens: 2000,
-      system: useSiteCraftBuilder() ? INTAKE_SYSTEM : `You are Orbit Design, about to build a real seller's whole storefront. BEFORE building, ask ONLY the clarifying questions whose answers would genuinely change the design. If the brief already gives the pages, the visual direction (palette/fonts/mood) and the key content, return an EMPTY questions array — do not invent questions for a complete brief. When the brief IS vague, good candidates: brand wordmark, copy tone, catalogue size, visual direction / dark mode, imagery approach, what to prioritise for a first pass.
+      system: siteCraftBuilderOn() ? INTAKE_SYSTEM : `You are Orbit Design, about to build a real seller's whole storefront. BEFORE building, ask ONLY the clarifying questions whose answers would genuinely change the design. If the brief already gives the pages, the visual direction (palette/fonts/mood) and the key content, return an EMPTY questions array — do not invent questions for a complete brief. When the brief IS vague, good candidates: brand wordmark, copy tone, catalogue size, visual direction / dark mode, imagery approach, what to prioritise for a first pass.
 
 Make the questions feel like a sharp designer's intake form, not a quiz:
 - Each question gets a short 'why' line saying what the answer changes ("Sets the logo wordmark and product copy").
@@ -532,7 +532,7 @@ Never lecture about the seller's previous/existing brand; the brief is what matt
     const questions = Array.isArray(input.questions)
       ? input.questions
           .filter((q) => q && q.question && q.key)
-          .slice(0, useSiteCraftBuilder() ? 7 : 5)
+          .slice(0, siteCraftBuilderOn() ? 7 : 5)
           .map((q) => {
             const type = (["select", "toggle", "multi", "text"] as const).includes(q.type as never)
               ? (q.type as "select" | "toggle" | "multi" | "text")
@@ -2893,7 +2893,7 @@ export async function runWholeStoreBuild(businessId: string, message: string, re
   }
 
   // The simple builder: one prompt + the site-craft skill (ORBIT_STORE_BUILDER=classic for the old pipeline).
-  if (useSiteCraftBuilder()) return runSiteCraftBuild(businessId, message, { images: refs.images });
+  if (siteCraftBuilderOn()) return runSiteCraftBuild(businessId, message, { images: refs.images });
 
   const products: StorefrontProduct[] = toStorefrontProducts(business.products);
   const images = (refs.images ?? []).slice(0, 4);
