@@ -3,7 +3,8 @@ import { randomUUID } from "node:crypto";
 import sharp from "sharp";
 import { prisma } from "@/lib/prisma";
 import { putFile, readStoredFile } from "@/lib/storage";
-import type { ReferenceCapture } from "@/lib/reference-capture";
+import { captureReference, type ReferenceCapture } from "@/lib/reference-capture";
+import { firstSiteUrl } from "@/lib/screenshot";
 import { runStoreAgent, STORE_AGENT_MODEL, type AgentRef, type StoreAgentResult } from "@/lib/store-agent";
 import { loadDoc } from "@/lib/orbit-design-generate";
 import { defaultDoc, type OrbitDesignDoc } from "@/lib/orbit-design";
@@ -156,7 +157,9 @@ export async function continueBuild(businessId: string): Promise<(() => Promise<
       const buf = await readStoredFile(u).catch(() => null);
       if (buf) refs.push({ mediaType: "image/webp", data: buf.toString("base64") });
     }
-    await runBuild(businessId, b, build.brief ?? "Finish this store.", refs, wip);
+    const url = build.kind === "build" ? firstSiteUrl(build.brief ?? "") : null;
+    const reference = url ? await captureReference(url).catch(() => null) : null;
+    await runBuild(businessId, b, build.brief ?? "Finish this store.", refs, wip, reference);
   };
 }
 

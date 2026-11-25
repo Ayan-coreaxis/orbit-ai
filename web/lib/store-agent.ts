@@ -438,7 +438,6 @@ async function artDirector(viewer: Viewer, site: StoreSite, reference: Reference
       thinking: { type: "adaptive" },
       output_config: { effort: "medium" },
       tools: [CRITIC_TOOL],
-      tool_choice: { type: "tool", name: "verdict" },
       messages: [
         {
           role: "user",
@@ -448,7 +447,7 @@ async function artDirector(viewer: Viewer, site: StoreSite, reference: Reference
             text(
               `You are the art director of a top e-commerce design studio, reviewing a store a junior designer built for ${data.store.name} (${data.products.length} products, sold in Pakistan, cash on delivery). Be demanding and specific.${
                 reference ? `\n\nThe seller asked for a store that looks and works like the REFERENCE site above. Judge first how closely it matches the reference in page colours (light/dark), type style, header, section order, card style and density.\n${reference.spec}` : `\n\nNo reference was given. Judge it against the best real stores in this niche:\n${storePattern(data.store.name)}`
-              }\n\nAlso check: alignment to one grid, consistent spacing and card sizes, readable type and contrast, clear prices and buttons, products visible early, a phone layout that works, and nothing that looks AI-made:\n${SLOP_TELLS}\n\nReturn ready=true only if you would publish it as it is.`,
+              }\n\nAlso check: alignment to one grid, consistent spacing and card sizes, readable type and contrast, clear prices and buttons, products visible early, a phone layout that works, and nothing that looks AI-made:\n${SLOP_TELLS}\n\nAnswer only by calling the verdict tool. Return ready=true only if you would publish it as it is.`,
             ),
           ],
         },
@@ -621,7 +620,10 @@ export async function runStoreAgent(opts: StoreAgentOpts): Promise<StoreAgentRes
         if (!opts.edit && critiques < 2 && cost < opts.budgetUsd * 0.85 && site.files["pages/home.html"]) {
           critiques++;
           await opts.progress?.("An art director is reviewing the store");
-          const c = await artDirector(viewer, site, opts.reference ?? null, opts.data);
+          const c = await artDirector(viewer, site, opts.reference ?? null, opts.data).catch((e) => {
+            console.error("[art-director]", e);
+            return { fixes: [] as string[], costUsd: 0, input: 0, output: 0 };
+          });
           cost += c.costUsd;
           await opts.onUsage?.({ input: c.input, output: c.output, costUsd: c.costUsd, totalUsd: cost });
           if (c.fixes.length) {
