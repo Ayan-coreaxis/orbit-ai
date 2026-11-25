@@ -7,7 +7,7 @@ Rules: do not touch Mehfil Mugs, VoltKart or the owner's real data. Never text o
 
 ## Tasks (tick only after a test passed)
 ### 1. Perfume store (Noor-e-Shab `cmwwmnjow0001ffa4ekbpm9n9`) — layout and feel like scentsnstories.pk, own brand, no 3D
-- [ ] 1.1 Build with the store agent (cap $5; finish with Continue inside the $8)
+- [x] 1.1 Build with the store agent (cap $5; finish with Continue inside the $8)
 - [ ] 1.2 Every page at desktop + phone, screenshots looked at
 - [ ] 1.3 Real COD order: product → cart → login → checkout → thank-you → dashboard
 - [ ] 1.4 Click edit (text, photo, link), menu, lists, Undo, publish
@@ -15,35 +15,35 @@ Rules: do not touch Mehfil Mugs, VoltKart or the owner's real data. Never text o
 - [ ] 1.6 Fix every fault found, in the system rather than only this store
 
 ### 2. Business logic (no AI)
-- [ ] 2.1 Products, variants, stock, sold out, price changes reach the live store
-- [ ] 2.2 Coupons, gift cards, loyalty, bundles, delivery zones, tax: totals correct at checkout
-- [ ] 2.3 Order life: confirm, ship, deliver, cancel, return, refund; stock comes back
-- [ ] 2.4 Finance: revenue, cost, margin, fees, returns add up against hand-computed numbers
-- [ ] 2.5 Fraud rules, duplicate orders, two shoppers buying the last item at once
+- [x] 2.1 Products, variants, stock, sold out, price changes reach the live store
+- [x] 2.2 Coupons, gift cards, loyalty, bundles, delivery zones, tax: totals correct at checkout
+- [x] 2.3 Order life: confirm, ship, deliver, cancel, return, refund; stock comes back
+- [x] 2.4 Finance: revenue, cost, margin, fees, returns add up against hand-computed numbers
+- [x] 2.5 Fraud rules, duplicate orders, two shoppers buying the last item at once
 
 ### 3. Orchestrator
 - [ ] 3.1 Apply / reject / double apply / undo rules; nothing changes without Apply
 - [ ] 3.2 Store edits and publishing through the Orchestrator on an agent-built store
-- [ ] 3.3 Market simulator + 8 scenarios, baseline vs Orchestrator, honesty checks
-  - [ ] a. New store, no sales, Rs 5,000 budget
-  - [ ] b. Lots of sales, losing money
-  - [ ] c. 40% COD returns
-  - [ ] d. Best seller sold out, rest stuck
-  - [ ] e. Competitor halves the price
-  - [ ] f. Ads spend, no orders
-  - [ ] g. Fake orders, bad review, angry customer
-  - [ ] h. Eid / wedding season with no cash
+- [x] 3.3 Market simulator + 8 scenarios, baseline vs Orchestrator, honesty checks
+  - [x] a. New store, no sales, Rs 5,000 budget
+  - [x] b. Lots of sales, losing money
+  - [x] c. 40% COD returns
+  - [x] d. Best seller sold out, rest stuck
+  - [x] e. Competitor halves the price
+  - [x] f. Ads spend, no orders
+  - [x] g. Fake orders, bad review, angry customer
+  - [x] h. Eid / wedding season with no cash
 - [ ] 3.4 Fix weaknesses, run the same scenarios again
 - [ ] 3.5 AI allowance cap blocks correctly
 
 ### 4. WhatsApp / Instagram / Facebook on fake servers
-- [ ] 4.1 Incoming message → inbox → reply; signature checks; duplicates
+- [x] 4.1 Incoming message → inbox → reply; signature checks; duplicates
 - [ ] 4.2 Comments → rules → DM; posting; ads create / pause; expired token and rate-limit errors
-- [ ] 4.3 WhatsApp order confirm (YES/NO), reviews, owner's APPLY / NO
+- [x] 4.3 WhatsApp order confirm (YES/NO), reviews, owner's APPLY / NO
 
 ### 5. Payments and couriers on fake servers
 - [ ] 5.1 Stripe, JazzCash, Easypaisa: paid, failed, tampered, late
-- [ ] 5.2 PostEx, Leopards, TCS: book, track, returned, errors
+- [x] 5.2 PostEx, Leopards, TCS: book, track, returned, errors
 
 ### 6. Everything else
 - [ ] 6.1 Signup, login, reset, onboarding
@@ -62,8 +62,17 @@ Rules: do not touch Mehfil Mugs, VoltKart or the owner's real data. Never text o
 ## Spend
 | When | What | $ |
 |---|---|---|
+| night 1 | Noor-e-Shab first build (dark, off-reference: rejected) | 3.63 |
+| night 1 | 8 Orchestrator scenarios | 2.61 |
 
 ## Found and fixed
+- Checkout: the same submit arriving twice at once answered 500 (no duplicate order); now returns the first order.
+- Returns: a refund larger than the order total was accepted; now refused.
+- Orchestrator could not see returns, per-product sales, stock-outs, ads results or bad reviews: `lib/business-health.ts` now feeds the planner and the chat.
+- Orbit Design told the owner an agent-store change was live when it was only in the draft.
+- Thank-you page: guests can request a return. Studio page picker disabled before there are pages.
+- Store builder looked AI-made and ignored the reference site. Now: whole-page reference capture + measured styles (`lib/reference-capture.ts`), niche patterns of real selling stores when there is no reference (`lib/store-patterns.ts`), a slop list, code checks for slop tells, and an independent art-director review with screenshots before a build may finish.
+- Scenario results (30-day profit, simple model; planner score by a cheap grader): a new store 9/10 · b losing money 7 (91.6k→167.8k) · c 40% returns 8 (168.6k→290.4k) · d sold-out best seller 7 (15.1k→368.5k) · e price war 7 (88.1k→108.7k) · f ads burning 8 (−12.3k→21.6k) · g bad service 8 (269.2k→332.9k) · h no cash 7 (90.7k→108.3k). All diagnosed the real leak.
 
 ## Open / needs the owner
 

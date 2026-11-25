@@ -63,7 +63,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     // refunded → actually move the money
     if (next === "refunded" && order && !rr.refundedAt) {
-      const amount = body.refundAmount != null ? Math.max(0, Number(body.refundAmount)) : order.total;
+      const asked = body.refundAmount != null ? Number(body.refundAmount) : order.total;
+      if (!Number.isFinite(asked) || asked < 0 || asked > order.total)
+        return NextResponse.json({ error: `The refund must be between 0 and the order total (${order.total}).` }, { status: 400 });
+      const amount = asked;
       data.refundAmount = amount;
       data.refundedAt = new Date();
 

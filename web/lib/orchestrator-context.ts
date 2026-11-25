@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { businessHealth, businessHealthText } from "@/lib/business-health";
 import { getOrderGrowth } from "@/lib/get-order-growth";
 import { businessModelGuidanceLine } from "@/lib/business-model";
 import { sellerAnswersBlock } from "@/lib/onboarding-questions";
@@ -38,7 +39,7 @@ export async function buildOrchestratorContext(businessId: string): Promise<stri
     prisma.storeDesign.findUnique({ where: { businessId }, select: { published: true } }),
   ]);
   const revenue = revenueAgg._sum.total ?? 0;
-  const orderGrowth = await getOrderGrowth(businessId);
+  const [orderGrowth, health] = await Promise.all([getOrderGrowth(businessId), businessHealth(businessId).catch(() => null)]);
   const businessModelGuidance = businessModelGuidanceLine(business.businessModel);
 
   return `Business: ${business.name} — sells ${business.niche}. The single metric this business exists to move is real orders, not traffic or vague brand awareness — ground every answer in that.${
@@ -78,5 +79,8 @@ REAL BUSINESS DATA (actually in the database right now — never contradict this
     orderGrowth.orderGrowthPct !== null
       ? ` (${orderGrowth.orderGrowthPct >= 0 ? "+" : ""}${orderGrowth.orderGrowthPct.toFixed(0)}%)`
       : " (no real orders last week to compare against yet)"
-  }.`;
+  }.${health ? `
+
+HEALTH, last 30 days (real — use it before suggesting anything):
+${businessHealthText(health, business.storeCurrency)}` : ""}`;
 }

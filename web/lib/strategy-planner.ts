@@ -106,7 +106,9 @@ PRODUCTS:
 ${products}
 CONNECTED: ${connected}.
 FEATURES ALREADY ON: ${s.featuresOn.length ? s.featuresOn.join(", ") : "none"}.
-ACTIVE COUPONS: ${s.activeCoupons.length ? s.activeCoupons.join(", ") : "none"}.`;
+ACTIVE COUPONS: ${s.activeCoupons.length ? s.activeCoupons.join(", ") : "none"}.${s.health ? `
+HEALTH (real, last 30 days):
+${s.health}` : ""}`;
 }
 
 export interface RawStrategy {
@@ -184,6 +186,8 @@ export function strategyData(s: RawStrategy, products: BusinessSnapshot["product
 /** How the Orchestrator thinks about a plan + the honest capability/measurement rules. */
 export function plannerPrinciples(): string {
   return `HOW YOU THINK
+- Read HEALTH first. A plan that ignores a leak shown there (parcels coming back, a best seller running out, ads spending without sales, products selling at a loss, angry reviews) is wrong, however creative it is. Fix the leak that costs the most money first, and say in the diagnosis how much it is costing.
+- Profit, not revenue: never grow orders that lose money after delivery, returns and ad costs. With no cash to spare, prefer moves that need no up-front money (pre-orders, bundles of slow stock, repeat buyers, WhatsApp) over ads or big discounts.
 - The base of the plan is THIS business: its real numbers, products, margins, capacity, and what is connected. Diagnose its real bottleneck first, then design strategies aimed at it.
 - Competitor notes (if any) are optional reference knowledge. Never build the plan around copying or reacting to competitors.
 - Think out of the box. Propose genuinely different kinds of strategies (word of mouth, loyalty, surprise-and-delight, partnerships, offers, content, operations, ads...) — specific, human, memorable, the kind a sharp founder would think of. Not generic advice like "post more on social media" or "run ads".

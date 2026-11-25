@@ -57,6 +57,11 @@ async function storeApi(businessId: string, op: string, d: Record<string, unknow
     }
     case "quote":
       return post("/coupon", { items, code: str(d.code, 60), giftCardCode: str(d.giftCardCode, 60), phone: str(d.phone, 40), city: str(d.city, 80), loyaltyPointsRedeem: Math.max(0, Math.floor(Number(d.points) || 0)) });
+    case "return": {
+      const r = await fetch("/api/returns", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ orderId: str(d.orderId, 60), reason: str(d.reason, 1000) }) });
+      const j = await r.json().catch(() => ({}));
+      return r.ok ? { ok: true } : { error: j.error ?? "That didn't work. Please try again." };
+    }
     case "abandoned":
       return post("/abandoned", { items, phone: str(d.phone, 40) });
     case "place": {

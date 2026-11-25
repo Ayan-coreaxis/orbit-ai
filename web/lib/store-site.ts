@@ -451,6 +451,13 @@ export function lintSite(site: StoreSite, productIds: string[] = []): string[] {
     for (const x of body.matchAll(/<script\b[^>]*src=["'](https?:[^"']+)/gi)) out.push(`${name} loads a script from ${x[1].slice(0, 60)}; only /vendor/ libraries are allowed.`);
     if (/\b(localStorage|sessionStorage|document\.cookie)\b/.test(body)) out.push(`${name} uses browser storage, which is blocked; use ORBIT.cart / ORBIT.firstVisit.`);
   }
+  const html = Object.entries(f).filter(([n]) => n.endsWith(".html")).map(([, b]) => b).join("\n");
+  const css = f["site.css"] ?? "";
+  const accents = (html.match(/<h[12][^>]*>[^<]{0,80}<(em|i)\b/gi) ?? []).length + (f["site.js"]?.match(/<h[12][^>]*>[^<]{0,80}<(em|i)\b/gi) ?? []).length;
+  if (accents > 1) out.push(`AI-made look: ${accents} headings put one word in italics. Use plain headings.`);
+  if (/-webkit-text-stroke/.test(css)) out.push("AI-made look: outlined text (-webkit-text-stroke). Remove it.");
+  const eyebrows = (html.match(/class="[^"]*\b(eyebrow|kicker|overline)\b/gi) ?? []).length;
+  if (eyebrows > 3) out.push(`AI-made look: ${eyebrows} small labels above headings. Keep two at most.`);
   for (const r of RESERVED) if (f[`pages/${r}.html`]) out.push(`pages/${r}.html is a platform address; use another name.`);
   for (const p of SYSTEM_PAGES) {
     const own = f[`pages/${p.slug}.html`];

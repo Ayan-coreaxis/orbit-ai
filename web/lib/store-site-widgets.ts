@@ -199,6 +199,9 @@ W.thanks=function(box){
  o.items.forEach(function(l){sum.append(h("div",{cls:"ob-row"},h("span",{text:l.qty+" × "+l.name+(l.variantLabel?" ("+l.variantLabel+")":"")}),h("span",{cls:"ob-price",text:O.money(l.price*l.qty)})))});
  rows(sum,[["Discount",o.discount>0?"− "+O.money(o.discount):null],["Tax",o.tax>0?O.money(o.tax):null],["Delivery",o.shipping>0?O.money(o.shipping):"Free"],["Total",O.money(o.total),1]]);
  sum.append(h("a",{cls:"ob-btn ob-primary",href:"#page:home",text:"Continue shopping"}));
+ if(o.status==="fulfilled"||o.status==="shipped"){var rbox=h("div",{});card.append(rbox);var ask=h("button",{type:"button",cls:"ob-link",text:"Something wrong? Request a return",onclick:function(){
+  ask.remove();var f=h("form",{cls:"ob-form",novalidate:true,onsubmit:function(e){e.preventDefault();var why=f.elements.reason.value.trim();if(why.length<3){say(f,"Please tell us what went wrong.");return}
+   O.api("return",{orderId:o.id,reason:why}).then(function(r){if(r.error){say(f,r.error);return}rbox.replaceChildren(h("p",{cls:"ob-ok",role:"status",text:"Thanks. We have your return request and will contact you."}))})}},field("What went wrong?","reason",{req:1,area:1,max:1000}),h("button",{cls:"ob-btn ob-alt",text:"Send return request"}));rbox.append(f)}});rbox.append(ask)}
  box.replaceChildren(h("div",{cls:"ob-grid"},card,sum));
 };
 

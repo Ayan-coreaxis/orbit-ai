@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import sharp from "sharp";
 import { prisma } from "@/lib/prisma";
 import { putFile, readStoredFile } from "@/lib/storage";
+import type { ReferenceCapture } from "@/lib/reference-capture";
 import { runStoreAgent, STORE_AGENT_MODEL, type AgentRef, type StoreAgentResult } from "@/lib/store-agent";
 import { loadDoc } from "@/lib/orbit-design-generate";
 import { defaultDoc, type OrbitDesignDoc } from "@/lib/orbit-design";
@@ -37,7 +38,7 @@ async function keepVersion(businessId: string, site: StoreSite, note: string) {
   if (old.length) await prisma.storeSiteVersion.deleteMany({ where: { id: { in: old.map((o) => o.id) } } });
 }
 
-export async function runBuild(businessId: string, b: SiteBuild, brief: string, references: AgentRef[], resumeFrom: StoreSite | null = null): Promise<{ reply: string; error?: string }> {
+export async function runBuild(businessId: string, b: SiteBuild, brief: string, references: AgentRef[], resumeFrom: StoreSite | null = null, reference: ReferenceCapture | null = null): Promise<{ reply: string; error?: string }> {
   const edit = b.kind === "edit";
   const before = (await loadSite(businessId)).draft;
   b.brief = brief.slice(0, 14000);
@@ -87,6 +88,7 @@ export async function runBuild(businessId: string, b: SiteBuild, brief: string, 
       edit,
       resume: !!resumeFrom,
       references,
+      reference,
       budgetUsd: budget,
       progress: async (line) => {
         if (b.log.at(-1) !== line) b.log = [...b.log, line].slice(-80);

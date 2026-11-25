@@ -7,6 +7,7 @@ import { continueBuild, discardSite, keepRefs, runBuild, saveCustomise, saveEdit
 import { loadSite } from "@/lib/store-site-data";
 import { buildRunning } from "@/lib/store-site";
 import { screenshotSite, firstSiteUrl } from "@/lib/screenshot";
+import { captureReference } from "@/lib/reference-capture";
 import type { AgentRef } from "@/lib/store-agent";
 
 export const maxDuration = 800; // the build runs after the response
@@ -45,11 +46,14 @@ export async function POST(req: NextRequest) {
   await prisma.orbitDesignTurn.create({ data: { businessId, role: "user", content: message || "Follow this picture." } });
   after(async () => {
     await keepRefs(businessId, b, refs);
-    const url = firstSiteUrl(message);
-    const shot = url ? await screenshotSite(url).catch(() => null) : null;
-    if (shot) refs.push({ data: shot.data, mediaType: shot.mediaType as AgentRef["mediaType"] });
-    const note = shot ? `\n\nThe last attached image is a screenshot of ${url}, a site the seller mentions. Learn its layout and mood; do not copy its brand, text or pictures.` : "";
-    await runBuild(businessId, b, (message || "Follow the attached picture.") + note, refs);
+    // a site the seller names is captured whole and measured, so the store can really follow it
+    const url = kind === "build" ? firstSiteUrl(message) : null;
+    const reference = url ? await captureReference(url).catch(() => null) : null;
+    if (!reference && firstSiteUrl(message)) {
+      const shot = await screenshotSite(firstSiteUrl(message)!).catch(() => null);
+      if (shot) refs.push({ data: shot.data, mediaType: shot.mediaType as AgentRef["mediaType"] });
+    }
+    await runBuild(businessId, b, message || "Follow the attached picture.", refs, null, reference);
   });
   return NextResponse.json(await siteState(businessId));
 }

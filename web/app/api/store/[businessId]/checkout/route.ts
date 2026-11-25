@@ -289,6 +289,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ bus
       return NextResponse.json({ error: "Sorry — one of your items just sold out. Please review your cart." }, { status: 409 });
     if (e instanceof GiftCardError) return NextResponse.json({ error: e.message }, { status: 409 });
     if (e instanceof LoyaltyError) return NextResponse.json({ error: e.message }, { status: 409 });
+    // the same submit arrived twice at once: the other one made the order, answer with it
+    if (clientToken && (e as { code?: string })?.code === "P2002") {
+      const first = await prisma.order.findUnique({ where: { clientToken } });
+      if (first) return NextResponse.json({ orderId: first.id, total: first.total, duplicate: true });
+    }
     throw e;
   }
 

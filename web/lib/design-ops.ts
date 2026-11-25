@@ -230,10 +230,12 @@ export async function runDesignJobs(businessId: string, jobs: DesignJob[], planI
           continue;
         }
         const questions = r.orbitCode?.questions?.length ? `\n\n**Orbit Code has a question** before it wires the new part — open Orbit Design to answer it.` : "";
-        const live = (await prisma.storeDesign.findUnique({ where: { businessId }, select: { published: true } }))?.published;
-        await say(
-          `Orbit Design is done: ${r.reply.trim()}${questions}\n\n${live ? "Content changes are live on your store; " : "Your store isn't published yet — "}see it in Orbit Design: /dashboard/orbit-design`,
-        );
+        const row = await prisma.storeDesign.findUnique({ where: { businessId }, select: { published: true, site: true } });
+        // an agent-built store changes its draft; it goes live when the owner publishes it
+        const where = row?.site ? "It's in your draft: check it and press Publish in Orbit Design to make it live" : row?.published ? "Content changes are live on your store; see it in Orbit Design" : "Your store isn't published yet; see it in Orbit Design";
+        await say(`Orbit Design is done: ${r.reply.trim()}${questions}
+
+${where}: /dashboard/orbit-design`);
       } else {
         const r = await publishStore(businessId, j.publish);
         await say(

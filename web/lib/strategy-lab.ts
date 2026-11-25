@@ -1,3 +1,4 @@
+import { businessHealth, businessHealthText } from "@/lib/business-health";
 import { prisma } from "@/lib/prisma";
 import { totalStock } from "@/lib/variants";
 
@@ -149,6 +150,8 @@ export interface BusinessSnapshot {
   featuresOn: string[];
   activeCoupons: string[];
   competitorNotes: string[]; // reference only
+  /** returns, product sales, stock-outs, ads, reviews — as lines for the planner */
+  health: string;
 }
 
 function orderPhones(orders: { customerPhone: string }[]) {
@@ -237,6 +240,7 @@ export async function getBusinessSnapshot(businessId: string): Promise<BusinessS
     featuresOn,
     activeCoupons: coupons.map((c) => c.code),
     competitorNotes,
+    health: businessHealthText(await businessHealth(businessId), business.storeCurrency),
   };
 }
 
