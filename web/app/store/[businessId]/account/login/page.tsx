@@ -8,6 +8,7 @@ import { WidgetSlot } from "@/components/store/WidgetSlot";
 import { StoreLogin } from "@/components/store/StoreLogin";
 import { StoreWidgets } from "@/components/store/StoreWidgets";
 import { CartSync } from "@/components/store/CartSync";
+import { SiteShell } from "@/components/store/SiteShell";
 import { StoreCartBar } from "../../../StoreCartBar";
 import { parseWidgetCopy } from "@/lib/widget-copy";
 
@@ -29,6 +30,8 @@ export default async function LoginPage({ params }: { params: Promise<{ business
     select: { name: true, niche: true, storeCurrency: true, widgetCopy: true, widgetMotion: true, storeDesign: { select: { doc: true, wired: true, published: true, backend: true } } },
   });
   if (!business?.storeDesign?.published) notFound();
+  const agentSite = await SiteShell({ businessId, slug: "login" });
+  if (agentSite) return agentSite;
 
   const doc = safeDoc(business.storeDesign.wired ?? business.storeDesign.doc, business.name, business.niche);
   if (!doc) notFound();

@@ -1,11 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowUp, ExternalLink, Loader2, Menu, MessageSquare, Monitor, Plus, Rocket, Smartphone, Square, Trash2, Undo2 } from "lucide-react";
+import { ArrowUp, ExternalLink, Loader2, Menu, MousePointerClick, Monitor, Plus, Rocket, SlidersHorizontal, Smartphone, Square, Trash2, Undo2 } from "lucide-react";
 import type { SiteState } from "@/lib/store-site-state";
 import { SiteFrame, type PickedEl } from "@/components/store/SiteFrame";
 import { BuildingCanvas } from "./BuildingCanvas";
-import { CommentComposer } from "./CommentComposer";
+import { ClickEditor, CustomisePanel } from "./EditPanel";
 import { useImageAttachments } from "./useImageAttachments";
 import { AttachButton, AttachmentTray } from "./Attachments";
 
@@ -23,6 +23,7 @@ export function SiteStudio({ businessId, storeName, initial }: { businessId: str
   const [pick, setPick] = useState(false);
   const [picked, setPicked] = useState<PickedEl | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [custom, setCustom] = useState(false);
   const [adding, setAdding] = useState(false);
   const [newPage, setNewPage] = useState({ title: "", about: "" });
   const [now, setNow] = useState(0);
@@ -106,17 +107,18 @@ export function SiteStudio({ businessId, storeName, initial }: { businessId: str
 
   const go = useCallback(
     (to: string, id: string | null) => {
-      if (to === "cart" || to === "account") return flash(to === "cart" ? "Checkout (cash on delivery) opens on your live store." : "Customer accounts open on your live store.");
-      setAt({ slug: to, productId: to === "product" ? id : null });
+      if (to === "account-more") return flash("Addresses, returns and rewards open on your live store.");
+      if (to === "order") flash("This is a demo order. Nothing was saved.");
+      setAt({ slug: to === "order" ? "thanks" : to, productId: to === "product" ? id : null });
     },
     [flash],
   );
 
-  const slug = st.pages.some((p) => p.slug === at.slug) ? at.slug : "home";
+  const slug = [...st.pages, ...st.shopPages].some((p) => p.slug === at.slug) ? at.slug : "home";
   const q = new URLSearchParams({ page: slug, rev: st.rev });
   if (at.productId && slug === "product") q.set("product", at.productId);
   const b = st.build;
-  const live = `/store/${businessId}${slug === "home" || slug === "product" ? "" : `/p/${slug}`}`;
+  const live = `/store/${businessId}${slug === "home" || slug === "product" || slug === "thanks" ? "" : slug === "login" ? "/account/login" : st.shopPages.some((p) => p.slug === slug) ? `/${slug}` : `/p/${slug}`}`;
 
   return (
     <div className="fixed inset-0 z-50 flex h-dvh flex-col bg-bg">
@@ -231,11 +233,20 @@ export function SiteStudio({ businessId, storeName, initial }: { businessId: str
         <div className={`relative ${tab === "preview" ? "flex" : "hidden"} min-w-0 flex-1 flex-col bg-panel-2 lg:flex`}>
           <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-2.5">
             <select value={slug} onChange={(e) => setAt({ slug: e.target.value, productId: null })} aria-label="Page" className="max-w-[180px] rounded-lg border border-border bg-panel px-2.5 py-2 text-[13px] font-medium">
-              {st.pages.map((p) => (
-                <option key={p.slug} value={p.slug}>
-                  {p.title}
-                </option>
-              ))}
+              <optgroup label="Your pages">
+                {st.pages.map((p) => (
+                  <option key={p.slug} value={p.slug}>
+                    {p.title}
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label="Shop pages">
+                {st.shopPages.map((p) => (
+                  <option key={p.slug} value={p.slug}>
+                    {p.title}
+                  </option>
+                ))}
+              </optgroup>
             </select>
             <button className={btn} onClick={() => setAdding((a) => !a)} disabled={st.running || !st.has}>
               <Plus className="h-3.5 w-3.5" /> Page
@@ -250,8 +261,11 @@ export function SiteStudio({ businessId, storeName, initial }: { businessId: str
                 );
               })}
             </div>
-            <button className={`${btn} ${pick ? "!border-accent/40 bg-accent-soft !text-accent-strong" : ""}`} aria-pressed={pick} onClick={() => setPick((p) => !p)} disabled={st.running || !st.has}>
-              <MessageSquare className="h-3.5 w-3.5" /> {pick ? "Click anything" : "Comment"}
+            <button className={`${btn} ${pick ? "!border-accent/40 bg-accent-soft !text-accent-strong" : ""}`} aria-pressed={pick} onClick={() => { setPick((p) => !p); setCustom(false); setPicked(null); }} disabled={st.running || !st.has}>
+              <MousePointerClick className="h-3.5 w-3.5" /> {pick ? "Click anything" : "Edit"}
+            </button>
+            <button className={`${btn} ${custom ? "!border-accent/40 bg-accent-soft !text-accent-strong" : ""}`} aria-pressed={custom} onClick={() => { setCustom((c) => !c); setPick(false); setPicked(null); }} disabled={st.running || !st.has}>
+              <SlidersHorizontal className="h-3.5 w-3.5" /> Customise
             </button>
             {st.published && (
               <a href={live} target="_blank" rel="noreferrer" className="ml-auto flex items-center gap-1.5 text-[13px] font-medium text-text-dim hover:text-text">
@@ -286,14 +300,34 @@ export function SiteStudio({ businessId, storeName, initial }: { businessId: str
               <p className="pt-24 text-[14.5px] text-text-dim">Describe your store in the chat and it will appear here.</p>
             )}
             {picked && (
-              <CommentComposer
-                target={{ block: null, tag: picked.tag, role: picked.tag, text: picked.text }}
-                contextLabel={picked.where || "this page"}
-                onCancel={() => setPicked(null)}
-                onSend={(note, o) => {
+              <ClickEditor
+                key={`${picked.where}-${picked.tag}-${picked.texts[0]?.from ?? picked.image ?? ""}`}
+                picked={picked}
+                slug={slug}
+                st={st}
+                busy={busy || st.running}
+                onClose={() => setPicked(null)}
+                onSave={async (edits) => {
+                  if (await call("PATCH", { action: "edit", edits })) {
+                    setPicked(null);
+                    flash("Saved in your draft.");
+                  }
+                }}
+                onAsk={(note) => {
                   const p = picked;
                   setPicked(null);
-                  void send(`On the ${slug} page, in ${p.where || "the page"}, the <${p.tag}${p.cls ? ` class="${p.cls}"` : ""}>${p.text ? ` that reads "${p.text}"` : ""}${o?.applyToSimilar ? ", and every element like it" : ""}: ${note}`, o?.images);
+                  void send(`On the ${slug} page, in ${p.where || "the page"}, the <${p.tag}${p.cls ? ` class="${p.cls}"` : ""}>${p.text ? ` that reads "${p.text}"` : ""}: ${note}`);
+                }}
+              />
+            )}
+            {custom && (
+              <CustomisePanel
+                key={st.rev}
+                st={st}
+                busy={busy || st.running}
+                onClose={() => setCustom(false)}
+                onSave={async (b) => {
+                  if (await call("PATCH", { action: "customise", ...b })) flash("Saved in your draft.");
                 }}
               />
             )}

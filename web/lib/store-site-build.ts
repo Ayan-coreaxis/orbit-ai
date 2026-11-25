@@ -4,7 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { runStoreAgent, STORE_AGENT_MODEL, type AgentRef, type StoreAgentResult } from "@/lib/store-agent";
 import { loadDoc } from "@/lib/orbit-design-generate";
 import { defaultDoc, type OrbitDesignDoc } from "@/lib/orbit-design";
-import { buildRunning, lintSite, manifest, parseBuild, parseSite, type SiteBuild, type StoreSite } from "@/lib/store-site";
+import { buildRunning, lintSite, manifest, siteEdits, parseBuild, parseSite, type SiteBuild, type StoreSite } from "@/lib/store-site";
+import { assertUnderUsageCap, getUsageStatus } from "@/lib/usage-limit";
 import { loadSite, siteData } from "@/lib/store-site-data";
 
 const VERSIONS_KEPT = 20;
@@ -70,13 +71,19 @@ export async function runBuild(businessId: string, b: SiteBuild, brief: string, 
   try {
     const data = await siteData(businessId);
     if (!data) throw new Error("no business");
+    const used = new Set(data.products.flatMap((p) => p.images));
+    const media = await prisma.mediaAsset.findMany({ where: { businessId, kind: "image" }, orderBy: { createdAt: "desc" }, take: 60, select: { url: true, name: true } });
+    data.media = media.filter((m) => !used.has(m.url)).slice(0, 40);
+    // Never past what is left of the plan's monthly AI allowance.
+    const left = (await getUsageStatus(businessId)).remainingUsd;
+    const budget = Math.min(edit ? EDIT_BUDGET() : BUILD_BUDGET(), left ?? Infinity);
     const result = await runStoreAgent({
       brief,
       data,
       site: edit ? (before ?? undefined) : undefined,
       edit,
       references,
-      budgetUsd: edit ? EDIT_BUDGET() : BUILD_BUDGET(),
+      budgetUsd: budget,
       progress: async (line) => {
         if (b.log.at(-1) !== line) b.log = [...b.log, line].slice(-80);
         await beat();
@@ -95,14 +102,14 @@ export async function runBuild(businessId: string, b: SiteBuild, brief: string, 
     });
 
     const usable = !!result.site.files["pages/home.html"];
-    const hardFaults = lintSite(result.site, data.products.map((p) => p.id)).filter((x) => /cut off|missing/.test(x) && !/site\.json/.test(x));
+    const hardFaults = lintSite(result.site, data.products.map((p) => p.id)).filter((x) => /cut off|home\.html is missing|site\.css is missing/.test(x));
     const changed = JSON.stringify(result.site) !== JSON.stringify(before ?? { files: {} });
     const keep = usable && changed && owns() && !(edit && (hardFaults.length > 0 || result.stopped === "stopped"));
     if (keep) {
       if (before) await keepVersion(businessId, before, edit ? brief : "Before the new build");
       await prisma.storeDesign.update({ where: { businessId }, data: { site: JSON.stringify(result.site), doc: JSON.stringify(await shellDoc(businessId, result.site)) } });
     }
-    const left = result.issues.length ? ` ${result.issues.length} small thing${result.issues.length === 1 ? "" : "s"} still need attention: ${result.issues.slice(0, 3).join("; ")}.` : "";
+    const open = result.issues.length ? ` ${result.issues.length} small thing${result.issues.length === 1 ? "" : "s"} still need attention: ${result.issues.slice(0, 3).join("; ")}.` : "";
     if (result.stopped === "stopped") {
       await finish("stopped", keep ? "Stopped. What was built so far is in the preview." : "Stopped. Nothing was changed.", result);
       return { reply: "Stopped." };
@@ -113,7 +120,7 @@ export async function runBuild(businessId: string, b: SiteBuild, brief: string, 
       return { reply, error: reply };
     }
     const cut = result.stopped === "budget" || result.stopped === "turns" || result.stopped === "max_tokens" ? " I reached the working limit, so check the pages and tell me what to finish." : "";
-    const reply = (result.summary || (edit ? "Done. The change is in the preview." : "Your store is ready in the preview.")) + cut + left;
+    const reply = (result.summary || (edit ? "Done. The change is in the preview." : "Your store is ready in the preview.")) + cut + open;
     await finish("done", reply, result);
     return { reply };
   } catch (e) {
@@ -128,6 +135,12 @@ export async function runBuild(businessId: string, b: SiteBuild, brief: string, 
 
 /** One edit, start to finish (the Orchestrator's route). */
 export async function editSiteNow(businessId: string, message: string, refs: AgentRef[]): Promise<{ reply: string; error?: string }> {
+  try {
+    await assertUnderUsageCap(businessId);
+  } catch (e) {
+    const error = e instanceof Error ? e.message : "The AI allowance is used up.";
+    return { reply: error, error };
+  }
   const b = await startBuild(businessId, "edit");
   if (!b) return { reply: "The store is being worked on right now.", error: "The store is being worked on right now. Try again in a few minutes." };
   await prisma.orbitDesignTurn.create({ data: { businessId, role: "user", content: message.slice(0, 4000) } });
@@ -167,6 +180,106 @@ export async function shellDoc(businessId: string, site: StoreSite): Promise<Orb
     pages: m.pages.map((p) => ({ slug: p.slug, title: p.title, nav: p.nav !== false, sections: [] })) as OrbitDesignDoc["pages"],
     direction: "store-agent",
   };
+}
+
+const IMG = /^(https:\/\/|\/uploads\/)[^\s"'<>`\\]{3,500}$/;
+const LINK = /^(#page:[a-z0-9-]{1,41}|#product:[A-Za-z0-9_-]{1,60}|#cart|#account|https:\/\/[^\s"'<>]{3,280}|mailto:[^\s"'<>]{3,120}|tel:[0-9+ -]{5,20})$/;
+
+/** The seller's own click edits: no AI, saved to the draft at once. Same target again replaces it. */
+export async function saveEdits(businessId: string, raw: unknown): Promise<string | null> {
+  const { draft, build } = await loadSite(businessId);
+  if (!draft) return "There's no store yet.";
+  if (buildRunning(build)) return "Wait for the current change to finish.";
+  const str = (v: unknown, n: number) => (typeof v === "string" ? v.slice(0, n) : "");
+  let list = siteEdits(draft);
+  for (const x of (Array.isArray(raw) ? raw : []).slice(0, 20) as Record<string, unknown>[]) {
+    const page = x.page === "*" || (typeof x.page === "string" && /^[a-z0-9-]{1,41}$/.test(x.page)) ? String(x.page) : "*";
+    const from = str(x.from, 600);
+    if (!from) continue;
+    if (x.kind === "text") {
+      const to = str(x.to, 600).trim();
+      list = list.filter((e) => !(e.kind === "text" && e.from === from && (e.page === page || page === "*")));
+      if (to && to !== from) list.push({ kind: "text", page, from, to });
+    } else if (x.kind === "image") {
+      const to = str(x.to, 520);
+      if (!IMG.test(from) || !IMG.test(to)) return "That picture can't be used.";
+      // the picture on screen may itself be a replacement: follow it back to the design's own
+      const root = list.find((e) => e.kind === "image" && e.to === from)?.from ?? from;
+      list = list.filter((e) => !(e.kind === "image" && e.from === root));
+      if (root !== to) list.push({ kind: "image", from: root, to });
+    } else if (x.kind === "link") {
+      const to = str(x.to, 300).trim();
+      if (!LINK.test(to)) return "Use a page, a product, or a full web address (https://…).";
+      const text = str(x.text, 200);
+      list = list.filter((e) => !(e.kind === "link" && e.from === from && e.text === text && (e.page === page || page === "*")));
+      if (to !== from) list.push({ kind: "link", page, from, text, to });
+    } else if (x.kind === "hide") {
+      if (!list.some((e) => e.kind === "hide" && e.from === from && e.page === page)) list.push({ kind: "hide", page, from });
+    } else if (x.kind === "unhide") list = list.filter((e) => !(e.kind === "hide" && e.from === from));
+  }
+  await keepVersion(businessId, draft, "Your edit");
+  const next: StoreSite = { files: { ...draft.files, "edits.json": JSON.stringify(list.slice(-400)) } };
+  await prisma.storeDesign.update({ where: { businessId }, data: { site: JSON.stringify(next) } });
+  return null;
+}
+
+/** Menu, settings and lists the design declared. Only values change; the declarations stay the designer's. */
+export async function saveCustomise(businessId: string, body: { menu?: unknown; settings?: unknown; lists?: unknown }): Promise<string | null> {
+  const { draft, build } = await loadSite(businessId);
+  if (!draft) return "There's no store yet.";
+  if (buildRunning(build)) return "Wait for the current change to finish.";
+  let json: Record<string, unknown>;
+  try {
+    json = JSON.parse(draft.files["site.json"] ?? "{}") as Record<string, unknown>;
+  } catch {
+    json = {};
+  }
+  const m = manifest(draft);
+  if (Array.isArray(body.menu)) {
+    const menu = (body.menu as Record<string, unknown>[]).slice(0, 14).map((x) => ({ label: String(x?.label ?? "").trim().slice(0, 40), href: String(x?.href ?? "").trim().slice(0, 300) }));
+    if (!menu.length || menu.some((x) => !x.label)) return "Every menu item needs a name, and the menu needs at least one.";
+    if (menu.some((x) => !LINK.test(x.href))) return "A menu link must be a page, a product, or a full web address (https://…).";
+    json.menu = menu;
+  }
+  if (body.settings && typeof body.settings === "object") {
+    const v = body.settings as Record<string, unknown>;
+    json.settings = m.settings.map((s) => {
+      if (!(s.key in v)) return s;
+      const x = v[s.key];
+      if (s.type === "number") {
+        const n = Number(x);
+        return Number.isFinite(n) ? { ...s, value: Math.min(s.max ?? Infinity, Math.max(s.min ?? -Infinity, n)) } : s;
+      }
+      if (s.type === "toggle") return { ...s, value: x === true };
+      if (s.type === "select") return (s.options ?? []).map(String).includes(String(x)) ? { ...s, value: String(x) } : s;
+      if (s.type === "color") return HEX.test(String(x)) ? { ...s, value: String(x) } : s;
+      if (s.type === "image") return IMG.test(String(x)) ? { ...s, value: String(x) } : s;
+      return { ...s, value: String(x ?? "").slice(0, 600) };
+    });
+  }
+  if (body.lists && typeof body.lists === "object") {
+    const v = body.lists as Record<string, unknown>;
+    const lists = m.lists.map((l) => {
+      const items = v[l.key];
+      if (!Array.isArray(items)) return l;
+      const min = Math.max(0, l.min ?? 0);
+      const max = Math.min(60, l.max ?? 30);
+      const clean = (items as Record<string, unknown>[]).slice(0, max).map((it) =>
+        Object.fromEntries(
+          l.fields.map((f) => {
+            const x = String(it?.[f.key] ?? "").slice(0, f.type === "textarea" ? 3000 : 600);
+            return [f.key, f.type === "image" ? (IMG.test(x) ? x : "") : f.type === "link" ? (LINK.test(x) ? x : "") : x];
+          }),
+        ),
+      );
+      return clean.length < min ? l : { ...l, items: clean };
+    });
+    json.lists = lists;
+  }
+  await keepVersion(businessId, draft, "Your settings");
+  const next: StoreSite = { files: { ...draft.files, "site.json": JSON.stringify(json) } };
+  await prisma.storeDesign.update({ where: { businessId }, data: { site: JSON.stringify(next), doc: JSON.stringify(await shellDoc(businessId, next)) } });
+  return null;
 }
 
 export async function undoSite(businessId: string): Promise<{ left: number } | null> {

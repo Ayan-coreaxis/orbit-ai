@@ -8,6 +8,7 @@ import { isOnlinePayment, isWalletProvider, paymentMethodLabel } from "@/lib/pay
 import { getStoreStripe, paymentOptions } from "@/lib/store-stripe";
 import { copyText, parseWidgetCopy, statusLabel } from "@/lib/widget-copy";
 import { PixelPurchase } from "@/components/store/PixelPurchase";
+import { SiteShell } from "@/components/store/SiteShell";
 import { StoreCartBar } from "../../../StoreCartBar";
 
 export const dynamic = "force-dynamic";
@@ -87,6 +88,24 @@ export default async function OrderConfirmationPage({
           : pay === "codfailed"
             ? `We couldn't switch this order to cash on delivery — an item may have just sold out. Please contact ${storeName}.`
             : `This order is waiting for your ${walletName} payment.`;
+  // An agent-built store shows its own thank-you page; an unpaid online order stays here, where it can be paid.
+  const agentSite = awaitingPayment ? null : await SiteShell({ businessId, slug: "thanks", orderId: order.id });
+  if (agentSite)
+    return (
+      <>
+        {!cancelled && (
+          <PixelPurchase
+            orderId={order.id}
+            placedAt={order.createdAt.getTime()}
+            value={order.total}
+            currency={(business?.storeCurrency || "PKR").toUpperCase()}
+            contentIds={lines.map((l) => l.productId).filter((x): x is string => !!x)}
+            numItems={lines.reduce((s, l) => s + l.qty, 0)}
+          />
+        )}
+        {agentSite}
+      </>
+    );
   const stepIdx = cancelled ? -1 : STEPS.indexOf(order.status as (typeof STEPS)[number]);
 
   return (

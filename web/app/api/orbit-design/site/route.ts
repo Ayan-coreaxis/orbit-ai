@@ -2,7 +2,8 @@ import { after, NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getActiveBusinessId } from "@/lib/get-active-business-id";
 import { siteState } from "@/lib/store-site-state";
-import { runBuild, startBuild, undoSite } from "@/lib/store-site-build";
+import { assertUnderUsageCap, UsageCapExceededError } from "@/lib/usage-limit";
+import { runBuild, saveCustomise, saveEdits, startBuild, undoSite } from "@/lib/store-site-build";
 import { loadSite } from "@/lib/store-site-data";
 import { buildRunning } from "@/lib/store-site";
 import { screenshotSite, firstSiteUrl } from "@/lib/screenshot";
@@ -31,6 +32,12 @@ export async function POST(req: NextRequest) {
   const message = (body.message ?? "").trim().slice(0, 12000);
   const refs = (Array.isArray(body.images) ? body.images : []).slice(0, 8).map(ref).filter((x): x is AgentRef => !!x);
   if (!message && !refs.length) return NextResponse.json({ error: "Say what you'd like." }, { status: 400 });
+  try {
+    await assertUnderUsageCap(businessId);
+  } catch (e) {
+    if (e instanceof UsageCapExceededError) return NextResponse.json({ error: e.message }, { status: 402 });
+    throw e;
+  }
   const { draft } = await loadSite(businessId);
   const kind = body.build || !draft?.files["pages/home.html"] ? "build" : "edit";
   const b = await startBuild(businessId, kind);
@@ -50,13 +57,17 @@ export async function POST(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   const businessId = await getActiveBusinessId();
   if (!businessId) return NextResponse.json({ error: "No active business." }, { status: 400 });
-  const { action } = (await req.json().catch(() => ({}))) as { action?: string };
+  const body = (await req.json().catch(() => ({}))) as { action?: string; edits?: unknown; menu?: unknown; settings?: unknown; lists?: unknown };
+  const { action } = body;
   const { build } = await loadSite(businessId);
   if (action === "stop") {
     if (build && buildRunning(build)) await prisma.storeDesign.update({ where: { businessId }, data: { siteBuild: JSON.stringify({ ...build, stop: true }) } });
   } else if (action === "undo") {
     if (buildRunning(build)) return NextResponse.json({ error: "Wait for the current change to finish." }, { status: 409 });
     if (!(await undoSite(businessId))) return NextResponse.json({ error: "Nothing to undo." }, { status: 404 });
+  } else if (action === "edit" || action === "customise") {
+    const error = action === "edit" ? await saveEdits(businessId, body.edits) : await saveCustomise(businessId, body);
+    if (error) return NextResponse.json({ error }, { status: 400 });
   } else return NextResponse.json({ error: "Unknown action." }, { status: 400 });
   return NextResponse.json(await siteState(businessId));
 }

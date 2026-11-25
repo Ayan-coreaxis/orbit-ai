@@ -1,19 +1,20 @@
 import type { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
-import { manifest } from "@/lib/store-site";
+import { isSystemPage, manifest } from "@/lib/store-site";
 import { loadSite, siteData } from "@/lib/store-site-data";
 import { StoreAnalyticsBeacon } from "@/components/store/StoreAnalyticsBeacon";
 import { StoreChat } from "@/app/store/StoreChat";
+import { CartSync } from "@/components/store/CartSync";
 import { LiveSite } from "./SiteFrame";
 
 const HEX = /^#[0-9a-f]{3,8}$/i;
 
 /** The live page of an agent-built store, or null when this store wasn't built that way / has no such page. */
-export async function SiteShell({ businessId, slug, productId = null }: { businessId: string; slug: string; productId?: string | null }) {
+export async function SiteShell({ businessId, slug, productId = null, orderId = null }: { businessId: string; slug: string; productId?: string | null; orderId?: string | null }) {
   const { live, published } = await loadSite(businessId);
   if (!live || !published) return null;
   const m = manifest(live);
-  if (!m.pages.some((p) => p.slug === slug)) return null;
+  if (!isSystemPage(slug) && !m.pages.some((p) => p.slug === slug)) return null;
   const data = await siteData(businessId);
   if (!data) return null;
   const c = (k: "bg" | "surface" | "text" | "muted" | "border" | "accent" | "accentText", or: string) => {
@@ -34,7 +35,7 @@ export async function SiteShell({ businessId, slug, productId = null }: { busine
   const money = data.store.currency.toUpperCase();
   return (
     <>
-      <LiveSite businessId={businessId} storeName={data.store.name} slug={slug} productId={productId} pages={m.pages.map((p) => p.slug)} products={data.products} bg={c("bg", "#ffffff")} />
+      <LiveSite businessId={businessId} storeName={data.store.name} slug={slug} productId={productId} orderId={orderId} pages={m.pages.map((p) => p.slug)} products={data.products} bg={c("bg", "#ffffff")} />
       {/* The store itself is in a frame; this is the same catalogue as plain text for search engines and readers without scripts. */}
       <noscript>
         <h1>{data.store.name}</h1>
@@ -46,7 +47,8 @@ export async function SiteShell({ businessId, slug, productId = null }: { busine
           ))}
         </ul>
       </noscript>
-      <StoreAnalyticsBeacon businessId={businessId} type={productId ? "view_product" : "view_store"} productId={productId ?? undefined} />
+      <CartSync businessId={businessId} />
+      {!isSystemPage(slug) && <StoreAnalyticsBeacon businessId={businessId} type={productId ? "view_product" : "view_store"} productId={productId ?? undefined} />}
       <StoreChat businessId={businessId} storeName={data.store.name} vars={vars} />
     </>
   );

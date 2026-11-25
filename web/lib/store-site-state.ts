@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { buildRunning, manifest, type SiteBuild, type SitePage, type SiteProduct } from "@/lib/store-site";
+import { buildRunning, manifest, siteEdits, SYSTEM_PAGES, type MenuItem, type SiteBuild, type SiteEdit, type SiteList, type SiteSetting, type SitePage, type SiteProduct } from "@/lib/store-site";
 import { loadSite, siteData } from "@/lib/store-site-data";
 
 export interface SiteState {
@@ -7,6 +7,11 @@ export interface SiteState {
   running: boolean;
   build: SiteBuild | null;
   pages: SitePage[];
+  shopPages: SitePage[];
+  menu: MenuItem[];
+  settings: SiteSetting[];
+  lists: SiteList[];
+  hidden: Extract<SiteEdit, { kind: "hide" }>[];
   published: boolean;
   dirty: boolean;
   undo: number;
@@ -29,11 +34,17 @@ export async function siteState(businessId: string): Promise<SiteState> {
     prisma.orbitDesignTurn.findMany({ where: { businessId }, orderBy: { createdAt: "desc" }, take: 40 }),
     siteData(businessId),
   ]);
+  const m = draft ? manifest(draft) : null;
   return {
     has: !!draft?.files["pages/home.html"],
     running: buildRunning(build),
     build,
-    pages: draft ? manifest(draft).pages : [],
+    pages: m?.pages ?? [],
+    shopPages: SYSTEM_PAGES,
+    menu: m?.menu ?? [],
+    settings: m?.settings ?? [],
+    lists: m?.lists ?? [],
+    hidden: draft ? siteEdits(draft).filter((e): e is Extract<SiteEdit, { kind: "hide" }> => e.kind === "hide") : [],
     published,
     dirty,
     undo,

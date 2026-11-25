@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { composePage, siteHeaders, type StoreSite } from "@/lib/store-site";
-import { mediaOrigin, siteData } from "@/lib/store-site-data";
+import { mediaOrigin, siteData, siteOrder } from "@/lib/store-site-data";
 
 /** The address the shopper's browser is really using (a seller's own domain sits behind a proxy). */
 export function requestOrigin(req: Request): string {
@@ -16,8 +16,10 @@ export async function serveSite(req: Request, businessId: string, site: StoreSit
   const slug = q.get("page") || "home";
   if (!site || !data) return new NextResponse("Not found", { status: 404 });
   const productId = q.get("product") ?? (preview && slug === "product" ? (data.products[0]?.id ?? null) : null);
+  const orderId = slug === "thanks" && !preview ? q.get("order") : null;
+  const order = orderId ? await siteOrder(businessId, orderId) : null;
   const origin = requestOrigin(req);
-  const html = composePage(site, { slug, productId, data, origin, mediaOrigin: mediaOrigin(), preview, firstVisit: q.get("seen") !== "1" });
+  const html = composePage(site, { slug, productId, order, data, origin, mediaOrigin: mediaOrigin(), preview, firstVisit: q.get("seen") !== "1" });
   if (!html) return new NextResponse("Not found", { status: 404 });
   return new NextResponse(html, { headers: siteHeaders(origin, mediaOrigin()) });
 }

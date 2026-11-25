@@ -8,6 +8,7 @@ import { WidgetSlot } from "@/components/store/WidgetSlot";
 import { AccountDashboard } from "@/components/store/AccountDashboard";
 import { StoreWidgets } from "@/components/store/StoreWidgets";
 import { CartSync } from "@/components/store/CartSync";
+import { SiteShell } from "@/components/store/SiteShell";
 import { StoreCartBar } from "../../StoreCartBar";
 import { parseWidgetCopy } from "@/lib/widget-copy";
 
@@ -32,8 +33,9 @@ function safeDoc(raw: string | null | undefined, name: string, niche: string): O
   }
 }
 
-export default async function AccountPage({ params }: { params: Promise<{ businessId: string }> }) {
+export default async function AccountPage({ params, searchParams }: { params: Promise<{ businessId: string }>; searchParams: Promise<{ full?: string }> }) {
   const { businessId } = await params;
+  const { full } = await searchParams;
   const business = await prisma.business.findUnique({
     where: { id: businessId },
     select: {
@@ -47,6 +49,9 @@ export default async function AccountPage({ params }: { params: Promise<{ busine
     },
   });
   if (!business?.storeDesign?.published) notFound();
+  // ?full=1: the full dashboard (addresses, returns, rewards), in the store's colours
+  const agentSite = full ? null : await SiteShell({ businessId, slug: "account" });
+  if (agentSite) return agentSite;
 
   const doc = safeDoc(business.storeDesign.wired ?? business.storeDesign.doc, business.name, business.niche);
   if (!doc) notFound();

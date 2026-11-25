@@ -2,13 +2,91 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { addToCart, lineKey, readCart, setQty, CART_EVENT } from "@/app/store/cart-store";
-import { priceLine, type SiteLine, type SiteProduct } from "@/lib/store-site";
+import { clearCart } from "@/app/store/cart-store";
+import { firePixel } from "@/lib/pixel-client";
+import { isSystemPage, priceLine, type SiteLine, type SiteProduct } from "@/lib/store-site";
 
 export interface PickedEl {
   tag: string;
   cls: string;
   text: string;
   where: string;
+  texts: { from: string; now: string; product: boolean }[];
+  image: string | null;
+  imageIsProduct: boolean;
+  link: { href: string; from: string; text: string } | null;
+}
+
+const newToken = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`);
+
+/** Everything a store page may ask the server for. Items always come from the shopper's own cart here. */
+async function storeApi(businessId: string, op: string, d: Record<string, unknown>, token: { current: string }): Promise<Record<string, unknown>> {
+  const base = `/api/store/${businessId}`;
+  const items = readCart(businessId).map((l) => (l.bundleId ? { bundleId: l.bundleId, qty: l.qty } : { productId: l.productId, variantId: l.variantId ?? undefined, qty: l.qty }));
+  const str = (v: unknown, n = 300) => (typeof v === "string" ? v.slice(0, n) : "");
+  const obj = (v: unknown) => (v && typeof v === "object" ? (v as Record<string, unknown>) : {});
+  const get = (p: string) => fetch(base + p).then((r) => r.json());
+  const post = async (p: string, body: object) => {
+    const r = await fetch(base + p, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const j = await r.json().catch(() => ({}));
+    return r.ok ? j : { ...j, ok: false, error: j.error ?? "That didn't work. Please try again." };
+  };
+  switch (op) {
+    case "me":
+      return get("/auth/me");
+    case "login":
+    case "signup":
+    case "otp-request":
+    case "otp-verify":
+      return post(`/auth/${op}`, { name: str(d.name), email: str(d.email), phone: str(d.phone, 40), password: str(d.password), code: str(d.code, 12) });
+    case "logout":
+      return post("/auth/logout", {});
+    case "orders":
+      return get("/orders");
+    case "addresses":
+      return get("/account/addresses");
+    case "loyalty":
+      return get("/loyalty");
+    case "cities":
+      return get("/cities");
+    case "options": {
+      const lines = readCart(businessId);
+      fetch(`${base}/event`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "checkout_start" }) }).catch(() => {});
+      firePixel("checkout_start", { content_ids: lines.map((l) => l.productId).filter((x): x is string => !!x), num_items: lines.reduce((s, l) => s + l.qty, 0) });
+      return get("/checkout/options");
+    }
+    case "quote":
+      return post("/coupon", { items, code: str(d.code, 60), giftCardCode: str(d.giftCardCode, 60), phone: str(d.phone, 40), city: str(d.city, 80), loyaltyPointsRedeem: Math.max(0, Math.floor(Number(d.points) || 0)) });
+    case "abandoned":
+      return post("/abandoned", { items, phone: str(d.phone, 40) });
+    case "place": {
+      const s = obj(d.shipping);
+      const r = await post("/checkout", {
+        items,
+        customerName: str(d.customerName),
+        customerPhone: str(d.customerPhone, 40),
+        customerEmail: str(d.customerEmail),
+        shipping: { line1: str(s.line1), city: str(s.city, 80), area: str(s.area, 80), postalCode: str(s.postalCode, 20) },
+        couponCode: str(d.couponCode, 60) || undefined,
+        giftCardCode: str(d.giftCardCode, 60) || undefined,
+        loyaltyPointsRedeem: Math.max(0, Math.floor(Number(d.loyaltyPointsRedeem) || 0)) || undefined,
+        payment: str(d.payment, 20),
+        clientToken: token.current,
+        customFields: obj(d.customFields),
+      });
+      if (r.error) return r;
+      token.current = newToken();
+      if (typeof r.redirect === "string") {
+        if (d.payment !== "stripe") clearCart(businessId); // a wallet order already exists; its page offers a retry
+        window.location.href = r.redirect;
+        return { redirect: true };
+      }
+      clearCart(businessId);
+      return r;
+    }
+    default:
+      return { error: "Unknown request." };
+  }
 }
 
 /**
@@ -41,6 +119,7 @@ export function SiteFrame({
 }) {
   const frame = useRef<HTMLIFrameElement>(null);
   const demo = useRef<SiteLine[]>([]);
+  const token = useRef(newToken()); // one per checkout attempt: a double-submitted order is created once
   // Fetched and shown as srcdoc: the sandbox attribute gives it an opaque origin, its own meta CSP
   // limits what it loads, and the page before stays on screen until the next one is ready.
   const [page, setPage] = useState<{ src: string; html: string } | null>(null);
@@ -100,9 +179,23 @@ export function SiteFrame({
             .catch(() => ({ ok: false, error: "Network error. Please try again." }));
         }
         post({ t: "reply", n: d.n, result: { ok: !!result.ok, error: result.error } });
+      } else if (d.t === "api" && typeof d.n === "number" && live) {
+        const q = (d.data ?? {}) as { op?: unknown; data?: unknown };
+        const result = await storeApi(businessId, String(q.op), (q.data && typeof q.data === "object" ? q.data : {}) as Record<string, unknown>, token).catch(() => ({ ok: false, error: "Network error. Please try again." }));
+        post({ t: "reply", n: d.n, result });
       } else if (d.t === "picked") {
         const p = e.data as Record<string, unknown>;
-        onPicked?.({ tag: String(p.tag ?? "").slice(0, 20), cls: String(p.cls ?? "").slice(0, 80), text: String(p.text ?? "").slice(0, 120), where: String(p.where ?? "").slice(0, 80) });
+        const l = p.link as PickedEl["link"];
+        onPicked?.({
+          tag: String(p.tag ?? "").slice(0, 20),
+          cls: String(p.cls ?? "").slice(0, 80),
+          text: String(p.text ?? "").slice(0, 120),
+          where: String(p.where ?? "").slice(0, 80),
+          texts: (Array.isArray(p.texts) ? p.texts : []).slice(0, 6).map((x: Record<string, unknown>) => ({ from: String(x.from ?? ""), now: String(x.now ?? ""), product: !!x.product })),
+          image: typeof p.image === "string" ? p.image.slice(0, 600) : null,
+          imageIsProduct: !!p.imageIsProduct,
+          link: l && typeof l === "object" ? { href: String(l.href ?? "").slice(0, 300), from: String(l.from ?? "").slice(0, 300), text: String(l.text ?? "").slice(0, 200) } : null,
+        });
       }
     }
     window.addEventListener("message", onMsg);
@@ -128,16 +221,18 @@ export function SiteFrame({
 }
 
 /** The live store: full-window frame, with real addresses and back/forward. */
-export function LiveSite({ businessId, storeName, slug, productId, pages, products, bg }: { businessId: string; storeName: string; slug: string; productId: string | null; pages: string[]; products: SiteProduct[]; bg: string }) {
-  const [at, setAt] = useState({ slug, productId, seen: false });
+export function LiveSite({ businessId, storeName, slug, productId, orderId = null, pages, products, bg }: { businessId: string; storeName: string; slug: string; productId: string | null; orderId?: string | null; pages: string[]; products: SiteProduct[]; bg: string }) {
+  const [at, setAt] = useState({ slug, productId, orderId, seen: false });
   const base = `/store/${businessId}`;
 
   useEffect(() => {
     function read() {
-      const path = location.pathname.replace(base, "");
+      const path = location.pathname.replace(base, "").replace(/\/$/, "");
       const p = /^\/p\/([a-z0-9-]+)/.exec(path)?.[1];
-      const id = /^\/product\/([A-Za-z0-9_-]+)/.exec(path)?.[1];
-      setAt(id ? { slug: "product", productId: id, seen: true } : { slug: p ?? "home", productId: null, seen: true });
+      const id = /^\/product\/([A-Za-z0-9_-]+)/.exec(path)?.[1] ?? null;
+      const order = /^\/order\/([A-Za-z0-9_-]+)/.exec(path)?.[1] ?? null;
+      const sys = ({ "/cart": "cart", "/checkout": "checkout", "/account": "account", "/account/login": "login" } as Record<string, string>)[path];
+      setAt({ slug: id ? "product" : order ? "thanks" : (sys ?? p ?? "home"), productId: id, orderId: order, seen: true });
     }
     window.addEventListener("popstate", read);
     return () => window.removeEventListener("popstate", read);
@@ -145,18 +240,23 @@ export function LiveSite({ businessId, storeName, slug, productId, pages, produc
 
   const go = useCallback(
     (to: string, id: string | null) => {
-      if (to === "cart" || to === "account") return location.assign(`${base}/${to}`);
-      if (to === "product" && id && !pages.includes("product")) return location.assign(`${base}/product/${id}`);
-      if (!pages.includes(to)) return;
-      const url = to === "home" ? base : to === "product" && id ? `${base}/product/${id}` : `${base}/p/${to}`;
+      const leave = (u: string) => window.location.assign(u);
+      if (to === "account-more") return leave(`${base}/account?full=1`);
+      if (to === "product" && id && !pages.includes("product")) return leave(`${base}/product/${id}`);
+      const order = to === "order" ? id : null;
+      if (to === "order" && !order) return;
+      if (to !== "order" && !isSystemPage(to) && !pages.includes(to)) return;
+      const url = order ? `${base}/order/${order}` : to === "home" ? base : to === "product" && id ? `${base}/product/${id}` : to === "login" ? `${base}/account/login` : isSystemPage(to) ? `${base}/${to}` : `${base}/p/${to}`;
+      if (order) return leave(url); // the server settles the order (pixel, payment) before it is shown
       history.pushState(null, "", url);
-      setAt({ slug: to, productId: to === "product" ? id : null, seen: true });
+      setAt({ slug: to, productId: to === "product" ? id : null, orderId: null, seen: true });
     },
     [base, pages],
   );
 
   const q = new URLSearchParams({ page: at.slug });
   if (at.productId) q.set("product", at.productId);
+  if (at.orderId) q.set("order", at.orderId);
   if (at.seen) q.set("seen", "1");
   return (
     <div style={{ position: "fixed", inset: 0, background: bg }}>

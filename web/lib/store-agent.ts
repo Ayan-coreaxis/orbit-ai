@@ -14,8 +14,8 @@ import type { Browser, BrowserContext, Page } from "playwright";
 import { anthropic } from "@/lib/anthropic";
 import { SITE_CRAFT_SKILL } from "@/lib/site-craft-skill";
 import { assertPublicUrl } from "@/lib/safe-fetch";
-import { readLocalUpload } from "@/lib/storage";
-import { FILE_RE, MAX_FILE, RESERVED, composePage, lintSite, manifest, type SiteData, type StoreSite } from "@/lib/store-site";
+import { r2Config, readLocalUpload } from "@/lib/storage";
+import { FILE_RE, MAX_FILE, RESERVED, SYSTEM_PAGES, isSystemPage, composePage, lintSite, manifest, type SiteData, type StoreSite } from "@/lib/store-site";
 
 export const STORE_AGENT_MODEL = "claude-opus-5-5";
 const PRICE = { input: 4, cacheWrite: 5, cacheRead: 0.2, output: 20 }; // $ per million tokens
@@ -87,21 +87,29 @@ const TOOLS: Anthropic.Tool[] = [
 
 const CONTRACT = `# How this store is put together
 You write a small website of plain files:
-- site.json — {"pages":[{"slug":"home","title":"Home","nav":true}, ...], "theme":{"bg","surface","text","muted","border","accent","accentText" (hex colours), "radius" (px number), "headingFont","bodyFont" (Google font family names)}, "tagline"}. The theme dresses the platform's own checkout, order and account screens, so it must match your design.
+- site.json — {"pages":[{"slug":"home","title":"Home","nav":true}, ...], "theme":{"bg","surface","text","muted","border","accent","accentText" (hex colours), "radius" (px number), "headingFont","bodyFont" (Google font family names)}, "tagline", "menu", "settings", "lists"}. The theme feeds the checkout, account and thank-you parts, so it must match your design.
+  "menu": [{"label","href"}] is the header menu (href "#page:slug", "#product:id" or https). Render the header and footer menus from ORBIT.menu, never from fixed HTML.
+  "settings": [{"key","label","type":"text|number|select|color|toggle|image","value","min","max","options"}] are this design's own knobs the seller can turn without you (columns on desktop, how many best sellers, announcement text, slider speed, 3D colour …). Read them from ORBIT.settings.key. Give 5 to 10 that make sense, with limits that cannot break the layout.
+  "lists": [{"key","label","fields":[{"key","label","type":"text|textarea|image|link"}],"items":[{…}],"min","max"}] hold everything that repeats and isn't a product (slides, banners, steps, FAQ, gallery, promises). Render them from ORBIT.lists.key with any number of items between min and max. Links use "#page:slug", "#product:id" or https.
+- Collections: products have a category; link to a collection as the shop page with a filter the page itself understands.
 - site.css — the shared stylesheet. Every page has <link rel="stylesheet" href="site.css">.
 - site.js — shared behaviour. Every page has <script src="site.js"></script> before </body>. It runs as an ES module after the HTML is parsed. Put the header, footer, bag drawer, phone menu and product cards here as one implementation and render them on every page, so pages never drift apart.
 - pages/<slug>.html — one complete HTML document per page (<!doctype html> … </html>). Google Fonts <link>s are allowed. No other outside stylesheet or script.
 
-PAGES ARE THE SELLER'S CHOICE. Build exactly the pages they ask for, whatever they are (a lookbook, a size guide, a recipe page, wholesale, a single-page store with nothing else). No page is compulsory except home. When they leave it open, choose the few pages this shop really needs. If products have their own page, build one template, pages/product.html (nav false), which reads ORBIT.page.productId and shows a sensible fallback when it is empty or unknown; link to it with #product:<id>. Never build cart, checkout, account, order or login pages: the platform runs those.
+PAGES ARE THE SELLER'S CHOICE. Build exactly the pages they ask for, whatever they are (a lookbook, a size guide, a recipe page, wholesale, a single-page store with nothing else). No page is compulsory except home. When they leave it open, choose the few pages this shop really needs. If products have their own page, build one template, pages/product.html (nav false), which reads ORBIT.page.productId and shows a sensible fallback when it is empty or unknown; link to it with #product:<id>. 
+
+EVERY store also has five shop pages that you design in the same art direction, with the same header and footer: pages/cart.html, pages/checkout.html, pages/login.html, pages/account.html, pages/thanks.html. Each has a <main> with your own composition (heading, a line of copy, an image or motion where it helps; checkout stays calm) and exactly one <div data-orbit-widget="cart"></div> (or checkout / login / account / thanks), which the platform fills with the working part. You never write its markup, forms or logic. You style it in site.css through these classes so it looks made for this shop: .ob (root), .ob-grid (main column + summary), .ob-card, .ob-narrow, .ob-h (card heading), .ob-line .ob-thumb .ob-name .ob-price .ob-dim .ob-qty .ob-link (bag lines), .ob-row .ob-total .ob-summary, .ob-btn .ob-primary .ob-alt, .ob-field (label > span + input/textarea), .ob-two, .ob-check, .ob-pay, .ob-code, .ob-tabs, .ob-steps, .ob-err, .ob-ok, .ob-empty. Sensible defaults come from the theme; write your rules as ".ob .ob-btn{…}" and they win. Do not list these five in site.json pages or the menu. The header always has a bag link (href="#cart", with data-cart-count) and a login link (href="#account"), on phones too. Product photos in the widgets use your stand-ins if site.js sets window.ORBIT_STANDIN = (productId) => url.
 
 # window.ORBIT — the live store (available before any script of yours)
 - ORBIT.products: [{id,name,price,fromPrice,image|null,images[],description (HTML),category|null,stock,options[{name,values}],variants[{id,label,options,price,stock,image}],sold,rating,reviews[]}]. ALWAYS render products from this list in JavaScript; the seller adds, reprices and sells out products after you are done. Never hard-code a price or a name of a product. reviews/rating exist only on the product page and only when real.
-- ORBIT.money(n) formats a price. ORBIT.product(id). ORBIT.store {name,email,phone,address,socials,announcement} — hide anything that is empty. ORBIT.page {slug,productId}. ORBIT.hasPage[slug].
-- ORBIT.cart: lines() → [{key,productId,variantId,variantLabel,name,price,qty,image}], add(productId,{variantId,qty}) → false if a variant must be chosen first, setQty(key,n), remove(key), count(), total(), onChange(fn) (called at once and on every change), checkout(). Any element with data-cart-count gets the count. Design your own bag drawer on top of this; its main button calls ORBIT.cart.checkout(). Sold-out (stock 0) must not be addable.
+- ORBIT.money(n) formats a price. ORBIT.product(id). ORBIT.store {name,email,phone,address,socials,announcement} — hide anything that is empty. ORBIT.page {slug,productId}. ORBIT.hasPage[slug]. ORBIT.menu, ORBIT.settings, ORBIT.lists.
+- ORBIT.cart: lines() → [{key,productId,variantId,variantLabel,name,price,qty,image}], add(productId,{variantId,qty}) → false if a variant must be chosen first, setQty(key,n), remove(key), count(), total(), onChange(fn) (called at once and on every change), checkout() (opens the checkout page). Any element with data-cart-count gets the count. Design your own bag drawer on top of this; its main button calls ORBIT.cart.checkout(). Sold-out (stock 0) must not be addable.
 - ORBIT.contact({name,email,message}) and ORBIT.newsletter(email) → Promise<{ok,error?}>. They really send; show the result.
-- Links: href="#page:<slug>", "#product:<id>", "#cart" (checkout), "#account" (sign in / orders). "#some-id" scrolls on the page. Outside links open in a new tab.
+- Links: href="#page:<slug>", "#product:<id>", "#cart" (bag page), "#checkout", "#account" (login / orders). "#some-id" scrolls on the page. Outside links open in a new tab.
 - ORBIT.firstVisit is true only on the first page of a visit — play a splash only then.
 - localStorage, sessionStorage, cookies and fetch to other servers are blocked.
+- The seller edits any text, photo or link by clicking it. So put real words in the HTML as plain text (no text drawn in images or canvas), keep each sentence in one element, and use normal <img> or CSS background images. site.js runs on every page: guard every querySelector.
+- The store must survive any catalogue: 1 product or 200, long names, no photo, no description, sold out, with or without variants, one category or ten.
 - Product photos: use p.image; when it is null fall back to a stand-in photo you chose (keep one map keyed by product id in site.js, plus a generic fallback for products added later). When ORBIT.products is empty show a designed "opening soon" state.
 
 # Motion and 3D — use as much as the brief deserves, and make it excellent
@@ -112,7 +120,7 @@ Libraries on this server (nothing else loads):
 - Page transitions, scroll storytelling, pinned scenes, marquee, magnetic cursors, shaders, particles, video: all yours. Content must be visible if a script fails or the visitor prefers reduced motion; 3D pauses off screen, caps pixel ratio at 2, and has a still fallback when WebGL is missing; everything stays smooth on a mid-range Android phone.
 
 # Order of work
-1. Decide the art direction and the page list. Find and look at photos. 2. Write site.json, site.css, site.js and pages/home.html; screenshot and get the home page right. 3. Write the other pages. 4. Look at every page at desktop and phone width; add to the bag, open it, open the phone menu, play the splash. 5. Fix, then stop.
+1. Decide the art direction and the page list. Find and look at photos. 2. Write site.json, site.css, site.js and pages/home.html; screenshot and get the home page right. 3. Write the other pages and the five shop pages. 4. Look at every page at desktop and phone width; add to the bag, open it, open the phone menu, play the splash, and look at cart, checkout, login and thanks at both widths (they open with two products in the bag). 5. Fix, then stop.
 Be economical: several tool calls in one turn, "both" viewports, edit_file for fixes instead of rewriting files. The platform runs an automatic check on every page when you finish and sends you anything it finds.
 Never invent reviews, ratings, customer numbers, press, or policies the brief doesn't give. Every photo must be one you have looked at and judged right for this shop. Avoid close-ups of identifiable faces. Write real copy for this shop, in the language the seller uses for their customers (English unless told otherwise).`;
 
@@ -126,7 +134,12 @@ async function contactSheet(urls: string[]): Promise<{ sheet: Buffer | null; fai
   const tiles = await Promise.all(
     urls.slice(0, 12).map(async (u, i) => {
       try {
-        if (!PHOTO_HOSTS.test(u)) throw new Error("host not allowed");
+        if (/^\/uploads\/[\w./-]+$/.test(u)) {
+          const own = await readLocalUpload(u.split("/").slice(2));
+          if (!own) throw new Error("missing");
+          return { i, img: await sharp(own).resize(W, H, { fit: "contain", background: "#777" }).jpeg().toBuffer(), label: Buffer.from(`<svg width="44" height="30"><rect width="44" height="30" fill="#000"/><text x="8" y="21" font-size="18" font-family="Arial" fill="#fff">${i + 1}</text></svg>`) };
+        }
+        if (!PHOTO_HOSTS.test(u) && !(r2Config()?.publicUrl && u.startsWith(`${r2Config()!.publicUrl}/`))) throw new Error("host not allowed");
         const r = await fetch(u, { signal: AbortSignal.timeout(15000), redirect: "error" });
         if (!r.ok || !/^image\//.test(r.headers.get("content-type") ?? "")) throw new Error(String(r.status));
         const img = await sharp(Buffer.from(await r.arrayBuffer())).resize(W, H, { fit: "cover" }).jpeg().toBuffer();
@@ -204,7 +217,7 @@ class Viewer {
       }
       const slug = parts[0] ?? "home";
       const productId = url.searchParams.get("product") ?? (slug === "product" ? (this.data.products[0]?.id ?? null) : null);
-      const html = composePage(this.site(), { slug, productId, data: this.data, origin: ORIGIN, preview: true, firstVisit: url.searchParams.get("seen") !== "1" });
+      const html = composePage(this.site(), { slug, productId, data: this.data, origin: ORIGIN, preview: true, firstVisit: url.searchParams.get("seen") !== "1", seedCart: isSystemPage(slug) && url.searchParams.get("empty") !== "1" });
       return html ? route.fulfill({ body: html, contentType: "text/html; charset=utf-8" }) : route.fulfill({ status: 404, body: `no page "${slug}"` });
     });
     return { ctx, page, errors };
@@ -224,7 +237,7 @@ class Viewer {
 
   async shoot(a: { page?: string; viewport?: string; selector?: string; click?: string[]; wait_ms?: number; full_page?: boolean }): Promise<Block[]> {
     const slug = a.page || "home";
-    if (!this.site().files[`pages/${slug}.html`]) return [text(`There is no pages/${slug}.html yet.`)];
+    if (!isSystemPage(slug) && !this.site().files[`pages/${slug}.html`]) return [text(`There is no pages/${slug}.html yet.`)];
     const out: Block[] = [];
     for (const vp of a.viewport === "both" ? ["desktop", "mobile"] : [a.viewport === "mobile" ? "mobile" : "desktop"]) {
       const mobile = vp === "mobile";
@@ -264,7 +277,7 @@ class Viewer {
   /** Every page, both widths — no model involved. */
   async check(): Promise<string[]> {
     const issues: string[] = [];
-    for (const p of manifest(this.site()).pages) {
+    for (const p of [...manifest(this.site()).pages, ...SYSTEM_PAGES]) {
       for (const mobile of [false, true]) {
         const at = `${p.slug} (${mobile ? "phone" : "desktop"})`;
         const { ctx, page, errors } = await this.open(mobile);
@@ -276,6 +289,7 @@ class Viewer {
           if (f.over > 1) issues.push(`${at}: ${f.over}px of sideways overflow`);
           if (f.text < 60) issues.push(`${at}: the page is almost empty`);
           for (const b of f.broken) issues.push(`${at}: image failed to load — ${b}`);
+          if (isSystemPage(p.slug)) issues.push(...(await this.checkShopPage(page, p.slug)).map((x) => `${at}: ${x}`));
           for (const e of new Set(errors)) issues.push(`${at}: console error — ${e}`);
         } catch (e) {
           issues.push(`${at}: did not load — ${String(e).slice(0, 120)}`);
@@ -284,7 +298,72 @@ class Viewer {
         }
       }
     }
-    return issues.slice(0, 20);
+    issues.push(...(await this.checkCatalogues()));
+    return issues.slice(0, 24);
+  }
+
+  /** The working part is there, readable and clickable, and an order goes through (a demo one). */
+  private async checkShopPage(page: Page, slug: string): Promise<string[]> {
+    const out: string[] = [];
+    const w = page.locator(`[data-orbit-widget="${slug}"]`).first();
+    await w.locator(".ob-primary, .ob-card").first().waitFor({ state: "visible", timeout: 6000 }).catch(() => {});
+    const btn = w.locator(slug === "account" ? ".ob-btn" : ".ob-primary").first();
+    if (!(await btn.isVisible().catch(() => false))) return [`the ${slug} part is not visible`];
+    const bad = (await page
+      .evaluate(
+        `(()=>{const out=[];const L=c=>{const m=c.match(/[\\d.]+/g);if(!m||m.length<3)return null;if(m.length>3&&+m[3]<.5)return null;const f=v=>{v/=255;return v<=.03928?v/12.92:((v+.055)/1.055)**2.4};return .2126*f(+m[0])+.7152*f(+m[1])+.0722*f(+m[2])};
+        document.querySelectorAll('.ob .ob-btn,.ob .ob-h,.ob .ob-dim,.ob .ob-name,.ob .ob-row span,.ob .ob-field>span,.ob input,.ob .ob-tabs button').forEach(e=>{const r=e.getBoundingClientRect();if(!r.width||!r.height)return;let b=e,bg=null;while(b&&bg===null){if(getComputedStyle(b).backgroundImage!=='none')return;bg=L(getComputedStyle(b).backgroundColor);b=b.parentElement}if(bg===null)bg=1;const fg=L(getComputedStyle(e).color);if(fg===null)return;const k=(Math.max(fg,bg)+.05)/(Math.min(fg,bg)+.05);if(k<4)out.push(e.className+' "'+(e.textContent||e.name||'').trim().slice(0,24)+'" contrast '+k.toFixed(1))});return [...new Set(out)].slice(0,4)})()`,
+      )
+      .catch(() => [])) as string[];
+    for (const b of bad) out.push(`hard to read: ${b}`);
+    const hid = await page.evaluate("(()=>{scrollTo(0,0);const h=document.querySelector('main h1');if(!h)return'no h1 in main';const r=h.getBoundingClientRect(),e=document.elementFromPoint(r.left+Math.min(r.width/2,60),r.top+r.height/2);return e&&(h.contains(e)||e.contains(h))?'':(r.top>innerHeight?'':'the h1 is covered by '+(e?e.tagName.toLowerCase()+'.'+String(e.className).slice(0,30):'something'))})()").catch(() => "");
+    if (hid) out.push(String(hid));
+    if (slug === "checkout") {
+      try {
+        await w.locator('[name="name"]').fill("Test Shopper", { timeout: 4000 });
+        await w.locator('[name="phone"]').fill("03001234567", { timeout: 4000 });
+        await w.locator('[name="line1"]').fill("12 Test Street", { timeout: 4000 });
+        await w.locator('[name="city"]').fill("Lahore", { timeout: 4000 });
+        await btn.click({ timeout: 5000 });
+        await page.waitForURL(/\/thanks/, { timeout: 6000 });
+      } catch (e) {
+        out.push(`an order could not be placed: ${String(e).split("\n")[0].slice(0, 160)}`);
+      }
+    } else if (slug !== "account") {
+      await btn.click({ trial: true, timeout: 4000 }).catch(() => out.push(`the "${slug}" button can't be clicked (something covers it)`));
+    }
+    return out;
+  }
+
+  /** The store with no products, one, and many awkward ones. */
+  private async checkCatalogues(): Promise<string[]> {
+    const real = this.data;
+    const out: string[] = [];
+    const base = real.products[0];
+    const many = base ? Array.from({ length: 48 }, (_, i) => ({ ...base, id: `t${i}`, name: i % 5 ? `Product ${i}` : `A product with a really long name that keeps going number ${i}`, image: null, images: [], description: "", stock: i % 7 ? 5 : 0, category: i % 2 ? "One" : null, options: [], variants: [], fromPrice: undefined, price: i % 3 ? 999 : 1299999 })) : [];
+    try {
+      for (const [label, products] of [["no products", []], ["one product", real.products.slice(0, 1)], ["48 awkward products", many]] as const) {
+        this.data = { ...real, products: [...products] };
+        for (const slug of ["home", "shop"]) {
+          if (!this.site().files[`pages/${slug}.html`]) continue;
+          const { ctx, page, errors } = await this.open(slug === "shop");
+          try {
+            await page.goto(`${ORIGIN}/${slug}?seen=1`, { waitUntil: "load", timeout: 40000 });
+            await page.waitForTimeout(1500);
+            const f = await this.facts(page);
+            if (f.over > 1) out.push(`${slug} with ${label}: ${f.over}px of sideways overflow`);
+            for (const e of new Set(errors)) out.push(`${slug} with ${label}: console error — ${e}`);
+          } catch (e) {
+            out.push(`${slug} with ${label}: did not load — ${String(e).slice(0, 100)}`);
+          } finally {
+            await ctx.close();
+          }
+        }
+      }
+    } finally {
+      this.data = real;
+    }
+    return out;
   }
 
   async close() {
@@ -304,7 +383,10 @@ const SAY: Record<string, (i: Record<string, unknown>) => string> = {
 
 function storeFacts(d: SiteData): string {
   const list = d.products.slice(0, 60).map((p) => `- ${p.name} (id ${p.id}) ${p.price} ${d.store.currency.toUpperCase()}${p.category ? ` · ${p.category}` : ""}${p.image ? " · has photo" : " · NO PHOTO"}${p.variants.length ? ` · variants: ${p.variants.map((v) => v.label).slice(0, 8).join(", ")}` : ""}${p.stock <= 0 ? " · sold out" : ""}${p.description ? ` — ${p.description.replace(/<[^>]+>/g, " ").slice(0, 120)}` : ""}`);
-  return `STORE FACTS\nName: ${d.store.name}\nCurrency: ${d.store.currency}\nContact on the store: ${[d.store.email, d.store.phone, d.store.address].filter(Boolean).join(" · ") || "none yet"}\nSocials: ${Object.entries(d.store.socials).map(([k, v]) => `${k} ${v}`).join(", ") || "none"}\nProducts in ORBIT.products${list.length ? ` (${d.products.length}):\n${list.join("\n")}` : ": none yet"}`;
+  return `STORE FACTS\nName: ${d.store.name}\nCurrency: ${d.store.currency}\nContact on the store: ${[d.store.email, d.store.phone, d.store.address].filter(Boolean).join(" · ") || "none yet"}\nSocials: ${Object.entries(d.store.socials).map(([k, v]) => `${k} ${v}`).join(", ") || "none"}\n${(d.media ?? []).length ? `THE SELLER'S OWN PHOTOS (use these before any stock photo; look at them with check_photos):
+${d.media!.map((m) => `- ${m.url} — ${m.name}`).join("
+")}
+` : ""}Products in ORBIT.products${list.length ? ` (${d.products.length}):\n${list.join("\n")}` : ": none yet"}`;
 }
 
 export async function runStoreAgent(opts: StoreAgentOpts): Promise<StoreAgentResult> {

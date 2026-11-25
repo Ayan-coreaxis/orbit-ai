@@ -4,8 +4,10 @@ import { parseOptionTypes, hasVariants } from "@/lib/variants";
 import { withSales } from "@/lib/storefront-products";
 import { getProductReviews } from "@/lib/product-reviews";
 import { loadDoc } from "@/lib/orbit-design-generate";
+import { parseCheckoutCustomFields } from "@/lib/checkout-fields";
+import { paymentMethodLabel } from "@/lib/payment-methods";
 import { r2Config } from "@/lib/storage";
-import { parseBuild, parseSite, type SiteData, type SiteProduct } from "@/lib/store-site";
+import { parseBuild, parseSite, type SiteData, type SiteOrder, type SiteProduct } from "@/lib/store-site";
 
 const json = <T,>(raw: string | null | undefined, or: T): T => {
   try {
@@ -18,7 +20,7 @@ const json = <T,>(raw: string | null | undefined, or: T): T => {
 /** The real catalogue and contact details an agent-built store runs on. Only details the seller has
  *  put on their store — never Business.whatsapp, which is the owner's own number. */
 export async function siteData(businessId: string, productId?: string | null): Promise<SiteData | null> {
-  const b = await prisma.business.findUnique({ where: { id: businessId }, select: { id: true, name: true, storeCurrency: true } });
+  const b = await prisma.business.findUnique({ where: { id: businessId }, select: { id: true, name: true, storeCurrency: true, checkoutCustomFields: true } });
   if (!b) return null;
   const [rows, doc] = await Promise.all([
     prisma.product.findMany({ where: { businessId }, orderBy: { createdAt: "desc" }, include: { variants: { orderBy: { createdAt: "asc" } }, category: { select: { name: true } } }, take: 500 }),
@@ -66,6 +68,30 @@ export async function siteData(businessId: string, productId?: string | null): P
       announcement: c?.announcement?.enabled ? c.announcement.text : "",
     },
     products: sold,
+    checkoutFields: parseCheckoutCustomFields(b.checkoutCustomFields),
+  };
+}
+
+/** One order for its thank-you page. Knowing the order id is the key, as on the order page itself. */
+export async function siteOrder(businessId: string, orderId: string): Promise<SiteOrder | null> {
+  const o = await prisma.order.findUnique({ where: { id: orderId } });
+  if (!o || o.businessId !== businessId) return null;
+  const items = json<SiteOrder["items"]>(o.items, []);
+  return {
+    id: o.id,
+    number: o.id.slice(-6).toUpperCase(),
+    status: o.status,
+    firstName: o.customerName.split(" ")[0],
+    phone: o.customerPhone,
+    address: o.address,
+    items: items.map((i) => ({ productId: i.productId, name: String(i.name), variantLabel: i.variantLabel ?? null, price: Number(i.price) || 0, qty: Number(i.qty) || 1 })),
+    subtotal: o.subtotal,
+    shipping: o.shippingFee,
+    discount: o.discountAmount + o.loyaltyDiscount,
+    tax: o.taxAmount,
+    total: o.total,
+    payment: paymentMethodLabel(o.paymentProvider as never),
+    tracking: [o.courierName, o.trackingNumber].filter(Boolean).join(" ") || undefined,
   };
 }
 

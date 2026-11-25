@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildRunning, composePage, lintSite, manifest, priceLine, siteHeaders, type SiteData, type StoreSite } from "@/lib/store-site";
 
+const sys = (w: string) => page(`<main><div data-orbit-widget="${w}"></div></main>`);
 const page = (body: string) => `<!doctype html><html><head><title>x</title><link rel="stylesheet" href="site.css"></head><body>${body}<script src="site.js"></script></body></html>`;
 const data: SiteData = {
   store: { id: "b", name: "Mehfil </script><b>", currency: "pkr", email: "", phone: "", address: "", socials: {}, announcement: "" },
@@ -13,8 +14,9 @@ const site = (extra: Record<string, string> = {}): StoreSite => ({
   files: {
     "site.json": JSON.stringify({ pages: [{ slug: "home", title: "Home" }], theme: { bg: "#fff", accent: "#000" } }),
     "site.css": "body{color:red}",
-    "site.js": 'const a="$& $1";document.title=a;',
+    "site.js": 'const a="$& $1";document.title=a;ORBIT.menu;"#account";"#cart"',
     "pages/home.html": page("<h1>Hi</h1>"),
+    ...Object.fromEntries(["cart", "checkout", "login", "account", "thanks"].map((w) => [`pages/${w}.html`, sys(w)])),
     ...extra,
   },
 });
@@ -49,7 +51,31 @@ describe("store site", () => {
     expect(bad).toMatch(/zzz/);
     expect(bad).toMatch(/evil\.test/);
     expect(bad).toMatch(/browser storage/);
-    expect(bad).toMatch(/cart screen/);
+    expect(bad).toMatch(/cart\.html has no/);
+  });
+  it("always has cart, checkout, login, account and thank-you pages, in the store's own header and footer", () => {
+    const old = { files: { "site.css": "", "site.js": "", "pages/home.html": "<html><body><main>hero</main></body></html>", "pages/contact.html": '<!doctype html><html><head><title>C</title></head><body><header>MY HEADER</header><main><form></form></main><footer>MY FOOTER</footer></body></html>' } };
+    for (const w of ["cart", "checkout", "login", "account", "thanks"]) {
+      const html = composePage(old, { slug: w, data, origin: "https://x.test" })!;
+      expect(html).toContain(`data-orbit-widget="${w}"`);
+      expect(html).toContain("MY HEADER");
+      expect(html).not.toContain("<form></form>");
+    }
+    // a designed page that lost its working part is not trusted
+    expect(composePage({ files: { ...old.files, "pages/cart.html": page("<main>pretty</main>") } }, { slug: "cart", data, origin: "https://x.test" })).toContain("MY HEADER");
+    expect(manifest(site()).pages.map((p) => p.slug)).not.toContain("cart");
+  });
+  it("keeps the seller's click edits apart from the design, and swaps a picture everywhere", () => {
+    const s = site({ "site.css": "a{background:url(https://p.test/a.jpg?w=1&q=2)}", "pages/home.html": page('<img src="https://p.test/a.jpg?w=1&amp;q=2">'), "edits.json": JSON.stringify([{ kind: "image", from: "https://p.test/a.jpg?w=1&q=2", to: "/uploads/b/x.webp" }, { kind: "text", page: "*", from: "Hi", to: "Salam </script>" }]) });
+    const html = composePage(s, { slug: "home", data, origin: "https://x.test" })!;
+    expect(html).not.toContain("p.test/a.jpg");
+    expect(html.match(/uploads\/b\/x\.webp/g)!.length).toBe(2);
+    expect(html).not.toContain("Salam </script>");
+  });
+  it("only offers knobs the design declared, and menu links that lead somewhere", () => {
+    const m = manifest(site({ "site.json": JSON.stringify({ pages: [], menu: [{ label: "Home", href: "#page:home" }, { label: "Gone", href: "#page:gone" }, { label: "Bad", href: "javascript:alert(1)" }], settings: [{ key: "cols", label: "Columns", type: "number", value: 4 }, { key: "<x>", label: "x", type: "text", value: "" }] }) }));
+    expect(m.menu).toEqual([{ label: "Home", href: "#page:home" }]);
+    expect(m.settings.map((x) => x.key)).toEqual(["cols"]);
   });
   it("prices a line from our own products only", () => {
     expect(priceLine(data.products, "p1", null)?.price).toBe(950);
