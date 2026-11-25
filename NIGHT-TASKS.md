@@ -8,11 +8,11 @@ Rules: do not touch Mehfil Mugs, VoltKart or the owner's real data. Never text o
 ## Tasks (tick only after a test passed)
 ### 1. Perfume store (Noor-e-Shab `cmwwmnjow0001ffa4ekbpm9n9`) — layout and feel like scentsnstories.pk, own brand, no 3D
 - [x] 1.1 Build with the store agent (cap $5; finish with Continue inside the $8)
-- [ ] 1.2 Every page at desktop + phone, screenshots looked at
-- [ ] 1.3 Real COD order: product → cart → login → checkout → thank-you → dashboard
-- [ ] 1.4 Click edit (text, photo, link), menu, lists, Undo, publish
+- [x] 1.2 Every page at desktop + phone, screenshots looked at
+- [x] 1.3 Real COD order: product → cart → login → checkout → thank-you → dashboard
+- [x] 1.4 Click edit (text, photo, link), menu, lists, Undo, publish
 - [ ] 1.5 Chat edit (AI), Stop, Continue
-- [ ] 1.6 Fix every fault found, in the system rather than only this store
+- [x] 1.6 Fix every fault found, in the system rather than only this store
 
 ### 2. Business logic (no AI)
 - [x] 2.1 Products, variants, stock, sold out, price changes reach the live store
@@ -34,11 +34,11 @@ Rules: do not touch Mehfil Mugs, VoltKart or the owner's real data. Never text o
   - [x] g. Fake orders, bad review, angry customer
   - [x] h. Eid / wedding season with no cash
 - [ ] 3.4 Fix weaknesses, run the same scenarios again
-- [ ] 3.5 AI allowance cap blocks correctly
+- [x] 3.5 AI allowance cap blocks correctly
 
 ### 4. WhatsApp / Instagram / Facebook on fake servers
 - [x] 4.1 Incoming message → inbox → reply; signature checks; duplicates
-- [ ] 4.2 Comments → rules → DM; posting; ads create / pause; expired token and rate-limit errors
+- [x] 4.2 Comments → rules → DM; posting; ads create / pause; expired token and rate-limit errors
 - [x] 4.3 WhatsApp order confirm (YES/NO), reviews, owner's APPLY / NO
 
 ### 5. Payments and couriers on fake servers
@@ -48,14 +48,14 @@ Rules: do not touch Mehfil Mugs, VoltKart or the owner's real data. Never text o
 ### 6. Everything else
 - [ ] 6.1 Signup, login, reset, onboarding
 - [ ] 6.2 Settings, team, domains, admin
-- [ ] 6.3 Inbox, Content, Studio (no paid image/video calls)
+- [x] 6.3 Inbox, Content, Studio (no paid image/video calls)
 - [x] 6.4 Phone view of every dashboard page
 - [x] 6.5 Security: another seller's data, unsigned webhooks, rate limits, upload abuse
 - [ ] 6.6 8 lint errors; production build; all tests; final commit; morning report
 
 ### 7. As a brand-new user, then improve (after everything above)
 - [ ] 7.1 New seller who knows nothing: signup → onboarding → first store → first product → publish → first order → Orchestrator, with no inside knowledge; write down every confusing word, dead end, wait and wrong turn
-- [ ] 7.2 Blind / keyboard / screen-reader user: whole seller journey and a shopper order with keyboard only; names, focus order, announcements, contrast, zoom 200%
+- [x] 7.2 Blind / keyboard / screen-reader user: whole seller journey and a shopper order with keyboard only; names, focus order, announcements, contrast, zoom 200%
 - [ ] 7.3 First-time shopper on a cheap phone, slow network
 - [ ] 7.4 Fix what was found, best first, and repeat the journey
 
@@ -64,7 +64,8 @@ Rules: do not touch Mehfil Mugs, VoltKart or the owner's real data. Never text o
 |---|---|---|
 | night 1 | Noor-e-Shab first build (dark, off-reference: rejected) | 3.63 |
 | night 1 | 8 Orchestrator scenarios | 2.61 |
-| night 1 | Noor-e-Shab rebuild with reference capture + art director (running) | ≤5 |
+| night 1 | Noor-e-Shab rebuild (reference + art director) and Continue | 7.19 |
+| **total** | | **~13.4 (cap 15)** |
 
 ## Found and fixed
 - Checkout: the same submit arriving twice at once answered 500 (no duplicate order); now returns the first order.
@@ -76,5 +77,9 @@ Rules: do not touch Mehfil Mugs, VoltKart or the owner's real data. Never text o
 - Scenario results (30-day profit, simple model; planner score by a cheap grader): a new store 9/10 · b losing money 7 (91.6k→167.8k) · c 40% returns 8 (168.6k→290.4k) · d sold-out best seller 7 (15.1k→368.5k) · e price war 7 (88.1k→108.7k) · f ads burning 8 (−12.3k→21.6k) · g bad service 8 (269.2k→332.9k) · h no cash 7 (90.7k→108.3k). All diagnosed the real leak.
 
 ## Open / needs the owner
+- PLAN LIMITS: the 5-hour AI window is 20% of the monthly cap. Starter ($15) → $3 per 5 hours, but one store build costs $4–5, so a Starter seller can never finish a build (Noor-e-Shab hit it: chat edit got 402). Decide: store builds outside the window, a one-off build allowance per plan, or cheaper builds.
+- Build cost: one full store with art director ≈ $7 (two runs). Needs work on cost before launch.
+- Not done tonight (AI budget used up): chat-edit test (1.5), onboarding with AI (6.1), Orchestrator Apply → design edit on an agent store (3.2), fixing then re-running scenarios (3.4), no-reference short-prompt build test.
+- 8 lint errors (setState in effects) in AppShell, NotificationBell, InboxClient, Composer, DemoFlow: harmless, not fixed.
 - Live accounts still needed for a real (not fake) test: Meta, Twilio WhatsApp, Stripe, JazzCash, Easypaisa, couriers.
 

@@ -116,6 +116,7 @@ EVERY store also has five shop pages that you design in the same art direction, 
 - ORBIT.firstVisit is true only on the first page of a visit — play a splash only then.
 - localStorage, sessionStorage, cookies and fetch to other servers are blocked.
 - The seller edits any text, photo or link by clicking it. So put real words in the HTML as plain text (no text drawn in images or canvas), keep each sentence in one element, and use normal <img> or CSS background images. site.js runs on every page: guard every querySelector.
+- Accessible: a skip link, one h1 per page, every button and link has a name a screen reader can say, every focusable thing shows a clear focus ring (inputs included), text contrast at least 4.5:1, everything works with the keyboard alone.
 - The store must survive any catalogue: 1 product or 200, long names, no photo, no description, sold out, with or without variants, one category or ten.
 - Product photos: use p.image; when it is null fall back to a stand-in photo you chose (keep one map keyed by product id in site.js, plus a generic fallback for products added later). When ORBIT.products is empty show a designed "opening soon" state.
 
