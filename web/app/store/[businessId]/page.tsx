@@ -9,6 +9,7 @@ import { parseWidgetCopy } from "@/lib/widget-copy";
 import { StoreWidgets } from "@/components/store/StoreWidgets";
 import { StoreAnalyticsBeacon } from "@/components/store/StoreAnalyticsBeacon";
 import { CartSync } from "@/components/store/CartSync";
+import { SiteShell, siteMeta } from "@/components/store/SiteShell";
 import { StoreCartBar } from "../StoreCartBar";
 
 export const dynamic = "force-dynamic";
@@ -40,6 +41,8 @@ export async function generateMetadata({ params }: { params: Promise<{ businessI
   const { businessId } = await params;
   const data = await load(businessId);
   if (!data?.business.storeDesign?.published) return {};
+  const agent = await siteMeta(businessId, "home");
+  if (agent) return agent;
   const doc = safeDoc(data.business.storeDesign.doc, data.business.name, data.business.niche);
   return { title: { absolute: doc?.storeName ?? data.business.name }, description: doc?.tagline ?? data.business.niche };
 }
@@ -60,6 +63,9 @@ export default async function StorefrontPage({ params }: { params: Promise<{ bus
       </main>
     );
   }
+
+  const agentSite = await SiteShell({ businessId, slug: "home" });
+  if (agentSite) return agentSite;
 
   const doc = safeDoc(design.wired ?? design.doc, business.name, business.niche);
   if (!doc) notFound();

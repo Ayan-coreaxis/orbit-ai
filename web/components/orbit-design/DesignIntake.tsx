@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Check, ImagePlus, Sparkles, X } from "lucide-react";
+import { Box, Check, ImagePlus, Sparkles, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { INTAKE, composeIntake, emptyAnswers, type IntakeAnswers, type IntakeSection } from "@/lib/design-intake";
 import { useImageAttachments } from "./useImageAttachments";
@@ -92,6 +92,28 @@ function RefUpload({ label, onChange }: { label: string; onChange: (urls: string
   );
 }
 
+function ModelUpload({ models, setModels }: { models: string[]; setModels: (m: string[]) => void }) {
+  const input = useRef<HTMLInputElement>(null);
+  const [state, setState] = useState("");
+  async function up(file: File) {
+    setState("Uploading…");
+    const fd = new FormData();
+    fd.append("file", file);
+    const r = await fetch("/api/orbit-design/site/model", { method: "POST", body: fd }).then((x) => x.json()).catch(() => ({ error: "Network error." }));
+    if (r.url) setModels([...models, r.url].slice(0, 4));
+    setState(r.url ? `${r.name} added` : (r.error ?? "Upload failed."));
+  }
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-3">
+      <input ref={input} type="file" accept=".glb,model/gltf-binary" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) void up(f); e.target.value = ""; }} />
+      <button type="button" onClick={() => input.current?.click()} disabled={models.length >= 4} className="inline-flex items-center gap-2 rounded-full border border-dashed border-border px-4 py-2 text-[14px] font-medium text-text-dim hover:border-accent hover:text-text disabled:opacity-40">
+        <Box className="h-4 w-4" /> Upload a 3D model (.glb)
+      </button>
+      {state && <span className="text-[13.5px] text-text-dim" role="status">{state}</span>}
+    </div>
+  );
+}
+
 /* ------------------------------------------------------------------ the intake */
 function Section({ s, a, setA }: { s: IntakeSection; a: IntakeAnswers; setA: React.Dispatch<React.SetStateAction<IntakeAnswers>> }) {
   const chosen = a.picks[s.id] ?? [];
@@ -135,6 +157,7 @@ function Section({ s, a, setA }: { s: IntakeSection; a: IntakeAnswers; setA: Rea
         placeholder="Anything specific? (optional — in your own words)"
         className="mt-4 w-full rounded-full border border-border bg-panel px-4 py-2.5 text-[14.5px] outline-none focus:border-accent"
       />
+      {s.id === "threeD" && <ModelUpload models={a.models ?? []} setModels={(m) => setA((x) => ({ ...x, models: m }))} />}
       {s.reference && <RefUpload label="Upload a reference image" onChange={(urls) => setA((x) => ({ ...x, refs: { ...x.refs, [s.id]: urls } }))} />}
     </section>
   );

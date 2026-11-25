@@ -28,5 +28,5 @@ export async function proxy(req: NextRequest) {
 export const config = {
   // Everything except Next's own assets, APIs and uploaded files (those work on any host as-is).
   // /sitemap.xml is included on purpose: on a store domain it becomes that store's sitemap.
-  matcher: ["/((?!_next/|api/|uploads/|favicon.ico).*)"],
+  matcher: ["/((?!_next/|api/|uploads/|vendor/|favicon.ico).*)"],
 };

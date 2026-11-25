@@ -220,13 +220,14 @@ export async function DELETE() {
   // and every shopper account / submitted record / OTP that belonged to it.
   await prisma.$transaction([
     prisma.orbitDesignTurn.deleteMany({ where: { businessId } }),
+    prisma.storeSiteVersion.deleteMany({ where: { businessId } }),
     prisma.storeRecord.deleteMany({ where: { businessId } }),
     prisma.customerOtp.deleteMany({ where: { businessId } }),
     prisma.storeCustomer.deleteMany({ where: { businessId } }),
     prisma.storeDesign.upsert({
       where: { businessId },
       create: { businessId, doc: JSON.stringify(fresh), published: false },
-      update: { doc: JSON.stringify(fresh), wired: null, wiredAt: null, backend: null, backendWiredAt: null, published: false },
+      update: { doc: JSON.stringify(fresh), wired: null, wiredAt: null, backend: null, backendWiredAt: null, published: false, site: null, siteLive: null, siteBuild: null },
     }),
   ]);
 

@@ -18,6 +18,7 @@ import { RecentlyViewed } from "@/components/store/RecentlyViewed";
 import { PreFooterSlot } from "@/components/store/PreFooterSlot";
 import { CartSync } from "@/components/store/CartSync";
 import { parseWidgetCopy } from "@/lib/widget-copy";
+import { SiteShell } from "@/components/store/SiteShell";
 import { StoreCartBar } from "../../../StoreCartBar";
 
 export const dynamic = "force-dynamic";
@@ -75,6 +76,9 @@ export default async function ProductPage({ params }: { params: Promise<{ busine
     },
   });
   if (!business?.storeDesign?.published) notFound();
+
+  const agentSite = await SiteShell({ businessId, slug: "product", productId });
+  if (agentSite) return agentSite;
   const spec = parseSpec(business.storeDesign.backend);
 
   const doc = safeDoc(business.storeDesign.wired ?? business.storeDesign.doc, business.name, business.niche);

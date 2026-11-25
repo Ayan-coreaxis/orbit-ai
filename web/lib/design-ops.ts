@@ -59,6 +59,14 @@ export async function runDesignEdit(
   message: string,
   refs: { images?: DesignRef[]; siteUrl?: string; siteHint?: string } = {},
 ) {
+  // An agent-built store is edited by the same agent that built it (draft only — the live copy
+  // changes when the seller publishes).
+  const site = await prisma.storeDesign.findUnique({ where: { businessId }, select: { site: true } });
+  if (site?.site) {
+    const { editSiteNow } = await import("@/lib/store-site-build");
+    const r = await editSiteNow(businessId, message, refs.images ?? []);
+    return { reply: r.reply, error: r.error, doc: await loadDoc(businessId), orbitCode: undefined };
+  }
   // Once the backend has been handed off, Orbit Code watches for new interactive parts the seller
   // designs and wires them itself — asking a clarifying question first when the intent is ambiguous.
   const design = await prisma.storeDesign.findUnique({ where: { businessId }, select: { backendWiredAt: true } });
@@ -91,6 +99,11 @@ export async function publishStore(businessId: string, publish: boolean): Promis
   if (!publish) {
     await prisma.storeDesign.updateMany({ where: { businessId }, data: { published: false } });
     return { published: false, note: "" };
+  }
+  const agentBuilt = await prisma.storeDesign.findUnique({ where: { businessId }, select: { site: true } });
+  if (agentBuilt?.site) {
+    const { publishSite } = await import("@/lib/store-site-build");
+    return publishSite(businessId);
   }
   const design = await prisma.storeDesign.findUnique({ where: { businessId }, select: { updatedAt: true, backendWiredAt: true, doc: true } });
   if (!design?.doc) return { published: false, note: "There's no store design yet — build the store in Orbit Design first, then publish." };

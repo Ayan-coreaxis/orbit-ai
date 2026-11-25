@@ -156,6 +156,7 @@ model Business {
   customerOtps          CustomerOtp[]
   storeRecords          StoreRecord[]
   storeDesign           StoreDesign?
+  siteVersions          StoreSiteVersion[]
   designSnapshots       DesignSnapshot[]
   orbitDesignTurns      OrbitDesignTurn[]
   pages                 Page[]
@@ -946,7 +947,22 @@ model StoreDesign {
   // this spec; the DB shape stays fixed (customer data lives in the generic StoreRecord bucket).
   backend        String?
   backendWiredAt DateTime?
+  site           String? // JSON: StoreSite (lib/store-site.ts) — the agent-built store's own files, draft
+  siteLive       String? // JSON: StoreSite — what the live /store serves
+  siteBuild      String? // JSON: SiteBuild — the running / last build (status, progress, cost)
   updatedAt      DateTime  @updatedAt
+}
+
+// The agent-built store as it was before each change — the studio's Undo. Only the last few are kept.
+model StoreSiteVersion {
+  id         String   @id @default(cuid())
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  site       String
+  note       String?
+  createdAt  DateTime @default(now())
+
+  @@index([businessId, createdAt])
 }
 
 /**

@@ -4,6 +4,9 @@ import { prisma } from "@/lib/prisma";
 import { loadDoc } from "@/lib/orbit-design-generate";
 import type { StorefrontProduct } from "@/lib/orbit-design";
 import { toStorefrontProducts } from "@/lib/storefront-products";
+import { agentBuilderOn } from "@/lib/store-site";
+import { siteState } from "@/lib/store-site-state";
+import { SiteStudio } from "@/components/orbit-design/SiteStudio";
 import { Studio } from "@/components/orbit-design/Studio";
 
 export const dynamic = "force-dynamic";
@@ -19,6 +22,12 @@ export default async function OrbitDesignPage() {
         </Card>
       </div>
     );
+  }
+
+  const site = await siteState(businessId);
+  if (site.has || site.running || site.build) {
+    const b = await prisma.business.findUnique({ where: { id: businessId }, select: { name: true } });
+    return <SiteStudio businessId={businessId} storeName={b?.name ?? "Your store"} initial={site} />;
   }
 
   const [doc, design, business, products, turns] = await Promise.all([
@@ -54,6 +63,7 @@ export default async function OrbitDesignPage() {
       initialDoc={doc}
       initialPublished={design?.published ?? false}
       initialWired={!!design?.backendWiredAt}
+      agentBuilder={agentBuilderOn()}
       website={business?.website ?? ""}
       currency={business?.storeCurrency ?? "pkr"}
       products={sfProducts}

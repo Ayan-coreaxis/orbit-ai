@@ -33,9 +33,9 @@ export const INTAKE: IntakeSection[] = [
     reference: true,
     options: [
       { id: "photo", label: "One big photo", hint: "A single striking product or lifestyle image", brief: "one large photograph filling the first screen, headline and one button over or beside it" },
-      { id: "slider", label: "Photo slider", hint: "Several photos that slide on their own", brief: "a full-width image carousel / slider of 3–4 slides, each with its own headline and button (data-od-carousel with autoplay, arrows and dots)" },
-      { id: "video", label: "One video", hint: "A full-screen looping background video", brief: "a full-screen looping background video (<video data-video-query=…>) with the headline and one button over it" },
-      { id: "videos", label: "Several videos", hint: "A row or grid of short clips", brief: "a hero built from several short looping videos in a grid / strip (each a <video data-video-query=…>), with the headline and one button" },
+      { id: "slider", label: "Photo slider", hint: "Several photos that slide on their own", brief: "a full-width image carousel / slider of 3–4 slides, each with its own headline and button with autoplay, arrows and dots" },
+      { id: "video", label: "One video", hint: "A full-screen looping background video", brief: "a full-screen looping background video  with the headline and one button over it" },
+      { id: "videos", label: "Several videos", hint: "A row or grid of short clips", brief: "a hero built from several short looping videos in a grid / strip, with the headline and one button" },
       { id: "type", label: "Big type only", hint: "Giant headline, no photo", brief: "a typographic hero — a giant headline as the picture, no photo, one button" },
       { id: "split", label: "Text + photo split", hint: "Words on one side, photo on the other", brief: "a split hero: text and button on one half, a tall photo on the other half" },
     ],
@@ -49,7 +49,7 @@ export const INTAKE: IntakeSection[] = [
       { id: "classic", label: "Logo left, menu right", hint: "Clean and familiar", brief: "logo at the left, page links at the right, cart and search icons at the far right" },
       { id: "centered", label: "Centred logo", hint: "Logo in the middle, menu beneath", brief: "the logo centred, the page links in a row beneath it, cart and search at the sides" },
       { id: "overlay", label: "Transparent over the hero", hint: "Floats on top of the first image", brief: "a transparent header that sits on top of the hero (light text), turning solid when the page is scrolled" },
-      { id: "side", label: "Burger + side menu", hint: "Minimal bar, menu slides in", brief: "a minimal bar — logo and a burger button — and a full-height menu panel that slides in from the side (CSS-only toggle with its own unique input)" },
+      { id: "side", label: "Burger + side menu", hint: "Minimal bar, menu slides in", brief: "a minimal bar — logo and a burger button — and a full-height menu panel that slides in from the side" },
       { id: "bold", label: "Bold bar + announcement", hint: "Loud, colourful, with a strip above", brief: "an announcement strip above a bold, high-contrast header bar" },
     ],
   },
@@ -88,11 +88,58 @@ export const INTAKE: IntakeSection[] = [
       { id: "featured", label: "Featured product", hint: "One product, big", brief: "one featured product shown large" },
       { id: "story", label: "Our story", hint: "Short brand story", brief: "a short brand-story section with a photo" },
       { id: "process", label: "How it's made", hint: "Steps or sourcing", brief: "a how-it's-made / sourcing section in 3–4 steps" },
-      { id: "video", label: "Video section", hint: "A video between sections", brief: "a video section (<video data-video-query=…>)" },
+      { id: "video", label: "Video section", hint: "A video between sections", brief: "a video section " },
       { id: "gallery", label: "Photo gallery", hint: "Grid or lookbook", brief: "a photo gallery / lookbook" },
       { id: "reviews", label: "Customer reviews", hint: "Only real reviews are shown", brief: "a reviews section — only real reviews, otherwise promises the seller really keeps" },
       { id: "faq", label: "FAQ", hint: "Common questions", brief: "a short FAQ" },
       { id: "newsletter", label: "Newsletter", hint: "Email sign-up", brief: "a newsletter sign-up" },
+    ],
+  },
+  {
+    id: "pages",
+    title: "Which pages do you want?",
+    why: "Only the pages you choose are built. Type any other page in the box below.",
+    multi: true,
+    options: [
+      { id: "single", label: "One page only", hint: "Everything on the home page", brief: "a single-page store: home only, no other pages" },
+      { id: "shop", label: "Shop", hint: "All products with filters", brief: "a shop page with all products, search and filters" },
+      { id: "product", label: "Product page", hint: "One page per product", brief: "a product detail page" },
+      { id: "about", label: "Our story", hint: "About the brand", brief: "an our-story page" },
+      { id: "contact", label: "Contact", hint: "Form and details", brief: "a contact page with a working form" },
+      { id: "faq", label: "FAQ", hint: "Common questions", brief: "an FAQ page" },
+      { id: "lookbook", label: "Lookbook", hint: "Photos that sell", brief: "a lookbook page" },
+      { id: "wholesale", label: "Bulk orders", hint: "For resellers", brief: "a bulk / wholesale orders page with an enquiry form" },
+      { id: "journal", label: "Journal", hint: "Stories or recipes", brief: "a journal page with two or three short pieces" },
+      { id: "gifts", label: "Gifting", hint: "Gift ideas and sets", brief: "a gifting page" },
+    ],
+  },
+  {
+    id: "motion",
+    title: "How much should it move?",
+    why: "Animation makes a store feel alive.",
+    multi: true,
+    options: [
+      { id: "calm", label: "Calm", hint: "Gentle fades only", brief: "restrained motion: gentle fades and hovers only" },
+      { id: "scroll", label: "Scroll story", hint: "Things happen as you scroll", brief: "scroll-driven storytelling with pinned scenes (GSAP ScrollTrigger)" },
+      { id: "type", label: "Moving type", hint: "Headlines that animate", brief: "animated typography: split-text headline reveals" },
+      { id: "parallax", label: "Parallax depth", hint: "Layers move at different speeds", brief: "layered parallax depth" },
+      { id: "transitions", label: "Page transitions", hint: "Smooth change between pages", brief: "a designed entrance on every page so moving between pages feels continuous" },
+      { id: "marquee", label: "Moving strips", hint: "Scrolling text or photos", brief: "moving marquee strips of type or photos" },
+      { id: "cursor", label: "Playful cursor", hint: "Follows and reacts (desktop)", brief: "a custom magnetic cursor and playful hover interactions on desktop" },
+    ],
+  },
+  {
+    id: "threeD",
+    title: "Any 3D?",
+    why: "A real 3D object shoppers can see move. You can upload your own .glb model.",
+    reference: true,
+    options: [
+      { id: "none", label: "No 3D", hint: "Photos and type only", brief: "no 3D" },
+      { id: "hero", label: "3D hero", hint: "A 3D product on the first screen", brief: "a 3D hero: the product modelled in three.js, lit well, reacting to the pointer and to scroll" },
+      { id: "viewer", label: "Turn it around", hint: "360° product viewer", brief: "an interactive 3D viewer the shopper can rotate with a finger or mouse" },
+      { id: "scene", label: "Full 3D world", hint: "Scroll flies through a scene", brief: "an immersive three.js scene the visitor travels through by scrolling" },
+      { id: "tilt", label: "3D cards", hint: "Cards tilt with the pointer", brief: "product cards with real 3D tilt and light" },
+      { id: "particles", label: "Particles / shader", hint: "Living background", brief: "a living shader or particle background that fits the brand" },
     ],
   },
   {
@@ -119,6 +166,8 @@ export interface IntakeAnswers {
   brand: string;
   /** reference images (data URLs) by section id; "site" = the whole store */
   refs: Record<string, string[]>;
+  /** the seller's own 3D model (.glb), already uploaded */
+  models?: string[];
 }
 
 export function emptyAnswers(): IntakeAnswers {
@@ -153,7 +202,7 @@ export function composeIntake(brief: string, a: IntakeAnswers): { message: strin
     const note = (a.notes[s.id] ?? "").trim();
     const hasRef = (a.refs[s.id] ?? []).length > 0;
     if (!picked.length && !note && !hasRef) continue;
-    const title = s.id === "sections" ? "Home page sections (include all of these)" : s.id === "splash" ? "Splash screen" : s.id === "cards" ? "Product cards" : s.id === "feel" ? "Overall feel" : s.id === "hero" ? "Hero" : "Header";
+    const title = s.id === "sections" ? "Home page sections (include all of these)" : s.id === "splash" ? "Splash screen" : s.id === "cards" ? "Product cards" : s.id === "feel" ? "Overall feel" : s.id === "hero" ? "Hero" : s.id === "pages" ? "Pages (build exactly these, plus home; nothing else)" : s.id === "motion" ? "Motion" : s.id === "threeD" ? "3D" : "Header";
     const parts = [picked.map((o) => o.brief).join("; ")];
     if (note) parts.push(`seller's own words: ${note}`);
     if (hasRef) parts.push("follow the attached reference image for this part (match its layout, spacing, type and colour mood — not its content)");
@@ -161,6 +210,7 @@ export function composeIntake(brief: string, a: IntakeAnswers): { message: strin
     addRefs(s.id, `reference for the ${s.id === "cards" ? "PRODUCT CARDS" : s.id.toUpperCase()}`);
   }
   if (a.brand.trim()) lines.push(`- Brand colours / things to keep: ${a.brand.trim()}`);
+  for (const m of (a.models ?? []).slice(0, 4)) lines.push(`- The seller's own 3D model (use it): ${m}`);
   addRefs("site", "reference for the WHOLE STORE — match its overall feel");
 
   const splash = a.picks.splash?.[0];

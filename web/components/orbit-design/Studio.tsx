@@ -44,6 +44,7 @@ export function Studio({
   initialDoc,
   initialPublished,
   initialWired = false,
+  agentBuilder = false,
   website,
   currency,
   products,
@@ -53,6 +54,8 @@ export function Studio({
   initialDoc: OrbitDesignDoc;
   initialPublished: boolean;
   initialWired?: boolean;
+  /** new stores are built by the store agent (SiteStudio) */
+  agentBuilder?: boolean;
   website: string;
   currency: string;
   products: StorefrontProduct[];
@@ -143,9 +146,24 @@ export function Studio({
   function buildFromIntake(message: string, extra: string[]) {
     if (!intake) return;
     const imgs = [...intake.images, ...extra].slice(0, 8);
+    if (agentBuilder) return void buildWithAgent(message, imgs);
     setIntake(null);
     setMessages([]);
     void send(message, imgs, true);
+  }
+
+  async function buildWithAgent(message: string, images: string[]) {
+    if (sending) return;
+    setSending(true);
+    try {
+      const res = await fetch("/api/orbit-design/site", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message, images, build: true }) });
+      const r = await res.json().catch(() => ({}));
+      if (res.ok && !r.error) return location.reload(); // the page now opens the agent's studio
+      flash(r.error ?? "Couldn't start. Try again.");
+    } catch {
+      flash("Network error. Try again.");
+    }
+    setSending(false);
   }
 
   async function startPlan(text: string, images: string[]) {

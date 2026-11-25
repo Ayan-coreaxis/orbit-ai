@@ -43,3 +43,6 @@ next-env.d.ts
 
 # AI eval run outputs (full replies)
 /evals/results/
+
+# browser libraries copied by scripts/vendor.mjs
+/public/vendor/

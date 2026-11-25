@@ -5,6 +5,7 @@ import { migrateDoc, renderPageParts, resolvePage, storefrontRuntimeJs, type Orb
 import { parseSpec } from "@/lib/orbit-backend-spec";
 import { getStoreCustomer } from "@/lib/store-auth";
 import { CartSync } from "@/components/store/CartSync";
+import { SiteShell, siteMeta } from "@/components/store/SiteShell";
 import { StoreCartBar } from "../../../StoreCartBar";
 import { StoreWidgets } from "@/components/store/StoreWidgets";
 import { StoreAnalyticsBeacon } from "@/components/store/StoreAnalyticsBeacon";
@@ -44,6 +45,8 @@ export async function generateMetadata({ params }: { params: Promise<{ businessI
   const { businessId, slug } = await params;
   const data = await load(businessId);
   if (!data?.business.storeDesign?.published) return {};
+  const agent = await siteMeta(businessId, slug);
+  if (agent) return agent;
   const doc = safeDoc(data.business.storeDesign.doc, data.business.name, data.business.niche);
   const page = doc ? resolvePage(doc, slug) : null;
   return { title: page ? page.title : { absolute: data.business.name } };
@@ -56,6 +59,9 @@ export default async function StorefrontSubPage({ params }: { params: Promise<{ 
 
   const design = data.business.storeDesign;
   if (!design?.published || !design.doc) notFound();
+
+  const agentSite = await SiteShell({ businessId, slug });
+  if (agentSite) return agentSite;
 
   const doc = safeDoc(design.wired ?? design.doc, data.business.name, data.business.niche);
   if (!doc) notFound();

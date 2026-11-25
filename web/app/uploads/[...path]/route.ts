@@ -18,6 +18,7 @@ const TYPES: Record<string, string> = {
   wav: "audio/wav",
   aac: "audio/aac",
   pdf: "application/pdf",
+  glb: "model/gltf-binary",
 };
 
 /**
@@ -35,6 +36,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ path: st
     "Cache-Control": "public, max-age=31536000, immutable",
     "X-Content-Type-Options": "nosniff",
     "Accept-Ranges": "bytes",
+    "Access-Control-Allow-Origin": "*", // agent-built stores run sandboxed (opaque origin) and load .glb models and textures
     ...(ext === "pdf" ? { "Content-Disposition": "inline" } : {}),
   };
   // Byte ranges — Safari (iPhone) won't play a video without them.
