@@ -1,7 +1,7 @@
 # Night run (started 2026-11-26)
 
-Owner's words: "haan, $20 tak, so raha hoon". Budget for AI calls (Anthropic API): **$20 in total**, hard stop.
-Store $8 · Orchestrator scenarios $10 · other agents $2. Log every paid run in "Spend" below. Read the real cost from `AgentUsage`.
+Owner's words: "haan, $20 tak, so raha hoon". Budget for AI calls (Anthropic API): **$15 in total** (owner lowered it from $20), hard stop.
+Store $7 · Orchestrator scenarios $6.5 · other agents and user test $1.5. Log every paid run in "Spend" below. Read the real cost from `AgentUsage`.
 
 Rules: do not touch Mehfil Mugs, VoltKart or the owner's real data. Never text or email anyone, never publish outside this computer, delete only rows created for these tests. Fake servers for Meta / WhatsApp / Stripe / wallets / couriers. Commits authored by the owner only, no AI attribution lines; run tsc and tests before every commit. Keep chat replies short (Roman Urdu). Work directory E:\orbit-ai\web. Server: preview_start "orbit-prod" after `npm run build`.
 
@@ -52,6 +52,12 @@ Rules: do not touch Mehfil Mugs, VoltKart or the owner's real data. Never text o
 - [ ] 6.4 Phone view of every dashboard page
 - [ ] 6.5 Security: another seller's data, unsigned webhooks, rate limits, upload abuse
 - [ ] 6.6 8 lint errors; production build; all tests; final commit; morning report
+
+### 7. As a brand-new user, then improve (after everything above)
+- [ ] 7.1 New seller who knows nothing: signup → onboarding → first store → first product → publish → first order → Orchestrator, with no inside knowledge; write down every confusing word, dead end, wait and wrong turn
+- [ ] 7.2 Blind / keyboard / screen-reader user: whole seller journey and a shopper order with keyboard only; names, focus order, announcements, contrast, zoom 200%
+- [ ] 7.3 First-time shopper on a cheap phone, slow network
+- [ ] 7.4 Fix what was found, best first, and repeat the journey
 
 ## Spend
 | When | What | $ |
