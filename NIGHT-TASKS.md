@@ -49,8 +49,8 @@ Rules: do not touch Mehfil Mugs, VoltKart or the owner's real data. Never text o
 - [ ] 6.1 Signup, login, reset, onboarding
 - [ ] 6.2 Settings, team, domains, admin
 - [ ] 6.3 Inbox, Content, Studio (no paid image/video calls)
-- [ ] 6.4 Phone view of every dashboard page
-- [ ] 6.5 Security: another seller's data, unsigned webhooks, rate limits, upload abuse
+- [x] 6.4 Phone view of every dashboard page
+- [x] 6.5 Security: another seller's data, unsigned webhooks, rate limits, upload abuse
 - [ ] 6.6 8 lint errors; production build; all tests; final commit; morning report
 
 ### 7. As a brand-new user, then improve (after everything above)
@@ -64,6 +64,7 @@ Rules: do not touch Mehfil Mugs, VoltKart or the owner's real data. Never text o
 |---|---|---|
 | night 1 | Noor-e-Shab first build (dark, off-reference: rejected) | 3.63 |
 | night 1 | 8 Orchestrator scenarios | 2.61 |
+| night 1 | Noor-e-Shab rebuild with reference capture + art director (running) | ≤5 |
 
 ## Found and fixed
 - Checkout: the same submit arriving twice at once answered 500 (no duplicate order); now returns the first order.
@@ -75,4 +76,5 @@ Rules: do not touch Mehfil Mugs, VoltKart or the owner's real data. Never text o
 - Scenario results (30-day profit, simple model; planner score by a cheap grader): a new store 9/10 · b losing money 7 (91.6k→167.8k) · c 40% returns 8 (168.6k→290.4k) · d sold-out best seller 7 (15.1k→368.5k) · e price war 7 (88.1k→108.7k) · f ads burning 8 (−12.3k→21.6k) · g bad service 8 (269.2k→332.9k) · h no cash 7 (90.7k→108.3k). All diagnosed the real leak.
 
 ## Open / needs the owner
+- Live accounts still needed for a real (not fake) test: Meta, Twilio WhatsApp, Stripe, JazzCash, Easypaisa, couriers.
 
