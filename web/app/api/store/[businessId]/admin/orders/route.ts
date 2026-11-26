@@ -36,7 +36,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ busi
           OR: [
             { customerName: { contains: q, mode: "insensitive" as const } }, // Postgres matches case-sensitively by default
             { customerPhone: { contains: q } },
-            { id: { contains: q } },
+            { id: { contains: q.replace(/^#/, "").toLowerCase() } }, // the number shown is the id's last 6, upper-cased
           ],
         }
       : {}),
@@ -49,6 +49,30 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ busi
     prisma.order.count({ where: { businessId, verified: false, status: { not: "cancelled" } } }),
     prisma.order.count({ where: { businessId, flagged: true, status: { not: "cancelled" } } }),
   ]);
+
+  // Each customer's record with this store, by phone: the single best COD signal a seller has.
+  const phones = [...new Set(rows.map((o) => o.customerPhone))];
+  const history = phones.length
+    ? await prisma.order.groupBy({ by: ["customerPhone", "status"], where: { businessId, customerPhone: { in: phones } }, _count: { _all: true } })
+    : [];
+  const returned = phones.length
+    ? await prisma.order.groupBy({ by: ["customerPhone"], where: { businessId, customerPhone: { in: phones }, courierStatus: { in: ["returned", "returning"] } }, _count: { _all: true } })
+    : [];
+  const historyFor = (phone: string) => {
+    const mine = history.filter((h) => h.customerPhone === phone);
+    const n = (st?: string) => mine.filter((h) => !st || h.status === st).reduce((a, h) => a + h._count._all, 0);
+    const back = returned.find((r) => r.customerPhone === phone)?._count._all ?? 0;
+    // a parcel that came back closes as cancelled — count it once, as a return
+    return { orders: n(), delivered: n("fulfilled"), cancelled: Math.max(0, n("cancelled") - back), returned: back };
+  };
+  const cityOf = (json: string | null) => {
+    try {
+      const c = json ? (JSON.parse(json) as { city?: string }).city : null;
+      return typeof c === "string" && c.trim() ? c.trim() : null;
+    } catch {
+      return null;
+    }
+  };
 
   const byStatus: Record<string, number> = { unconfirmed, flagged };
   for (const c of counts) byStatus[c.status] = c._count._all;
@@ -73,6 +97,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ busi
         customerPhone: o.customerPhone,
         customerEmail: o.customerEmail,
         address: o.address,
+        city: cityOf(o.shippingAddress),
+        history: historyFor(o.customerPhone),
         customFields: (() => {
           try {
             return o.customFieldsData ? JSON.parse(o.customFieldsData) : null;
@@ -107,6 +133,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ busi
         confirmationNotifyError: o.confirmationNotifyError,
         trackingNotifiedAt: o.trackingNotifiedAt,
         trackingNotifyError: o.trackingNotifyError,
+        confirmedAt: o.confirmedAt,
+        verifiedAt: o.verifiedAt,
         shippedAt: o.shippedAt,
         fulfilledAt: o.fulfilledAt,
         cancelledAt: o.cancelledAt,

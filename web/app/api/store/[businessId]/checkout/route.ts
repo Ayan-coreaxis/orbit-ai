@@ -13,6 +13,7 @@ import { getStoreStripe } from "@/lib/store-stripe";
 import { getStoreWallets, allPaymentOptions } from "@/lib/store-wallets";
 import { isWalletProvider, type PaymentMethod } from "@/lib/payment-methods";
 import { screenOrder } from "@/lib/fraud";
+import { normalizePkPhone } from "@/lib/fraud";
 import { bestEffort } from "@/lib/log";
 import { newVerifyToken } from "@/lib/order-verify";
 import { getAgentSettings } from "@/lib/agent-settings";
@@ -87,7 +88,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ bus
   };
 
   const name = (b.customerName ?? "").trim();
-  const phone = (b.customerPhone ?? "").trim();
+  let phone = (b.customerPhone ?? "").trim();
   const email = (b.customerEmail ?? "").trim();
   const clientToken = (b.clientToken ?? "").trim().slice(0, 80) || null;
 
@@ -110,6 +111,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ bus
   const address = structured ? formatAddress(structured, (b.address ?? "").trim()) : (b.address ?? "").trim();
   if (!name || !phone || !address)
     return NextResponse.json({ error: "Name, phone and address are all required." }, { status: 400 });
+  // A Pakistani store delivers to a Pakistani mobile: the courier calls it and WhatsApp confirms on it.
+  // One spelling (03xxxxxxxxx) so the same customer is found across orders, chats and couriers.
+  if (business.storeCurrency === "pkr") {
+    const pk = normalizePkPhone(phone);
+    if (!pk) return NextResponse.json({ error: "Please enter a valid mobile number, like 0300 1234567.", field: "phone" }, { status: 400 });
+    phone = pk;
+  }
 
   const customFieldConfig = parseCheckoutCustomFields(business.checkoutCustomFields);
   const customFieldsResult = validateCustomFieldAnswers(customFieldConfig, b.customFields);

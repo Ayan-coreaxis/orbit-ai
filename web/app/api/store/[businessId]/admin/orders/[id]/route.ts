@@ -34,6 +34,7 @@ export async function PATCH(
     trackingUrl?: string | null;
     sellerNote?: string | null;
     verified?: boolean;
+    returned?: boolean;
     book?: boolean;
     track?: boolean;
     notify?: boolean;
@@ -75,6 +76,28 @@ export async function PATCH(
   const data: Record<string, unknown> = {};
   const now = new Date();
 
+  // ---- the parcel came back (refused at the door, not reachable): close it, stock back, and record a
+  // return so the customer's history and the COD risk score see it — even without a courier connection.
+  if (body.returned) {
+    if (order.status !== "shipped" && order.status !== "confirmed")
+      return NextResponse.json({ error: "Only an order that went out can come back." }, { status: 400 });
+    let items: Item[] = [];
+    try {
+      items = JSON.parse(order.items) as Item[];
+    } catch {
+      items = [];
+    }
+    await prisma.$transaction(async (tx) => {
+      if (stockWasTaken(order))
+        await applyStockDelta(tx, businessId, items.filter((it): it is Item & { productId: string; qty: number } => !!it.productId && !!it.qty), 1);
+      await tx.order.update({
+        where: { id },
+        data: { status: "cancelled", cancelledAt: now, courierStatus: "returned", courierStatusText: "Came back to you", courierCheckedAt: now },
+      });
+    });
+    return NextResponse.json({ ok: true, order: await prisma.order.findUnique({ where: { id } }) });
+  }
+
   if (body.verified === true && !order.verified) {
     data.verified = true;
     data.verifiedAt = now;
@@ -99,6 +122,8 @@ export async function PATCH(
     if (!STATUSES.includes(next)) return NextResponse.json({ error: "Unknown status." }, { status: 400 });
     if (order.status === "cancelled" && next !== "cancelled")
       return NextResponse.json({ error: "A cancelled order can't be reopened." }, { status: 400 });
+    if (order.status === "fulfilled" && next === "cancelled")
+      return NextResponse.json({ error: "This order was delivered — if the customer is sending it back, record it under Returns." }, { status: 400 });
 
     if (next !== order.status) {
       data.status = next;

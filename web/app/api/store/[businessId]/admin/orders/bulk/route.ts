@@ -28,13 +28,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ bus
 
   for (const o of orders) {
     if (o.status === status || o.status === "cancelled") continue;
+    if (status === "cancelled" && o.status === "fulfilled") continue; // delivered goods are a return, not a cancel
     const data: Record<string, unknown> = { status, ...(status !== "cancelled" ? { verified: true } : {}) };
     if (status === "confirmed") data.confirmedAt = o.confirmedAt ?? now;
     if (status === "shipped") {
       data.shippedAt = o.shippedAt ?? now;
       if (!o.confirmedAt) data.confirmedAt = now;
     }
-    if (status === "fulfilled") data.fulfilledAt = o.fulfilledAt ?? now;
+    if (status === "fulfilled") {
+      data.fulfilledAt = o.fulfilledAt ?? now;
+      if (o.paymentProvider === "cod") data.paymentStatus = "paid"; // delivered = cash collected
+    }
     if (status === "cancelled") data.cancelledAt = now;
 
     await prisma.$transaction(async (tx) => {
