@@ -1,12 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Clapperboard, ImagePlus, Loader2, Lock, Mic, Music, Play, Sparkles } from "lucide-react";
+import { ArrowRight, Clapperboard, ImagePlus, Loader2, Lock, Mic, Music, Play, Sparkles } from "lucide-react";
 import { Card, Pill } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { FORMATS, GROUPS, getFormat, type FormatGroup, type StudioFormat, type StudioKind } from "@/lib/studio/formats";
 import { Composer } from "@/components/studio/Composer";
-import { DEMO_VIDEO, previewImage } from "@/lib/studio/previews";
+import { previewImage, previewVideo } from "@/lib/studio/previews";
 import { WORKING, type StudioData, type StudioJobView } from "@/components/studio/types";
 
 type Tab = StudioKind | "mine";
@@ -100,7 +100,7 @@ export function Studio() {
             </p>
           </div>
           {s.allowed && (
-            <div className="grid min-w-[220px] gap-2.5">
+            <div className="grid w-full gap-2.5 sm:w-auto sm:min-w-[240px]">
               <Meter label="Images" used={s.used.images} limit={s.limit.images} />
               <Meter label="Reels & videos" used={s.used.videos} limit={s.limit.videos} />
               <p className="text-[13px] text-text-faint">Resets on {new Date(s.resetsOn).toLocaleDateString(undefined, { day: "numeric", month: "short" })}</p>
@@ -120,9 +120,9 @@ export function Studio() {
         ) : !s.enabled ? (
           <Notice>Orbit Studio is switched off by the platform right now.</Notice>
         ) : !s.imageReady ? (
-          <Notice>Almost ready — the platform admin still needs to add the image and video model keys (Super Admin &gt; Studio).</Notice>
+          <Notice>Making new images and reels switches on soon. Until then, open any card to see a free demo of how it works.</Notice>
         ) : !s.videoReady ? (
-          <Notice>Images are ready. Reels switch on once the video model key is added (Super Admin &gt; Studio).</Notice>
+          <Notice>Images are ready. Reels switch on soon — open a reel card to see a free demo.</Notice>
         ) : null}
       </Card>
 
@@ -140,14 +140,14 @@ export function Studio() {
       </div>
 
       {tab === "mine" ? (
-        <Creations jobs={mine} onOpen={(j) => { const f = getFormat(j.format); if (f) setOpen({ format: f, job: j }); }} />
+        <Creations jobs={mine} onBrowse={() => setTab("image")} onOpen={(j) => { const f = getFormat(j.format); if (f) setOpen({ format: f, job: j }); }} />
       ) : (
         (Object.keys(GROUPS) as FormatGroup[])
           .filter((g) => GROUPS[g].kind === tab)
           .map((g) => (
             <section key={g}>
               <h3 className="mb-3 text-[18px] font-semibold tracking-tight">{GROUPS[g].label}</h3>
-              <div className="orbit-stagger grid grid-cols-[repeat(auto-fill,minmax(290px,1fr))] gap-4">
+              <div className="orbit-stagger grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 lg:gap-4">
                 {FORMATS.filter((f) => f.group === g).map((f) => (
                   <FormatCard key={f.id} format={f} locked={!s.allowed} onOpen={() => setOpen({ format: f, job: null })} />
                 ))}
@@ -186,7 +186,7 @@ function TabBtn({ on, onClick, icon, children }: { on: boolean; onClick: () => v
   return (
     <button
       onClick={onClick}
-      className={cn("flex flex-1 items-center justify-center gap-2 rounded-full px-4 py-2.5 text-[14.5px] font-medium transition-colors", on ? "bg-accent text-white" : "text-text-dim hover:text-text")}
+      className={cn("flex flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-full px-2 py-2.5 text-[14px] font-medium transition-colors sm:px-4 sm:text-[14.5px] [&>svg:first-child]:hidden sm:[&>svg:first-child]:block", on ? "bg-accent text-white" : "text-text-dim hover:text-text")}
     >
       {icon}
       {children}
@@ -196,47 +196,47 @@ function TabBtn({ on, onClick, icon, children }: { on: boolean; onClick: () => v
 
 function FormatCard({ format, locked, onOpen }: { format: StudioFormat; locked: boolean; onOpen: () => void }) {
   const vid = useRef<HTMLVideoElement>(null);
-  const isVideo = format.kind === "video";
+  const clip = previewVideo(format.id, 360);
+  // Reel cards play their example clip while on screen (muted), like a real feed.
+  useEffect(() => {
+    const v = vid.current;
+    if (!v || typeof IntersectionObserver === "undefined") return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    v.muted = true; // React's `muted` prop doesn't set the attribute browsers check before autoplay
+    const io = new IntersectionObserver(([e]) => (e.isIntersecting ? void v.play().catch(() => {}) : v.pause()), { threshold: 0.4 });
+    io.observe(v);
+    return () => io.disconnect();
+  }, []);
   return (
     <button
       onClick={onOpen}
-      onMouseEnter={() => void vid.current?.play().catch(() => {})}
-      onMouseLeave={() => {
-        const v = vid.current;
-        if (v) {
-          v.pause();
-          v.currentTime = 0;
-        }
-      }}
-      className="group hover-lift app-card flex h-full flex-col overflow-hidden p-0 text-left"
+      aria-label={`${format.name}: ${format.tagline}`}
+      className="group relative block aspect-[3/4] w-full overflow-hidden rounded-2xl bg-[#111] text-left outline-none ring-accent ring-offset-2 ring-offset-bg focus-visible:ring-2"
     >
-      <div className="relative aspect-[4/3] w-full overflow-hidden bg-panel-2">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={previewImage(format.id)} alt="" loading="lazy" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]" />
-        {isVideo && (
-          <video ref={vid} src={DEMO_VIDEO} muted loop playsInline preload="none" className="absolute inset-0 h-full w-full object-cover opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
-        )}
-        <span className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-black/70 px-3 py-1 text-[13px] font-medium text-white backdrop-blur-sm">
-          {isVideo ? <Play className="h-3.5 w-3.5" /> : <ImagePlus className="h-3.5 w-3.5" />}
-          {isVideo ? `${format.seconds}s reel` : "Image"}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={previewImage(format.id)} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.05]" />
+      {clip && <video ref={vid} src={clip} poster={previewImage(format.id)} muted loop playsInline preload="none" className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.05]" />}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-3/5 bg-gradient-to-t from-black/85 via-black/45 to-transparent" />
+      <span className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-black/55 px-2.5 py-1 text-[12.5px] font-medium text-white backdrop-blur-md">
+        {clip ? <Play className="h-3 w-3 fill-current" /> : <ImagePlus className="h-3.5 w-3.5" />}
+        {clip ? `${format.seconds}s reel` : "Image"}
+      </span>
+      {locked && (
+        <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-white/90 px-2.5 py-1 text-[12.5px] font-medium text-[#1a2a21]">
+          <Lock className="h-3 w-3" /> Growth
         </span>
-        {locked && (
-          <span className="absolute right-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-white/90 px-3 py-1 text-[13px] font-medium text-[#1a2a21]">
-            <Lock className="h-3.5 w-3.5" /> Growth plan
+      )}
+      <div className="absolute inset-x-0 bottom-0 p-3 text-white sm:p-4">
+        <div className="text-[14.5px] font-semibold leading-snug tracking-tight sm:text-[16px]">{format.name}</div>
+        <p className="mt-0.5 line-clamp-2 text-[12.5px] leading-snug text-white/75 sm:text-[13px]">{format.tagline}</p>
+        <div className="mt-2.5 flex items-center justify-between gap-2">
+          <span className="inline-flex items-center gap-1 text-[12px] text-white/70">
+            {clip ? (format.audio === "voice" ? <Mic className="h-3 w-3" /> : <Music className="h-3 w-3" />) : null}
+            {clip ? (format.audio === "voice" ? "Voice" : "Music") : ""}
           </span>
-        )}
-      </div>
-      <div className="flex flex-1 flex-col p-5">
-        <div className="text-[17px] font-semibold tracking-tight">{format.name}</div>
-        <p className="mt-1 text-[14.5px] leading-relaxed text-text-dim">{format.tagline}</p>
-        <div className="mt-4 flex flex-wrap items-center gap-2">
-          {isVideo && (
-            <Pill tone="neutral">
-              {format.audio === "voice" ? <Mic className="mr-1 h-3 w-3" /> : <Music className="mr-1 h-3 w-3" />}
-              {format.audio === "voice" ? "Voice" : "Music"}
-            </Pill>
-          )}
-          <span className="ml-auto text-[14px] font-medium text-accent">{locked ? "See a demo →" : "Start →"}</span>
+          <span className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1.5 text-[12.5px] font-semibold text-[#111] transition-transform duration-300 group-hover:-translate-y-0.5">
+            {locked ? "Demo" : "Start"} <ArrowRight className="h-3.5 w-3.5" />
+          </span>
         </div>
       </div>
     </button>
@@ -254,12 +254,15 @@ const STATUS: Record<string, { label: string; tone: "neutral" | "good" | "warn" 
 
 const DOT: Record<string, string> = { neutral: "bg-white/60", good: "bg-good", warn: "bg-warn", bad: "bg-bad", accent: "bg-accent animate-pulse" };
 
-function Creations({ jobs, onOpen }: { jobs: StudioJobView[]; onOpen: (j: StudioJobView) => void }) {
+function Creations({ jobs, onOpen, onBrowse }: { jobs: StudioJobView[]; onOpen: (j: StudioJobView) => void; onBrowse: () => void }) {
   if (!jobs.length) {
     return (
       <Card className="flex flex-col items-center gap-2 p-12 text-center">
         <Sparkles className="h-6 w-6 text-text-faint" />
         <p className="max-w-sm text-[13.5px] text-text-faint">Nothing made yet. Pick an image or reel type to start — or ask your Orchestrator to make one for you.</p>
+        <button onClick={onBrowse} className="btn-primary mt-2 !py-2 text-[13.5px]">
+          Make your first image
+        </button>
       </Card>
     );
   }

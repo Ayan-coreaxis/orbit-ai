@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Check, Loader2, Sparkles, Wand2 } from "lucide-react";
 import { Button, Pill } from "@/components/ui";
 import type { StudioFormat } from "@/lib/studio/formats";
-import { DEMO_VIDEO, previewImage } from "@/lib/studio/previews";
+import { DEMO_VIDEO, previewImage, previewVideo } from "@/lib/studio/previews";
 
 export type DemoStage = "plan" | "making" | "done";
 
@@ -17,11 +17,13 @@ const MAKING = ["Reading your product…", "Setting the scene…", "Composing th
  * before they have a plan or a product photo.
  */
 export function DemoBody({ format, stage, onDone }: { format: StudioFormat; stage: DemoStage; onDone: () => void }) {
-  const [pct, setPct] = useState(0);
+  // Progress belongs to one "making" run; a new run starts from 0 without resetting state in an effect.
+  const [run, setRun] = useState<{ stage: DemoStage; pct: number }>({ stage, pct: 0 });
+  if (run.stage !== stage) setRun({ stage, pct: 0 }); // new stage → fresh run (React's "adjust state on prop change")
+  const pct = run.stage === stage ? run.pct : 0;
   useEffect(() => {
     if (stage !== "making") return;
-    setPct(0);
-    const t = setInterval(() => setPct((p) => Math.min(100, p + 4 + Math.random() * 5)), 220);
+    const t = setInterval(() => setRun((r) => ({ stage, pct: Math.min(100, r.pct + 4 + Math.random() * 5) })), 220);
     return () => clearInterval(t);
   }, [stage]);
   useEffect(() => {
@@ -98,7 +100,7 @@ export function DemoBody({ format, stage, onDone }: { format: StudioFormat; stag
       <div className="overflow-hidden rounded-2xl border border-border bg-panel">
         <div className="relative">
           {isVideo ? (
-            <video src={DEMO_VIDEO} poster={previewImage(format.id)} autoPlay muted loop playsInline controls className="aspect-[4/3] w-full bg-black object-cover" />
+            <video src={previewVideo(format.id) ?? DEMO_VIDEO} poster={previewImage(format.id)} autoPlay muted loop playsInline controls className="aspect-[4/3] w-full bg-black object-cover" />
           ) : (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={previewImage(format.id)} alt="" className="aspect-[4/3] w-full object-cover" />

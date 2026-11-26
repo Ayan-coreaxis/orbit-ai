@@ -45,10 +45,8 @@ export function Composer({
   const [demo, setDemo] = useState<DemoStage | null>(null);
   // The drawer is mounted inside the themed app root, not inside the animated page: a transformed
   // ancestor would trap `position:fixed` underneath the top bar.
-  const [mount, setMount] = useState<Element | null>(null);
-  useEffect(() => {
-    setMount(document.querySelector(".orbit-app") ?? document.body);
-  }, []);
+  // Only ever opened by a click, so the document is always there.
+  const [mount] = useState<Element | null>(() => (typeof document === "undefined" ? null : (document.querySelector(".orbit-app") ?? document.body)));
 
   const kind = format.kind;
   const left = kind === "image" ? data.status.left.images : data.status.left.videos;
@@ -142,6 +140,9 @@ export function Composer({
   }
 
   const step = !job ? 1 : job.status === "draft" ? 2 : 3;
+  const body = useRef<HTMLDivElement>(null);
+  // Each step starts at its top, not wherever the last one was scrolled to.
+  useEffect(() => body.current?.scrollTo({ top: 0 }), [step, demo]);
 
   const ui = (
     <div className="fixed inset-0 z-[70] flex justify-end bg-black/50 backdrop-blur-[2px]" onClick={onClose}>
@@ -166,7 +167,7 @@ export function Composer({
         </div>
         <Steps step={demo ? (demo === "plan" ? 2 : 3) : step} />
 
-        <div className="scrollbar-thin flex-1 overflow-y-auto px-6 py-5">
+        <div ref={body} className="scrollbar-thin flex-1 overflow-y-auto px-6 py-5">
           {demo && <DemoBody format={format} stage={demo} onDone={() => setDemo("done")} />}
           {!demo && step === 1 && (
             <div className="grid gap-5">
@@ -219,7 +220,7 @@ export function Composer({
               {!data.status.allowed ? (
                 <Warn>Orbit Studio comes with the Growth ($75) and Scale ($150) plans — upgrade in Settings &amp; Billing to make this.</Warn>
               ) : !ready ? (
-                <Warn>{kind === "video" ? "Reels" : "Images"} aren&apos;t switched on yet — the platform admin needs to add the model key in Super Admin &gt; Studio.</Warn>
+                <Warn>Making {kind === "video" ? "reels" : "images"} switches on soon. Try the free demo below to see exactly how it works.</Warn>
               ) : left <= 0 ? (
                 <Warn>This month&apos;s {limit} {kind === "video" ? "reels" : "images"} are used up — they reset on the 1st.</Warn>
               ) : missing.length ? (
@@ -227,11 +228,13 @@ export function Composer({
               ) : (
                 <p className="mb-3 text-[13.5px] text-text-faint">Next the director shows you the plan — nothing is used from your allowance until you press Generate.</p>
               )}
-              <Button className="w-full" disabled={!data.status.allowed || !ready || left <= 0 || missing.length > 0 || brandMissing || busy === "plan"} onClick={plan}>
-                {busy === "plan" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
-                {busy === "plan" ? "The director is planning… (about 15 seconds)" : "Plan it with the director"}
-              </Button>
-              <Button variant="secondary" className="mt-2.5 w-full" onClick={() => setDemo("plan")}>
+              {data.status.allowed && ready && (
+                <Button className="w-full" disabled={left <= 0 || missing.length > 0 || brandMissing || busy === "plan"} onClick={plan}>
+                  {busy === "plan" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
+                  {busy === "plan" ? "The director is planning… (about 15 seconds)" : "Plan it with the director"}
+                </Button>
+              )}
+              <Button variant={data.status.allowed && ready ? "secondary" : "primary"} className={cn("w-full", data.status.allowed && ready && "mt-2.5")} onClick={() => setDemo("plan")}>
                 <Sparkles className="h-4 w-4" /> Try a free demo
               </Button>
             </>
@@ -444,7 +447,7 @@ function NeedField({
             {data.products.length > 8 && (
               <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search products" className="rounded-lg border border-border bg-panel-2 px-3 py-2 text-[13px] outline-none focus:border-accent/60" />
             )}
-            <div className="grid max-h-[260px] auto-rows-max grid-cols-3 gap-2.5 overflow-y-auto sm:grid-cols-4">
+            <div className="grid auto-rows-max grid-cols-3 gap-2.5 sm:grid-cols-4">
               {list.map((p) => (
                 <button
                   key={p.id}
